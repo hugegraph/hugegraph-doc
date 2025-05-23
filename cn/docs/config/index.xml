@@ -138,19 +138,63 @@
 &lt;div class="highlight">&lt;pre tabindex="0" style="background-color:#f8f8f8;-moz-tab-size:4;-o-tab-size:4;tab-size:4;">&lt;code class="language-fallback" data-lang="fallback">&lt;span style="display:flex;">&lt;span># bind url
 &lt;/span>&lt;/span>&lt;span style="display:flex;">&lt;span># could use &amp;#39;0.0.0.0&amp;#39; or specified (real)IP to expose external network access
 &lt;/span>&lt;/span>&lt;span style="display:flex;">&lt;span>restserver.url=http://127.0.0.1:8080
+&lt;/span>&lt;/span>&lt;span style="display:flex;">&lt;span>#restserver.enable_graphspaces_filter=false
 &lt;/span>&lt;/span>&lt;span style="display:flex;">&lt;span># gremlin server url, need to be consistent with host and port in gremlin-server.yaml
 &lt;/span>&lt;/span>&lt;span style="display:flex;">&lt;span>#gremlinserver.url=http://127.0.0.1:8182
 &lt;/span>&lt;/span>&lt;span style="display:flex;">&lt;span>
-&lt;/span>&lt;/span>&lt;span style="display:flex;">&lt;span># graphs list with pair NAME:CONF_PATH
-&lt;/span>&lt;/span>&lt;span style="display:flex;">&lt;span>graphs=[hugegraph:conf/hugegraph.properties]
+&lt;/span>&lt;/span>&lt;span style="display:flex;">&lt;span>graphs=./conf/graphs
 &lt;/span>&lt;/span>&lt;span style="display:flex;">&lt;span>
-&lt;/span>&lt;/span>&lt;span style="display:flex;">&lt;span># authentication
+&lt;/span>&lt;/span>&lt;span style="display:flex;">&lt;span># The maximum thread ratio for batch writing, only take effect if the batch.max_write_threads is 0
+&lt;/span>&lt;/span>&lt;span style="display:flex;">&lt;span>batch.max_write_ratio=80
+&lt;/span>&lt;/span>&lt;span style="display:flex;">&lt;span>batch.max_write_threads=0
+&lt;/span>&lt;/span>&lt;span style="display:flex;">&lt;span>
+&lt;/span>&lt;/span>&lt;span style="display:flex;">&lt;span># configuration of arthas
+&lt;/span>&lt;/span>&lt;span style="display:flex;">&lt;span>arthas.telnet_port=8562
+&lt;/span>&lt;/span>&lt;span style="display:flex;">&lt;span>arthas.http_port=8561
+&lt;/span>&lt;/span>&lt;span style="display:flex;">&lt;span>arthas.ip=127.0.0.1
+&lt;/span>&lt;/span>&lt;span style="display:flex;">&lt;span>arthas.disabled_commands=jad
+&lt;/span>&lt;/span>&lt;span style="display:flex;">&lt;span>
+&lt;/span>&lt;/span>&lt;span style="display:flex;">&lt;span># authentication configs
+&lt;/span>&lt;/span>&lt;span style="display:flex;">&lt;span># choose &amp;#39;org.apache.hugegraph.auth.StandardAuthenticator&amp;#39; or
+&lt;/span>&lt;/span>&lt;span style="display:flex;">&lt;span># &amp;#39;org.apache.hugegraph.auth.ConfigAuthenticator&amp;#39;
 &lt;/span>&lt;/span>&lt;span style="display:flex;">&lt;span>#auth.authenticator=
+&lt;/span>&lt;/span>&lt;span style="display:flex;">&lt;span>
+&lt;/span>&lt;/span>&lt;span style="display:flex;">&lt;span># for StandardAuthenticator mode
+&lt;/span>&lt;/span>&lt;span style="display:flex;">&lt;span>#auth.graph_store=hugegraph
+&lt;/span>&lt;/span>&lt;span style="display:flex;">&lt;span># auth client config
+&lt;/span>&lt;/span>&lt;span style="display:flex;">&lt;span>#auth.remote_url=127.0.0.1:8899,127.0.0.1:8898,127.0.0.1:8897
+&lt;/span>&lt;/span>&lt;span style="display:flex;">&lt;span>
+&lt;/span>&lt;/span>&lt;span style="display:flex;">&lt;span># for ConfigAuthenticator mode
 &lt;/span>&lt;/span>&lt;span style="display:flex;">&lt;span>#auth.admin_token=
 &lt;/span>&lt;/span>&lt;span style="display:flex;">&lt;span>#auth.user_tokens=[]
 &lt;/span>&lt;/span>&lt;span style="display:flex;">&lt;span>
+&lt;/span>&lt;/span>&lt;span style="display:flex;">&lt;span># TODO: Deprecated &amp;amp; removed later (useless from version 1.5.0)
+&lt;/span>&lt;/span>&lt;span style="display:flex;">&lt;span># rpc server configs for multi graph-servers or raft-servers
+&lt;/span>&lt;/span>&lt;span style="display:flex;">&lt;span>#rpc.server_host=127.0.0.1
+&lt;/span>&lt;/span>&lt;span style="display:flex;">&lt;span>#rpc.server_port=8091
+&lt;/span>&lt;/span>&lt;span style="display:flex;">&lt;span>#rpc.server_timeout=30
+&lt;/span>&lt;/span>&lt;span style="display:flex;">&lt;span>
+&lt;/span>&lt;/span>&lt;span style="display:flex;">&lt;span># rpc client configs (like enable to keep cache consistency)
+&lt;/span>&lt;/span>&lt;span style="display:flex;">&lt;span>#rpc.remote_url=127.0.0.1:8091,127.0.0.1:8092,127.0.0.1:8093
+&lt;/span>&lt;/span>&lt;span style="display:flex;">&lt;span>#rpc.client_connect_timeout=20
+&lt;/span>&lt;/span>&lt;span style="display:flex;">&lt;span>#rpc.client_reconnect_period=10
+&lt;/span>&lt;/span>&lt;span style="display:flex;">&lt;span>#rpc.client_read_timeout=40
+&lt;/span>&lt;/span>&lt;span style="display:flex;">&lt;span>#rpc.client_retries=3
+&lt;/span>&lt;/span>&lt;span style="display:flex;">&lt;span>#rpc.client_load_balancer=consistentHash
+&lt;/span>&lt;/span>&lt;span style="display:flex;">&lt;span>
+&lt;/span>&lt;/span>&lt;span style="display:flex;">&lt;span># raft group initial peers
+&lt;/span>&lt;/span>&lt;span style="display:flex;">&lt;span>#raft.group_peers=127.0.0.1:8091,127.0.0.1:8092,127.0.0.1:8093
+&lt;/span>&lt;/span>&lt;span style="display:flex;">&lt;span>
+&lt;/span>&lt;/span>&lt;span style="display:flex;">&lt;span># lightweight load balancing (beta)
 &lt;/span>&lt;/span>&lt;span style="display:flex;">&lt;span>server.id=server-1
 &lt;/span>&lt;/span>&lt;span style="display:flex;">&lt;span>server.role=master
+&lt;/span>&lt;/span>&lt;span style="display:flex;">&lt;span>
+&lt;/span>&lt;/span>&lt;span style="display:flex;">&lt;span># slow query log
+&lt;/span>&lt;/span>&lt;span style="display:flex;">&lt;span>log.slow_query_threshold=1000
+&lt;/span>&lt;/span>&lt;span style="display:flex;">&lt;span>
+&lt;/span>&lt;/span>&lt;span style="display:flex;">&lt;span># jvm(in-heap) memory usage monitor, set 1 to disable it
+&lt;/span>&lt;/span>&lt;span style="display:flex;">&lt;span>memory_monitor.threshold=0.85
+&lt;/span>&lt;/span>&lt;span style="display:flex;">&lt;span>memory_monitor.period=2000
 &lt;/span>&lt;/span>&lt;/code>&lt;/pre>&lt;/div>&lt;ul>
 &lt;li>restserver.url：RestServer 提供服务的 url，根据实际环境修改。如果其他 IP 地址无法访问，可以尝试修改为特定的地址；或修改为 &lt;code>http://0.0.0.0&lt;/code> 来监听来自任何 IP 地址的请求，这种方案较为便捷，但需要留意服务可被访问的网络范围；&lt;/li>
 &lt;li>graphs：RestServer 启动时也需要打开图，该项为 map 结构，key 是图的名字，value 是该图的配置文件路径；&lt;/li>
@@ -517,6 +561,16 @@
 &lt;td>exception.allow_trace&lt;/td>
 &lt;td>false&lt;/td>
 &lt;td>Whether to allow exception trace stack.&lt;/td>
+&lt;/tr>
+&lt;tr>
+&lt;td>memory_monitor.threshold&lt;/td>
+&lt;td>0.85&lt;/td>
+&lt;td>The threshold of JVM(in-heap) memory usage monitoring , 1 means disabling this function.&lt;/td>
+&lt;/tr>
+&lt;tr>
+&lt;td>memory_monitor.period&lt;/td>
+&lt;td>2000&lt;/td>
+&lt;td>The period in ms of JVM(in-heap) memory usage monitoring.&lt;/td>
 &lt;/tr>
 &lt;/tbody>
 &lt;/table>
@@ -1571,13 +1625,13 @@
 &lt;p>具体做法如下：&lt;/p>
 &lt;h4 id="1-采用-docker-run">1. 采用 docker run&lt;/h4>
 &lt;p>在 &lt;code>docker run&lt;/code> 中添加环境变量 &lt;code>PASSWORD=123456&lt;/code>（密码可以自由设置）即可开启鉴权模式：：&lt;/p>
-&lt;div class="highlight">&lt;pre tabindex="0" style="background-color:#f8f8f8;-moz-tab-size:4;-o-tab-size:4;tab-size:4;">&lt;code class="language-bash" data-lang="bash">&lt;span style="display:flex;">&lt;span>docker run -itd -e &lt;span style="color:#000">PASSWORD&lt;/span>&lt;span style="color:#ce5c00;font-weight:bold">=&lt;/span>&lt;span style="color:#0000cf;font-weight:bold">123456&lt;/span> --name&lt;span style="color:#ce5c00;font-weight:bold">=&lt;/span>server -p 8080:8080 hugegraph/hugegraph:1.2.0
+&lt;div class="highlight">&lt;pre tabindex="0" style="background-color:#f8f8f8;-moz-tab-size:4;-o-tab-size:4;tab-size:4;">&lt;code class="language-bash" data-lang="bash">&lt;span style="display:flex;">&lt;span>docker run -itd -e &lt;span style="color:#000">PASSWORD&lt;/span>&lt;span style="color:#ce5c00;font-weight:bold">=&lt;/span>&lt;span style="color:#0000cf;font-weight:bold">123456&lt;/span> --name&lt;span style="color:#ce5c00;font-weight:bold">=&lt;/span>server -p 8080:8080 hugegraph/hugegraph:1.5.0
 &lt;/span>&lt;/span>&lt;/code>&lt;/pre>&lt;/div>&lt;h4 id="2-采用-docker-compose">2. 采用 docker-compose&lt;/h4>
 &lt;p>使用 &lt;code>docker-compose&lt;/code> 在环境变量中设置 &lt;code>PASSWORD=123456&lt;/code>即可&lt;/p>
 &lt;div class="highlight">&lt;pre tabindex="0" style="background-color:#f8f8f8;-moz-tab-size:4;-o-tab-size:4;tab-size:4;">&lt;code class="language-yaml" data-lang="yaml">&lt;span style="display:flex;">&lt;span>&lt;span style="color:#204a87;font-weight:bold">version&lt;/span>&lt;span style="color:#000;font-weight:bold">:&lt;/span>&lt;span style="color:#f8f8f8;text-decoration:underline"> &lt;/span>&lt;span style="color:#4e9a06">&amp;#39;3&amp;#39;&lt;/span>&lt;span style="color:#f8f8f8;text-decoration:underline">
 &lt;/span>&lt;/span>&lt;/span>&lt;span style="display:flex;">&lt;span>&lt;span style="color:#f8f8f8;text-decoration:underline">&lt;/span>&lt;span style="color:#204a87;font-weight:bold">services&lt;/span>&lt;span style="color:#000;font-weight:bold">:&lt;/span>&lt;span style="color:#f8f8f8;text-decoration:underline">
 &lt;/span>&lt;/span>&lt;/span>&lt;span style="display:flex;">&lt;span>&lt;span style="color:#f8f8f8;text-decoration:underline"> &lt;/span>&lt;span style="color:#204a87;font-weight:bold">server&lt;/span>&lt;span style="color:#000;font-weight:bold">:&lt;/span>&lt;span style="color:#f8f8f8;text-decoration:underline">
-&lt;/span>&lt;/span>&lt;/span>&lt;span style="display:flex;">&lt;span>&lt;span style="color:#f8f8f8;text-decoration:underline"> &lt;/span>&lt;span style="color:#204a87;font-weight:bold">image&lt;/span>&lt;span style="color:#000;font-weight:bold">:&lt;/span>&lt;span style="color:#f8f8f8;text-decoration:underline"> &lt;/span>&lt;span style="color:#000">hugegraph/hugegraph:1.2.0&lt;/span>&lt;span style="color:#f8f8f8;text-decoration:underline">
+&lt;/span>&lt;/span>&lt;/span>&lt;span style="display:flex;">&lt;span>&lt;span style="color:#f8f8f8;text-decoration:underline"> &lt;/span>&lt;span style="color:#204a87;font-weight:bold">image&lt;/span>&lt;span style="color:#000;font-weight:bold">:&lt;/span>&lt;span style="color:#f8f8f8;text-decoration:underline"> &lt;/span>&lt;span style="color:#000">hugegraph/hugegraph:1.5.0&lt;/span>&lt;span style="color:#f8f8f8;text-decoration:underline">
 &lt;/span>&lt;/span>&lt;/span>&lt;span style="display:flex;">&lt;span>&lt;span style="color:#f8f8f8;text-decoration:underline"> &lt;/span>&lt;span style="color:#204a87;font-weight:bold">container_name&lt;/span>&lt;span style="color:#000;font-weight:bold">:&lt;/span>&lt;span style="color:#f8f8f8;text-decoration:underline"> &lt;/span>&lt;span style="color:#000">server&lt;/span>&lt;span style="color:#f8f8f8;text-decoration:underline">
 &lt;/span>&lt;/span>&lt;/span>&lt;span style="display:flex;">&lt;span>&lt;span style="color:#f8f8f8;text-decoration:underline"> &lt;/span>&lt;span style="color:#204a87;font-weight:bold">ports&lt;/span>&lt;span style="color:#000;font-weight:bold">:&lt;/span>&lt;span style="color:#f8f8f8;text-decoration:underline">
 &lt;/span>&lt;/span>&lt;/span>&lt;span style="display:flex;">&lt;span>&lt;span style="color:#f8f8f8;text-decoration:underline"> &lt;/span>- &lt;span style="color:#0000cf;font-weight:bold">8080&lt;/span>&lt;span style="color:#000;font-weight:bold">:&lt;/span>&lt;span style="color:#0000cf;font-weight:bold">8080&lt;/span>&lt;span style="color:#f8f8f8;text-decoration:underline">
