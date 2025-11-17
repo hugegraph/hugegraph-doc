@@ -210,7 +210,7 @@ POST http://localhost:8688/tasks/create
     "load.hg_pd_peers": "[\"<your-hugegraph-ip>:8686\"]",
     "load.hugegraph_name": "DEFAULT/hugegraph2/g",
     "load.hugegraph_username": "admin",
-    "load.hugegraph_password": "xxxxx",
+    "load.hugegraph_password": "<your-password-here>",
     "load.use_out_degree": "1",
     "load.use_outedge": "1"
   }
@@ -231,13 +231,13 @@ POST http://localhost:8688/tasks/create
     "load.type": "hdfs",
     "load.hdfs_namenode": "name_node1:9000",
     "load.hdfs_conf_path": "/path/to/conf",
-    "load.krb_realm": "admin",
-    "load.krb_name": "xxxxx",
-    "load.krb_keytab_path": "path",
-    "load.krb_conf_path": "path",
+    "load.krb_realm": "EXAMPLE.COM",
+    "load.krb_name": "user@EXAMPLE.COM",
+    "load.krb_keytab_path": "/path/to/keytab",
+    "load.krb_conf_path": "/path/to/krb5.conf",
     "load.hdfs_use_krb": "1",
-    "load.vertex_files": "/path/to/conf",
-    "load.edge_files": "/path/to/conf",
+    "load.vertex_files": "/data/graph/vertices",
+    "load.edge_files": "/data/graph/edges",
     "load.use_out_degree": "1",
     "load.use_outedge": "1"
   }
