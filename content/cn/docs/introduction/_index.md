@@ -32,6 +32,8 @@ HugeGraph 支持百亿以上的顶点和边的快速存储与查询，具备出�
 └────────────────────────────────────────────────────────────────────┘
 ```
 
+![Apache HugeGraph 全栈图系统生态全景图](/cn/docs/images/seatunnel/hugegraph-fullstack-ecosystem.png)
+
 ## HugeGraph Server（OLTP 图引擎）
 
 HugeGraph Server 是图数据库的 OLTP 引擎和服务入口，负责属性图建模、事务处理、查询执行和 API 接入。图数据实际保存在配置的 RocksDB、HStore 或 HBase 后端中。
