@@ -65,7 +65,7 @@ HugeGraph Toolchain 提供客户端、数据导入、可视化管理、Spark 集
 | [Loader](/cn/docs/quickstart/toolchain/hugegraph-loader/) | 从本地文件、HDFS、JDBC、Kafka 或其他图读取数据，转换为顶点和边后批量导入 HugeGraph |
 | [Hubble](/cn/docs/quickstart/toolchain/hugegraph-hubble/) | 提供图连接、Schema、数据导入、Gremlin 查询和图形化结果展示的 Web 管理界面 |
 | [Spark Connector](/cn/docs/quickstart/toolchain/hugegraph-spark-connector/) | 在 Spark 作业中批量读写 HugeGraph，适合大数据离线处理 |
-| [SeaTunnel Connector](/cn/docs/quickstart/toolchain/hugegraph-seatunnel-connector/) | 通过 SeaTunnel 在 HugeGraph 与外部数据系统之间同步数据 |
+| [SeaTunnel Connector](/cn/docs/quickstart/toolchain/hugegraph-seatunnel-connector/) | 提供 HugeGraph Sink；Source 目前随 SeaTunnel dev 分支预览 |
 | [Tools](/cn/docs/quickstart/toolchain/hugegraph-tools/) | 提供部署、图管理、备份恢复和 Gremlin 执行等命令行能力 |
 
 ## 图计算引擎（OLAP）
