@@ -34,4 +34,6 @@ GEMINI.md
 .aider*
 .gemini/
 WARP.md
-/.goal-task
+/.goal-task/*
+!/.goal-task/oink-site-improvements/
+!/.goal-task/oink-site-improvements/**
