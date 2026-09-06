@@ -93,7 +93,7 @@ graph.close()
 - 传入非空的 `graphspace` 字符串时直接开启 GraphSpace 模式。
 - 否则客户端会请求 `GET {url}/versions` 并读取 `versions.core`。
 - Server 版本低于 1.5.0 时抛出 `RuntimeError`，提示升级 Server 或改用 v1.3.x 客户端。
-- Server 版本高于 1.5.0 时会把 `graphspace` 设为 `DEFAULT` 并开启 GraphSpace 模式，同时在日志中打印警告。版本恰好为 1.5.0 时保持关闭。
+- 代码会在 `1.7.0+` 时把 `graphspace` 设为 `DEFAULT` 并开启 GraphSpace 模式，同时在日志中打印警告；1.5.0 和 1.6.x 仍保持关闭。
 - 若因网络原因探测失败，GraphSpace 模式保持关闭。
 
 该模式决定请求前缀：开启时为 `/graphspaces/<graphspace>/graphs/<graph>/...`，关闭时为 `/graphs/<graph>/...`。
@@ -283,7 +283,7 @@ metrics = client.metrics()
 metrics.get_all_basic_metrics()
 metrics.get_gauges_metrics()
 metrics.get_counters_metrics()
-metrics.get_histograms_metrics()
+metrics.get_histograms_metrics()   # 当前实现与 /metrics/gauges 共用同一路由
 metrics.get_meters_metrics()
 metrics.get_timers_metrics()
 metrics.get_statistics_metrics()
