@@ -27,7 +27,7 @@ ML 依赖在仓库根目录的 `[tool.uv] constraint-dependencies` 中固定版�
 | `numpy` | `~=1.24.4` |
 | `pandas` | `~=2.2.3` |
 
-上述约束安装的是 CPU 版本。每个任务都有 `gpu` 参数，默认值 `-1` 表示使用 CPU；只有自行安装 CUDA 版的 `torch` 和 `dgl` 之后，才可以传入设备编号。
+上述约束安装的是 CPU 版本。多数任务都支持 `gpu` 参数，默认值 `-1` 表示使用 CPU；只有自行安装 CUDA 版的 `torch` 和 `dgl` 之后，才可以传入设备编号。`NodeClassifyWithSample` 在当前实现中固定使用 CPU。
 
 ## 安装
 
@@ -138,7 +138,7 @@ hg2d = HugeGraph2DGL(
 
 `patience` 默认值为 `float("inf")`。`utils/early_stopping.py` 中的 `EarlyStopping` 可以监控 `loss` 或 `accuracy`，保存最优权重并在训练结束时恢复。
 
-## 可运行示例
+## 示例
 
 脚本位于 `hugegraph-ml/src/hugegraph_ml/examples/`。在 `hugegraph-ml/src` 目录下执行：
 
@@ -146,7 +146,7 @@ hg2d = HugeGraph2DGL(
 python ./hugegraph_ml/examples/dgi_example.py
 ```
 
-每个脚本同时提供同名函数，可以导入后用较小的 epoch 数调用。
+每个脚本通常都提供同名函数，可以导入后用较小的 epoch 数调用；如遇到前置依赖未对齐，部分脚本可能仍需先补齐数据与环境。
 
 | 脚本 | 模型 | 任务 | 读取的标签 |
 |---|---|---|---|
