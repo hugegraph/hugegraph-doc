@@ -578,6 +578,11 @@ pass. Before compaction, quota wait, handoff, or session end, update this file
 with gate progress, latest commit, validation/review evidence, active waits,
 uncommitted changes, and one next action.
 
+Every goal-task update is multi-branch: run `sync-branches.sh check` before
+resuming and `sync-branches.sh push` after committing goal-task changes, as
+defined in `handoff.md` "Multi-branch rule". A state change recorded on only
+one org branch is an incomplete checkpoint.
+
 ## Retry, waits, and recovery
 
 Try one failing item at most three times by default. Then record the exact
