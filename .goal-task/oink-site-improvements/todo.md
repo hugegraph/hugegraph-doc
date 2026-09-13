@@ -46,8 +46,16 @@ file after each productive loop; keep only counts and dependency summaries in
   route-byte equality, Chromium 32 with three expected PR-B-only skips, and
   visual 8/8. [PR #472](https://github.com/apache/hugegraph-doc/pull/472) is
   ready for review at the exact head.
-- [ ] Resume by checking CI run 33934549197 and required human review; merge
-  PR-A only when both are green, without override.
+- [x] Fix the four bitflicker64 review findings from the PR #472 review
+  thread (workflow contract test, hugo.sh reject machinery, hardcoded CN
+  strings with the dead `i18n/cn.yaml` catalogue, version-target scan cost)
+  on `hugegraph/hugegraph-doc handoff/oink-site-improvements` at
+  `71a6584f273ad295f76f2f2130481439bfff46e7`; validated (Python 122/122,
+  Node 24/24, links, strict latest/1.7 builds) with two clear review rounds.
+- [ ] Maintainer pulls `handoff/oink-site-improvements` into the apache
+  `feat/oink-core-platform` branch, then resume by checking exact-head CI
+  and required human review; merge PR-A only when both are green, without
+  override.
 
 ## Gate 2 — PR-B: Community and content experience
 

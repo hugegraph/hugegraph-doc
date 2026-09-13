@@ -17,6 +17,10 @@ goal on another host. Read files in this order:
 - Baseline `master`: `d88167dd797efafea50cec59909d57849703fde5`
 - PR-A branch: `feat/oink-core-platform`
 - PR-A exact head: `25f3e8c3f7982cbf1d08c4bda572e9da9add79eb`
+- Working copy with direct write access:
+  `https://github.com/hugegraph/hugegraph-doc.git`
+  branch `handoff/oink-site-improvements` (this branch). Review fixes land
+  here first; the maintainer pulls them into the apache PR-A branch.
 - PR-A: <https://github.com/apache/hugegraph-doc/pull/472>
 - PR-A CI run: <https://github.com/apache/hugegraph-doc/actions/runs/33934549197>
   — all jobs passed; required human review is still pending.

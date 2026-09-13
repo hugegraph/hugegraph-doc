@@ -56,6 +56,30 @@ Unattended authority confirmed by the user:
 
 ## Current exact-head checkpoint
 
+2026-09-13 review-fix checkpoint (destination host, org repository):
+
+- Working branch moved to `hugegraph/hugegraph-doc`
+  `handoff/oink-site-improvements`. Commit
+  `71a6584f273ad295f76f2f2130481439bfff46e7` on top of `bba8d83` fixes all
+  four bitflicker64 review findings on PR #472: the workflow contract test is
+  reduced to a hardened write-permission invariant, the hugo.sh reject
+  machinery is deleted with its three tests (one flag-beats-env alignment
+  test added), the Ask AI / version-fallback strings go through `T` with
+  `i18n/cn.yaml` renamed to `i18n/zh-CN.yaml` (the site CN catalogue was
+  silently unresolved because Hugo matches translations by locale), and the
+  version-target route lookup is cached per page with an early break.
+- Validation at that head: Python 122/122 (python3.12), Node 24/24
+  (tests/ui-ai plus workflow contract), `bash dist/validate-links.sh` pass,
+  strict wrapper production builds for latest and 1.7 with zero
+  MISSING_TRANSLATION warnings (Hugo 0.166.0 extended locally; CI pins
+  0.165.0). Two independent read-only review rounds: round 1 raised one
+  Important (write-scope guard) and three Minor findings, all fixed; round 2
+  re-review CLEAR.
+- The apache PR #472 branch still points at `25f3e8c`; the maintainer pulls
+  these commits into `feat/oink-core-platform` before the merge review.
+  Chromium E2E and the full five-version aggregate were not rerun on this
+  host; exact-head CI reruns when the apache branch advances.
+
 Latest authoritative checkpoint at pause:
 
 - PR-A is clean and pushed at
