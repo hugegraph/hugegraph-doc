@@ -11,6 +11,31 @@ goal on another host. Read files in this order:
 5. `pr-a-body.md` and `pr-b-body.md` — prepared GitHub descriptions.
 6. `evidence/` — retained design and browser screenshots.
 
+## Multi-branch rule (read before any work)
+
+All work is committed to `https://github.com/hugegraph/hugegraph-doc`; the
+maintainer pushes finished branches to ASF at the end. Each deliverable has
+its own org branch, and every branch carries this same goal-task directory:
+
+| Branch | Deliverable |
+| --- | --- |
+| `handoff/oink-site-improvements` | PR-A core platform and its review fixes |
+| `feat/oink-download-asf` | PR-C ASF download page (built on the handoff branch) |
+
+The goal-task directory must stay identical on every branch, so an agent
+resuming from any one of them sees the whole state:
+
+1. Before resuming: `sh .goal-task/oink-site-improvements/sync-branches.sh check`.
+   If another branch holds newer state, run `pull <branch>` first.
+2. After committing any change under this directory:
+   `sh .goal-task/oink-site-improvements/sync-branches.sh push`.
+   It copies only the goal-task files to the other branches, never code.
+3. When a new deliverable branch is created, add it to the table above and
+   to `BRANCHES` in `sync-branches.sh`, then push the sync.
+
+Code moves between branches only by merge: phase-1 changes on the handoff
+branch are merged into `feat/oink-download-asf` when they land.
+
 ## Remote checkpoint
 
 - Repository: `https://github.com/apache/hugegraph-doc.git`
