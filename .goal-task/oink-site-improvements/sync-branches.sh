@@ -36,6 +36,12 @@ last_goal_commit_time() {
   git log -1 --format=%ct "$1" -- "$DIR"
 }
 
+# Drop the goal-task entries from the index named by GIT_INDEX_FILE (or the
+# default index) without consulting the working tree.
+drop_goal_entries() {
+  git ls-files -z -- "$DIR" | xargs -0 git update-index --force-remove --
+}
+
 current_branch=$(git rev-parse --abbrev-ref HEAD)
 mode=${1:-check}
 
@@ -64,7 +70,7 @@ case "$mode" in
   pull)
     source_branch=${2:?usage: sync-branches.sh pull <branch>}
     fetch
-    git rm -r -q --cached -- "$DIR"
+    drop_goal_entries
     git read-tree --prefix="${DIR}/" "refs/handoff-sync/${source_branch}:${DIR}"
     git checkout -- "$DIR"
     if git diff --cached --quiet -- "$DIR"; then
@@ -97,10 +103,14 @@ case "$mode" in
         exit 1
       fi
       index=$(mktemp)
-      GIT_INDEX_FILE=$index git read-tree "$ref"
-      GIT_INDEX_FILE=$index git rm -r -q --cached -- "$DIR"
-      GIT_INDEX_FILE=$index git read-tree --prefix="${DIR}/" "HEAD:${DIR}"
-      tree=$(GIT_INDEX_FILE=$index git write-tree)
+      tree=$(
+        GIT_INDEX_FILE=$index
+        export GIT_INDEX_FILE
+        git read-tree "$ref"
+        drop_goal_entries
+        git read-tree --prefix="${DIR}/" "HEAD:${DIR}"
+        git write-tree
+      )
       rm -f "$index"
       commit=$(printf 'docs(goal): sync goal-task state from %s\n' "$current_branch" \
         | git commit-tree "$tree" -p "$ref")
