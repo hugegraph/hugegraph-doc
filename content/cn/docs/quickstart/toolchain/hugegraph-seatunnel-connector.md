@@ -176,6 +176,10 @@ sink {
           label = "person"
           idFields = ["target_name"]
         }
+        fieldMapping = {
+          source_name = "name"
+          target_name = "name"
+        }
         properties = ["since"]
       }
     ]
@@ -197,7 +201,7 @@ sink {
 g.V().has('person', 'name', 'marko').outE('knows').where(inV().has('name', 'vadas')).valueMap()
 ```
 
-`sourceConfig` 和 `targetConfig` 指定端点字段，`properties = ["since"]` 只写边属性。示例启用 `check_vertex = true`，并关闭失败后逐条跳过的回退（`batch_failure_fallback = false`）；端点不存在或写入失败时，任务会报错。
+`sourceConfig` 和 `targetConfig` 指定端点字段，`fieldMapping` 将它们对应到顶点主键 `name`，`properties = ["since"]` 只写边属性。示例启用 `check_vertex = true`，并关闭失败后逐条跳过的回退（`batch_failure_fallback = false`）；端点不存在或写入失败时，任务会报错。
 
 如果关系表只有数字外键，而图的主键使用姓名，请先在 SQL 中关联出姓名，再交给 Sink。MySQL CDC 接入方式见 [MySQL CDC Source](https://seatunnel.apache.org/docs/connectors/source/MySQL-CDC/)。
 
@@ -404,7 +408,7 @@ sink {
 | `batch_size` | 单批记录数，默认 500 |
 | `env.sink.flush.interval` | Zeta 定时刷新间隔，单位毫秒 |
 | `check_vertex` | 写边时检查端点，本文的边任务设为 `true` |
-| `batch_failure_fallback` | 默认失败后降级逐条写入并允许跳过失败记录；本文设为 `false`，便于发现错误 |
+| `batch_failure_fallback` | 默认 `false`，批量失败会使任务失败；设为 `true` 才启用逐条回退并允许跳过失败记录 |
 
 遇到问题时可按下面检查：
 
