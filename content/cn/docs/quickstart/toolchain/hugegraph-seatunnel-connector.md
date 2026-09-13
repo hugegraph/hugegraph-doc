@@ -8,7 +8,7 @@ SeaTunnel 可以把数据库、Kafka 等数据源接入 HugeGraph，也可以在
 
 > **版本要求：本文面向 SeaTunnel 3.0+（dev 分支）**，所有示例使用 `mappings`。SeaTunnel **2.3.13 只有 HugeGraph Sink**，使用旧的 `schema_config`，不能直接运行本文配置。
 
-![SeaTunnel 数据导入与图迁移：3.0+ dev 支持 Source 和 Sink，2.3.13 仅支持 Sink](/cn/docs/images/seatunnel/seatunnel-data-flow-en.png)
+![Loader 用图映射直接导入 HugeGraph；SeaTunnel 3.0+ dev 组合 Source、Transform、Sink，二者都支持 JDBC、Kafka 和图数据](/cn/docs/images/seatunnel/seatunnel-vs-loader-en.png)
 
 ## 1 与 Loader 的区别及版本要求
 
@@ -67,6 +67,8 @@ git checkout 35b2716cde7d4c91a24fc618a8d9cae90e213db3
 ## 3 从关系库导入（sql2graph）
 
 用两个任务完成导入：先把 `person` 表写成顶点，再把 `knows` 表写成边。这样写边时，两个端点都已经存在。
+
+![person 表生成 marko 和 vadas 顶点，knows 表通过端点字段生成 since 为 2010 的有向边](/cn/docs/images/seatunnel/seatunnel-records-to-graph-en.png)
 
 ### 3.1 导入顶点
 
@@ -276,6 +278,8 @@ HugeGraph Sink 是 **at-least-once（至少一次）** 写入，故障恢复可�
 
 这两个任务只迁移指定标签和属性，不会完整复制源图的索引、TTL 等全部 Schema 配置。运行期间应暂停源图写入，避免两个任务读到不同时间的数据；完成后核对顶点、边数量及抽样属性。
 
+![重建主键可能把 1:marko 变为 2:marko；使用 CUSTOMIZE_STRING 保留原 ID 后，边端点仍能找到对应顶点](/cn/docs/images/seatunnel/seatunnel-preserve-ids-en.png)
+
 ### 5.1 先迁移顶点
 
 Source 自动补充 `~id` 保留列，Sink 把原 ID 作为字符串保存。无需在 `schema.fields` 中声明 `~id`，手动声明保留列会被拒绝。
@@ -424,6 +428,8 @@ sink {
 ## 7 选型小结
 
 选工具时，先看要完成的工作：图管理、Gremlin、备份或克隆可用 [Tools](/cn/docs/quickstart/toolchain/hugegraph-tools/)；直接导入图可先看 [Loader](/cn/docs/quickstart/toolchain/hugegraph-loader/)；需要复用 Source、Transform、Sink 管道时选 SeaTunnel。使用 SeaTunnel 的图读取和迁移能力时，请按本文的 3.0+ dev 版本准备环境。
+
+![选型总结：图管理用 Tools，直接导入用 Loader，复用数据管道用 SeaTunnel](/cn/docs/images/seatunnel/seatunnel-tool-choice-en.png)
 
 ## 8 参考文档
 
