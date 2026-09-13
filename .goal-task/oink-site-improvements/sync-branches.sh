@@ -59,7 +59,11 @@ case "$mode" in
       if [ "$tree" = "$head_tree" ]; then state=identical; else state=DIFFERS; fi
       printf '%-36s %s %s last goal-task commit %s\n' "$b" \
         "$(git rev-parse --short "$ref")" "$state" "$(git log -1 --format=%cI "$ref" -- "$DIR")"
-      if [ "$time" -gt "$newest_time" ]; then newest=$b; newest_time=$time; fi
+      # A sync commit is newer but identical; only differing state can win.
+      if [ "$state" = DIFFERS ] && [ "$time" -gt "$newest_time" ]; then
+        newest=$b
+        newest_time=$time
+      fi
     done
     if [ "$newest" = HEAD ]; then
       echo "HEAD (${current_branch}) holds the newest goal-task state."
