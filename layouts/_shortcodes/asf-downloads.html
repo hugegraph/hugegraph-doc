@@ -1,0 +1,5 @@
+{{- /* {{< asf-downloads latest >}} or {{< asf-downloads archived >}}:
+     ASF release download tables driven by data/downloads/asf.json. */ -}}
+{{- $mode := "all" -}}
+{{- if .Params -}}{{- $mode = .Get 0 -}}{{- end -}}
+{{- partial "asf-downloads.html" (dict "page" .Page "mode" $mode "position" .Position) -}}

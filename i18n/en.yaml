@@ -4,3 +4,17 @@ ui_ask_ai_description: Powered by Kapa; only your question is sent.
 ui_ask_ai_latest: Answers use the latest documentation
 ui_retry: Retry
 ui_ai_error: AI is temporarily unavailable. Local search is unaffected.
+download_release_version: Version
+download_release_date: Release Date
+download_release_notes: Release Notes
+download_table_component: Component
+download_table_type: Type
+download_table_mirror: Download (ASF mirror)
+download_type_binary: Binary
+download_type_source: Source
+download_component_server: Server
+download_component_toolchain: Toolchain
+download_component_ai: AI
+download_component_computer: Computer
+download_component_commons: Common
+download_asf_note: All packages above are official Apache Software Foundation releases served from ASF mirrors, with signatures and checksums hosted on downloads.apache.org. Source archives generated automatically by GitHub are not ASF releases.

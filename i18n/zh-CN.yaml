@@ -240,3 +240,17 @@ ui_ask_ai_description: 由 Kapa 提供；仅发送你的问题。
 ui_ask_ai_latest: 回答基于 latest 文档
 ui_retry: 重试
 ui_ai_error: AI 暂时不可用，本地搜索不受影响。
+download_release_version: 版本
+download_release_date: 发布日期
+download_release_notes: 发布说明
+download_table_component: 组件
+download_table_type: 类型
+download_table_mirror: 下载 (ASF 镜像)
+download_type_binary: 二进制
+download_type_source: 源码
+download_component_server: Server
+download_component_toolchain: Toolchain
+download_component_ai: AI
+download_component_computer: Computer
+download_component_commons: Common
+download_asf_note: 以上安装包均为 Apache 软件基金会正式发布版本，通过 ASF 镜像分发，签名与校验和托管在 downloads.apache.org。GitHub 自动生成的源码归档不是 ASF 正式发布版本。
