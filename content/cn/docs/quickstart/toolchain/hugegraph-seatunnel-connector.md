@@ -10,13 +10,17 @@ SeaTunnel 可以把数据库、Kafka 等数据源接入 HugeGraph，也可以在
 
 ![SeaTunnel 数据导入与图迁移：3.0+ dev 支持 Source 和 Sink，2.3.13 仅支持 Sink](/cn/docs/images/seatunnel/seatunnel-data-flow-en.png)
 
-## 1 选择工具和版本
+## 1 与 Loader 的区别及版本要求
 
-| 你的任务 | 适合的工具 |
-| --- | --- |
-| 从文件、HDFS、关系库等批量导入数据，希望少部署组件 | [HugeGraph-Loader](/cn/docs/quickstart/toolchain/hugegraph-loader/) |
-| 管理图、执行 Gremlin、备份恢复或图克隆 | [HugeGraph-Tools](/cn/docs/quickstart/toolchain/hugegraph-tools/) |
-| 接入多种数据源、转换字段，或复用已有的批处理和流处理任务 | SeaTunnel |
+[HugeGraph-Loader](/cn/docs/quickstart/toolchain/hugegraph-loader/) 面向图数据导入，用输入源和图映射描述“哪些记录变成哪些顶点或边”。SeaTunnel 则把任务组织成 **Source → Transform → Sink**，适合复用已有的连接器、转换步骤和数据处理管道。
+
+| 对比点 | HugeGraph-Loader | SeaTunnel |
+| --- | --- | --- |
+| 任务配置 | JSON 映射文件，描述输入源、顶点和边 | HOCON 作业文件，组合 Source、Transform 和 Sink |
+| 适合的需求 | 直接把数据导入 HugeGraph，字段和值映射已能满足需求 | 把 HugeGraph 接入已有 SeaTunnel 管道，或复用其连接器与转换组件 |
+| 运行准备 | 使用 Loader 工具；也提供 Spark Loader、Flink CDC 集成 | 准备匹配版本的引擎和连接器；本文使用 Zeta local 模式 |
+
+**不要只按数据源或批量/流式来选。** 两者都支持 JDBC、Kafka 和图数据，Loader 也有字段/值映射、Spark 与 Flink CDC 集成。直接导入图时可先用 Loader；如果已经有 SeaTunnel 作业，通常在原管道中接入 HugeGraph 更方便。
 
 新建 SeaTunnel 任务建议使用 3.0+ 的开发分支和 `mappings`。本文按 dev 提交 [`35b2716`](https://github.com/apache/seatunnel/commit/35b2716cde7d4c91a24fc618a8d9cae90e213db3) 核对；这里的 3.0+ 指开发版本，不能仅凭文档中的版本号认定某个发行包已包含这些功能。获取更新的 dev 后，请一并核对连接器配置。
 
@@ -417,7 +421,11 @@ sink {
 - **Schema 不兼容**：检查标签的 ID 策略、属性类型和边端点。自动创建不会把已有 `PRIMARY_KEY` 标签改成 `CUSTOMIZE_STRING`。
 - **Kafka 少量数据未及时出现**：确认使用 Zeta，并在 `env` 中设置 `sink.flush.interval`。当前 dev 的 `batch_interval_ms` 仅为兼容保留，不能代替它。
 
-## 7 参考文档
+## 7 选型小结
+
+选工具时，先看要完成的工作：图管理、Gremlin、备份或克隆可用 [Tools](/cn/docs/quickstart/toolchain/hugegraph-tools/)；直接导入图可先看 [Loader](/cn/docs/quickstart/toolchain/hugegraph-loader/)；需要复用 Source、Transform、Sink 管道时选 SeaTunnel。使用 SeaTunnel 的图读取和迁移能力时，请按本文的 3.0+ dev 版本准备环境。
+
+## 8 参考文档
 
 - [HugeGraph Sink（本文核对的 dev）](https://github.com/apache/seatunnel/blob/35b2716cde7d4c91a24fc618a8d9cae90e213db3/docs/zh/connectors/sink/HugeGraph.md)
 - [HugeGraph Source（本文核对的 dev）](https://github.com/apache/seatunnel/blob/35b2716cde7d4c91a24fc618a8d9cae90e213db3/docs/zh/connectors/source/HugeGraph.md)
