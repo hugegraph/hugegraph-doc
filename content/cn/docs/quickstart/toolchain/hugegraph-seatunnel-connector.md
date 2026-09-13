@@ -8,7 +8,7 @@ SeaTunnel 可以把数据库、Kafka 等数据源接入 HugeGraph，也可以在
 
 > **版本要求：本文面向 SeaTunnel 3.0+（dev 分支）**，所有示例使用 `mappings`。SeaTunnel **2.3.13 只有 HugeGraph Sink**，使用旧的 `schema_config`，不能直接运行本文配置。
 
-![SeaTunnel 数据导入与图迁移：3.0+ dev 支持 Source 和 Sink，2.3.13 仅支持 Sink](/cn/docs/images/seatunnel/seatunnel-overview.png)
+![SeaTunnel 数据导入与图迁移：3.0+ dev 支持 Source 和 Sink，2.3.13 仅支持 Sink](/cn/docs/images/seatunnel/seatunnel-data-flow-en.png)
 
 ## 1 选择工具和版本
 
