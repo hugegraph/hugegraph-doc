@@ -17,4 +17,5 @@ download_component_toolchain: Toolchain
 download_component_ai: AI
 download_component_computer: Computer
 download_component_commons: Common
-download_asf_note: All packages above are official Apache Software Foundation releases served from ASF mirrors, with signatures and checksums hosted on downloads.apache.org. Source archives generated automatically by GitHub are not ASF releases.
+download_asf_note: All packages on this page are official Apache Software Foundation releases served from ASF mirrors, with signatures and checksums hosted on downloads.apache.org. Source archives generated automatically by GitHub are not ASF releases.
+ui_assets_download: Download asset

@@ -253,4 +253,4 @@ download_component_toolchain: Toolchain
 download_component_ai: AI
 download_component_computer: Computer
 download_component_commons: Common
-download_asf_note: 以上安装包均为 Apache 软件基金会正式发布版本，通过 ASF 镜像分发，签名与校验和托管在 downloads.apache.org。GitHub 自动生成的源码归档不是 ASF 正式发布版本。
+download_asf_note: 本页所列软件包均为 Apache 软件基金会正式发布版本，通过 ASF 镜像分发，签名与校验和托管在 downloads.apache.org。GitHub 自动生成的源码归档不是 ASF 正式发布版本。

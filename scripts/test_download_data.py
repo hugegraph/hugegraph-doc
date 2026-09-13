@@ -6,6 +6,7 @@ import unittest
 
 ROOT = pathlib.Path(__file__).resolve().parents[1]
 DATA = ROOT / "data" / "downloads" / "asf.json"
+PARTIAL = ROOT / "layouts" / "_partials" / "asf-downloads.html"
 PAGES = (
     ROOT / "content" / "en" / "docs" / "download" / "download.md",
     ROOT / "content" / "cn" / "docs" / "download" / "download.md",
@@ -61,6 +62,7 @@ EXPECTED_ARTIFACTS = {
 }
 
 FIXED_I18N_KEYS = (
+    "ui_assets_download",
     "download_release_version",
     "download_release_date",
     "download_release_notes",
@@ -80,10 +82,11 @@ def load_data() -> dict:
 
 def derive_files(release: dict, components: dict) -> set[str]:
     files = set()
+    infix = "-incubating" if release["incubating"] else ""
     for kind, suffix in (("binary", ""), ("source", "-src")):
         for component_id in release.get(kind, []):
             prefix = components[component_id]["prefix"]
-            files.add(f"{prefix}-{release['version']}{suffix}.tar.gz")
+            files.add(f"{prefix}{infix}-{release['version']}{suffix}.tar.gz")
     return files
 
 
@@ -101,12 +104,16 @@ class DownloadDataTest(unittest.TestCase):
 
     def test_schema_and_release_ordering(self) -> None:
         data = self.data
+        self.assertEqual(
+            set(data), {"$comment", "dist_path", "components", "releases"}
+        )
         self.assertEqual(data["dist_path"], "hugegraph")
-        self.assertTrue(data["keys_url"].startswith("https://downloads.apache.org/"))
+        label_keys = [c["label_key"] for c in data["components"].values()]
+        self.assertEqual(len(label_keys), len(set(label_keys)))
         for component_id, component in data["components"].items():
-            self.assertRegex(component_id, r"^[a-z][a-z0-9]*$")
-            self.assertRegex(component["prefix"], r"^apache-hugegraph[a-z-]*-incubating$")
-            self.assertRegex(component["label_key"], r"^download_component_[a-z]+$")
+            self.assertRegex(component_id, r"^[a-z][a-z0-9]*\Z")
+            self.assertRegex(component["prefix"], r"^apache-hugegraph(-[a-z]+)?\Z")
+            self.assertRegex(component["label_key"], r"^download_component_[a-z]+\Z")
         releases = data["releases"]
         versions = [release["version"] for release in releases]
         self.assertEqual(versions, sorted(versions, key=lambda v: tuple(map(int, v.split("."))), reverse=True))
@@ -114,8 +121,9 @@ class DownloadDataTest(unittest.TestCase):
         self.assertEqual(sum(1 for release in releases if release.get("latest")), 1)
         self.assertTrue(releases[0].get("latest"), "the newest release must be the latest")
         for release in releases:
-            self.assertRegex(release["version"], r"^\d+\.\d+\.\d+$")
-            self.assertRegex(release["date"], r"^\d{4}-\d{2}-\d{2}$")
+            self.assertRegex(release["version"], r"^\d+\.\d+\.\d+\Z")
+            self.assertRegex(release["date"], r"^\d{4}-\d{2}-\d{2}\Z")
+            self.assertIsInstance(release["incubating"], bool)
             for kind in ("binary", "source"):
                 ids = release.get(kind, [])
                 self.assertTrue(ids, f"{release['version']} has no {kind} artifacts")
@@ -160,6 +168,21 @@ class DownloadDataTest(unittest.TestCase):
                 r"downloads\.apache\.org/hugegraph/\d", text
             )
             self.assertEqual(artifact_links, [], page)
+
+    def test_partial_derives_urls_with_the_same_tokens(self) -> None:
+        # The partial re-derives the same filenames and URLs in Go templates;
+        # lock its literal format tokens to this module's derivation so the
+        # two cannot drift apart silently.
+        template = PARTIAL.read_text(encoding="utf-8")
+        for token in (
+            '"-incubating" ""',
+            '"-src" ""',
+            '"%s%s-%s%s.tar.gz" $component.prefix $infix $version $suffix',
+            'https://www.apache.org/dyn/closer.lua/%s/%s/%s?action=download',
+            'https://downloads.apache.org/%s/%s/%s.asc',
+            'https://downloads.apache.org/%s/%s/%s.sha512',
+        ):
+            self.assertIn(token, template)
 
     def test_i18n_catalogues_carry_every_label(self) -> None:
         data = self.data

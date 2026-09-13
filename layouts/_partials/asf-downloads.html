@@ -5,12 +5,13 @@
      build via errorf so a broken table can never publish silently.
 
      mode: "latest" renders the one latest release, "archived" renders the
-     rest, "all" renders everything. */ -}}
+     rest. The mode is required so a page cannot render duplicate sections
+     (and duplicate element ids) by accident. */ -}}
 {{- $page := .page -}}
-{{- $mode := .mode | default "all" -}}
+{{- $mode := .mode -}}
 {{- $position := .position | default $page.Path -}}
-{{- if not (in (slice "latest" "archived" "all") $mode) -}}
-  {{- errorf "%s: asf-downloads mode must be latest, archived, or all; got %q" $position $mode -}}
+{{- if not (in (slice "latest" "archived") $mode) -}}
+  {{- errorf "%s: asf-downloads mode must be latest or archived; got %q" $position $mode -}}
 {{- end -}}
 {{- $data := index (index hugo.Data "downloads" | default dict) "asf" | default dict -}}
 {{- $dist := $data.dist_path | default "" -}}
@@ -22,13 +23,14 @@
 {{- $selected := slice -}}
 {{- range $releases -}}
   {{- $isLatest := .latest | default false -}}
-  {{- if or (eq $mode "all") (and (eq $mode "latest") $isLatest) (and (eq $mode "archived") (not $isLatest)) -}}
+  {{- if or (and (eq $mode "latest") $isLatest) (and (eq $mode "archived") (not $isLatest)) -}}
     {{- $selected = $selected | append . -}}
   {{- end -}}
 {{- end -}}
 {{- range $release := $selected -}}
 {{- $version := $release.version -}}
 {{- if not $version -}}{{- errorf "%s: asf-downloads release without a version" $position -}}{{- end -}}
+{{- $infix := cond ($release.incubating | default false) "-incubating" "" -}}
 {{- $rows := slice -}}
 {{- range $kind := slice "binary" "source" -}}
   {{- range $componentID := index $release $kind | default slice -}}
@@ -36,8 +38,11 @@
     {{- if not $component -}}
       {{- errorf "%s: asf-downloads release %s references unknown component %q" $position $version $componentID -}}
     {{- end -}}
+    {{- if not (and $component.prefix $component.label_key) -}}
+      {{- errorf "%s: asf-downloads component %q must define prefix and label_key" $position $componentID -}}
+    {{- end -}}
     {{- $suffix := cond (eq $kind "source") "-src" "" -}}
-    {{- $file := printf "%s-%s%s.tar.gz" $component.prefix $version $suffix -}}
+    {{- $file := printf "%s%s-%s%s.tar.gz" $component.prefix $infix $version $suffix -}}
     {{- $rows = $rows | append (dict
       "label" (T $component.label_key)
       "kind" $kind
