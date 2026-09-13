@@ -90,6 +90,7 @@ MARKDOWN_DESTINATION_RE = re.compile(
     r"(?P<open>\]\(\s*<?)(?P<url>(?:https?://[^\s)>]+|/[^\s)>]+))(?P<close>>?[^)]*\))"
 )
 HREFLANG_FALLBACKS = {
+    "cn/docs/quickstart/toolchain/hugegraph-seatunnel-connector/index.html": {"en-US": "/"},
     "cn/docs/changelog/hugegraph-0.12.0-release-notes/index.html": {"en-US": "/"},
     "community/maturity/index.html": {"zh-CN": "/cn/"},
 }

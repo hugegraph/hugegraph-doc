@@ -754,13 +754,19 @@ class VersionUrlTest(unittest.TestCase):
                 {"publishPath": "versions/1.5"},
             ]
         }
-        relative = "cn/docs/changelog/hugegraph-0.12.0-release-notes/index.html"
-        for publish_path, expected_url in (
-            ("", "/"),
-            ("versions/1.7", f"{STAGING_ORIGIN}versions/1.7/"),
-            ("versions/1.5", f"{STAGING_ORIGIN}versions/1.5/"),
+        for relative, publish_path, expected_url in (
+            (relative, publish_path, expected_url)
+            for relative in (
+                "cn/docs/changelog/hugegraph-0.12.0-release-notes/index.html",
+                "cn/docs/quickstart/toolchain/hugegraph-seatunnel-connector/index.html",
+            )
+            for publish_path, expected_url in (
+                ("", "/"),
+                ("versions/1.7", f"{STAGING_ORIGIN}versions/1.7/"),
+                ("versions/1.5", f"{STAGING_ORIGIN}versions/1.5/"),
+            )
         ):
-            with self.subTest(publish_path=publish_path):
+            with self.subTest(relative=relative, publish_path=publish_path):
                 with tempfile.TemporaryDirectory() as temp_name:
                     output = Path(temp_name)
                     page = output / relative
@@ -779,7 +785,7 @@ class VersionUrlTest(unittest.TestCase):
                                     {
                                         "id": "zh-CN",
                                         "active": True,
-                                        "url": "/cn/docs/changelog/",
+                                        "url": "/" + relative.removesuffix("index.html"),
                                     },
                                 ],
                             }
