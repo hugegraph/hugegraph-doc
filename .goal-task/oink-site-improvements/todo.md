@@ -125,17 +125,24 @@ file after each productive loop; keep only counts and dependency summaries in
   Both languages duplicate 31 ASF artifacts and 93 release links; OINK v1.0.0
   is GitHub-release-specific and has no ASC field, so PR-C needs a narrow ASF
   data contract and site adapter.
-- [ ] After first-phase stability, create the direct Apache PR-C branch from
-  refreshed `master`.
-- [ ] Inventory duplicated EN/CN download facts and define the single
-  data-source contract without rewriting unrelated documentation.
-- [ ] Implement the OINK download/checksum experience for ASF mirrors, official
-  source artifacts, ASC, and SHA512.
-- [ ] Ensure GitHub-generated source archives are never labeled as ASF official
-  releases.
-- [ ] Validate EN/CN parity, rendered links/artifacts, responsive browser
+- [x] Stability gate lifted by the maintainer on 2026-09-13. PR-C lives on
+  `hugegraph/hugegraph-doc` branch `feat/oink-download-asf`, cut from the
+  handoff head `82e9689`; phase-1 changes merge in later.
+- [x] Inventory duplicated EN/CN download facts and define the single
+  data-source contract (`data/downloads/asf.json`) without rewriting
+  unrelated documentation.
+- [x] Implement the ASF download experience with mirror, official source
+  artifact, ASC, and SHA512 links through the `asf-downloads` shortcode and
+  site partial over the OINK asset table shell.
+- [x] Ensure GitHub-generated source archives are never labeled as ASF
+  official releases (explicit note in both languages).
+- [x] Validate EN/CN parity, rendered links/artifacts, responsive browser
   behavior, accessibility, three independent reviews, fixes, and re-review;
-  then commit, push, and open PR-C.
+  commit and push to the org branch (head `892ba2b`, evidence in
+  `state.md`).
+- [ ] Maintainer opens the apache PR-C from `feat/oink-download-asf` (or
+  pulls it into an apache branch); exact-head CI then runs the five-version
+  aggregate and full Chromium matrix.
 
 ## Gate 6 — GitHub issue and design evidence
 

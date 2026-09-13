@@ -56,6 +56,46 @@ Unattended authority confirmed by the user:
 
 ## Current exact-head checkpoint
 
+2026-09-14 PR-C checkpoint (destination host, org repository):
+
+- The maintainer lifted the first-phase stability gate for PR-C on
+  2026-09-13: if phase 1 changes, this branch merges them later; avoid
+  blocking waits. PR-C therefore proceeds without waiting for #472.
+- PR-C branch `feat/oink-download-asf` on `hugegraph/hugegraph-doc`, cut
+  from `handoff/oink-site-improvements` head `82e9689`, head
+  `892ba2b8359639c1ac8dd140296f9b54693ed407` (plus this state commit).
+  `data/downloads/asf.json` is the single ASF download data source for EN
+  and CN: dist path, component base prefixes, and per-release
+  version/date/latest/incubating/binary/source sets. The
+  `asf-downloads` shortcode and `layouts/_partials/asf-downloads.html`
+  derive ASF mirror (`closer.lua ... ?action=download`), `.asc`, and
+  `.sha512` links, reuse the OINK `td-asset-list` table shell, localize
+  every label, link per-language release notes, and state in both
+  languages that GitHub auto-generated source archives are not ASF
+  releases. Malformed data, unknown or incomplete components, and a
+  missing shortcode mode fail the build. Incubating is a per-release
+  fact, so a post-graduation release is a data plus golden edit only.
+- Evidence at `892ba2b`: the 31 derived artifacts match the live
+  `downloads.apache.org/hugegraph/<version>/` listings in both directions
+  (2026-09-13); rendered link sets (31 mirror, 31 ASC, 31 SHA512 per page)
+  are identical to the previous hand-written tables for EN and CN; the
+  real `versioning.py build` of release-1.7.0 still renders its original
+  tables. Python 128/128 (python3.12), Node 24/24, links pass, strict
+  latest build with zero warnings, `validate-site-output.py
+  --security-only` pass, Playwright axe WCAG 2.2 AA 6/6 including both
+  download pages (Playwright 1.62.1, latest-only artifact), and browser
+  checks on desktop light/dark EN and mobile dark CN.
+- Review: exactly three independent reviewers (correctness/tests,
+  design/boundaries, security/maintainability) on `32366fa` raised two
+  Important findings (silent `%!s(<nil>)` filenames on a component without
+  prefix; `-incubating` baked into component prefixes) and six Minor
+  findings; all fixed in `892ba2b`. Re-review CLEAR with every fix
+  verified empirically.
+- Not done on this host: the full five-version aggregate and complete
+  Chromium matrix (versioning, platform, AI, ranking specs); exact-head CI
+  runs them when the apache PR-C branch exists. Open for Jin: create the
+  apache PR-C from this branch (or pull it into an apache branch).
+
 2026-09-13 review-fix checkpoint (destination host, org repository):
 
 - Working branch moved to `hugegraph/hugegraph-doc`
