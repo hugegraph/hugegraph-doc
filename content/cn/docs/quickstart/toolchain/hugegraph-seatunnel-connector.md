@@ -6,9 +6,9 @@ weight: 5
 
 SeaTunnel 可以把数据库、Kafka 等数据源接入 HugeGraph，也可以在两张 HugeGraph 图之间迁移顶点和边。连接器分为两部分：**Source 负责读取，Sink 负责写入**，中间可以接 SeaTunnel 的数据转换组件。
 
-> **版本要求：本文面向 SeaTunnel 3.0+（dev 分支）**，所有示例使用 `mappings`。SeaTunnel **2.3.13 只有 HugeGraph Sink**，使用旧的 `schema_config`，不能直接运行本文配置。
+> **版本要求：本文面向 SeaTunnel 3.0+（dev 分支）**。所有示例使用 `mappings`。SeaTunnel **2.3.13 只有 HugeGraph Sink**，使用旧的 `schema_config`，不能直接运行本文配置。
 
-[![Loader 用图映射直接导入 HugeGraph；SeaTunnel 3.0+ dev 组合 Source、Transform、Sink，二者都支持 JDBC、Kafka 和图数据](/cn/docs/images/seatunnel/seatunnel-vs-loader-en.png)](/cn/docs/images/seatunnel/seatunnel-vs-loader-en.png)
+[![Loader 用图映射直接导入 HugeGraph；SeaTunnel 3.0+ 组合 Source、Transform、Sink，二者都支持 JDBC、Kafka 和图数据](/cn/docs/images/seatunnel/seatunnel-vs-loader-en.png)](/cn/docs/images/seatunnel/seatunnel-vs-loader-en.png)
 
 点击配图可查看原图。
 
@@ -24,9 +24,9 @@ SeaTunnel 可以把数据库、Kafka 等数据源接入 HugeGraph，也可以在
 
 **不要只按数据源或批量/流式来选。** 两者都支持 JDBC、Kafka 和图数据，Loader 也有字段/值映射、Spark 与 Flink CDC 集成。直接导入图时可先用 Loader；如果已经有 SeaTunnel 作业，通常在原管道中接入 HugeGraph 更方便。
 
-新建 SeaTunnel 任务建议使用 3.0+ 的开发分支和 `mappings`。本文按 dev 提交 [`35b2716`](https://github.com/apache/seatunnel/commit/35b2716cde7d4c91a24fc618a8d9cae90e213db3) 核对；这里的 3.0+ 指开发版本，不能仅凭文档中的版本号认定某个发行包已包含这些功能。获取更新的 dev 后，请一并核对连接器配置。
+新建 SeaTunnel 任务使用 3.0+ 开发版本和 `mappings`。本文固定到提交 [`35b2716`](https://github.com/apache/seatunnel/commit/35b2716cde7d4c91a24fc618a8d9cae90e213db3) 核对，对应 `3.0.0-SNAPSHOT`。使用其他提交时，请重新核对连接器配置。
 
-| 能力 | 本文使用的 3.0+ dev | 2.3.13 |
+| 能力 | 本文固定版本 | 2.3.13 |
 | --- | --- | --- |
 | 写入 HugeGraph | Sink，使用 `mappings` | Sink，使用 `schema_config` |
 | 读取 HugeGraph 顶点和边 | 支持 Source | 不支持 |
@@ -36,7 +36,7 @@ SeaTunnel 可以把数据库、Kafka 等数据源接入 HugeGraph，也可以在
 
 ## 2 准备环境
 
-### 2.1 获取 SeaTunnel dev
+### 2.1 获取 SeaTunnel 3.0+
 
 准备 JDK 11，并设置 `JAVA_HOME`。从开发分支获取源码，按上游[开发环境文档](https://github.com/apache/seatunnel/blob/35b2716cde7d4c91a24fc618a8d9cae90e213db3/docs/zh/developer/setup.md)构建发行包：
 
@@ -48,7 +48,7 @@ git checkout 35b2716cde7d4c91a24fc618a8d9cae90e213db3
 ./mvnw clean package -pl seatunnel-dist -am -Dmaven.test.skip=true
 ```
 
-解压 `seatunnel-dist/target/` 中生成的二进制包，后续命令都在解压后的 SeaTunnel 安装目录执行。需要体验更新功能时，可以使用更新的 dev 提交；引擎与连接器插件应来自同一版本，避免混装 2.3.13 的 JAR。
+解压 `seatunnel-dist/target/` 中生成的二进制包，后续命令都在解压后的 SeaTunnel 安装目录执行。需要更新功能时，可以切换到其他提交；引擎与连接器插件应来自同一版本，避免混装 2.3.13 的 JAR。
 
 本文使用 SeaTunnel 自带的 **Zeta 引擎和 local 模式**。确认安装目录的 `connectors/` 中包含 HugeGraph，以及所需的 JDBC 或 Kafka 连接器；如果自定义构建没有包含它们，需补齐同一次构建产出的插件。JDBC 示例还需要将 MySQL 驱动 JAR 放入 `lib/`，驱动类为 `com.mysql.cj.jdbc.Driver`。
 
@@ -406,7 +406,7 @@ sink {
 
 ## 6 常用配置与排错
 
-下表适用于本文核对的 **3.0+ dev**：
+下表适用于本文固定版本：
 
 | 配置 | 用途 |
 | --- | --- |
@@ -425,18 +425,18 @@ sink {
 - **不识别 `mappings` 或找不到 HugeGraph Source**：检查是否误用了 2.3.13 发行包或旧插件。
 - **连接失败**：检查主机、端口、图空间、认证信息，以及 SeaTunnel 所在环境能否访问服务。
 - **Schema 不兼容**：检查标签的 ID 策略、属性类型和边端点。自动创建不会把已有 `PRIMARY_KEY` 标签改成 `CUSTOMIZE_STRING`。
-- **Kafka 少量数据未及时出现**：确认使用 Zeta，并在 `env` 中设置 `sink.flush.interval`。当前 dev 的 `batch_interval_ms` 仅为兼容保留，不能代替它。
+- **Kafka 少量数据未及时出现**：确认使用 Zeta，并在 `env` 中设置 `sink.flush.interval`。此版本的 `batch_interval_ms` 仅为兼容保留，不能代替它。
 
 ## 7 选型小结
 
-选工具时，先看要完成的工作：图管理、Gremlin、备份或克隆可用 [Tools](/cn/docs/quickstart/toolchain/hugegraph-tools/)；直接导入图可先看 [Loader](/cn/docs/quickstart/toolchain/hugegraph-loader/)；需要复用 Source、Transform、Sink 管道时选 SeaTunnel。使用 SeaTunnel 的图读取和迁移能力时，请按本文的 3.0+ dev 版本准备环境。
+选工具时，先看要完成的工作：图管理、Gremlin、备份或克隆可用 [Tools](/cn/docs/quickstart/toolchain/hugegraph-tools/)；直接导入图可先看 [Loader](/cn/docs/quickstart/toolchain/hugegraph-loader/)；需要复用 Source、Transform、Sink 管道时选 SeaTunnel。使用 SeaTunnel 的图读取和迁移能力时，请按本文固定版本准备环境。
 
 [![选型总结：图管理用 Tools，直接导入用 Loader，复用数据管道用 SeaTunnel](/cn/docs/images/seatunnel/seatunnel-tool-choice-en.png)](/cn/docs/images/seatunnel/seatunnel-tool-choice-en.png)
 
 ## 8 参考文档
 
-- [HugeGraph Sink（本文核对的 dev）](https://github.com/apache/seatunnel/blob/35b2716cde7d4c91a24fc618a8d9cae90e213db3/docs/zh/connectors/sink/HugeGraph.md)
-- [HugeGraph Source（本文核对的 dev）](https://github.com/apache/seatunnel/blob/35b2716cde7d4c91a24fc618a8d9cae90e213db3/docs/zh/connectors/source/HugeGraph.md)
-- [JDBC Source（本文核对的 dev）](https://github.com/apache/seatunnel/blob/35b2716cde7d4c91a24fc618a8d9cae90e213db3/docs/zh/connectors/source/Jdbc.md)
-- [Kafka Source（本文核对的 dev）](https://github.com/apache/seatunnel/blob/35b2716cde7d4c91a24fc618a8d9cae90e213db3/docs/zh/connectors/source/Kafka.md)
+- [HugeGraph Sink](https://github.com/apache/seatunnel/blob/35b2716cde7d4c91a24fc618a8d9cae90e213db3/docs/zh/connectors/sink/HugeGraph.md)
+- [HugeGraph Source](https://github.com/apache/seatunnel/blob/35b2716cde7d4c91a24fc618a8d9cae90e213db3/docs/zh/connectors/source/HugeGraph.md)
+- [JDBC Source](https://github.com/apache/seatunnel/blob/35b2716cde7d4c91a24fc618a8d9cae90e213db3/docs/zh/connectors/source/Jdbc.md)
+- [Kafka Source](https://github.com/apache/seatunnel/blob/35b2716cde7d4c91a24fc618a8d9cae90e213db3/docs/zh/connectors/source/Kafka.md)
 - [SeaTunnel 本地部署](https://seatunnel.apache.org/docs/getting-started/locally/deployment/)
