@@ -402,7 +402,7 @@ This example checks endpoints and makes write errors fail the job. The default `
 
 > **Why preserve IDs?** A HugeGraph `PRIMARY_KEY` ID contains the internal ID of the vertex label, and that internal ID can differ between graphs. For example, a source vertex can be `1:marko`, while regenerating the primary key in the target graph can produce `2:marko`. Reusing the source edge endpoints after regenerating vertex IDs can connect edges to the wrong vertices. This example stores the original ID as a string, which changes the target graph's ID strategy.
 
-When Source reads every label, omit `label` and it outputs one table per `label_type`. In that case, bind each Sink mapping to its table with `sourceTable`, for example `sourceTable = "person"`. Do not reuse the single-label configuration from this section. See the [HugeGraph Source documentation](https://github.com/apache/seatunnel/blob/35b2716cde7d4c91a24fc618a8d9cae90e213db3/docs/en/connectors/source/HugeGraph.md) for other limitations.
+When Source reads every label, omit `label` to read all labels of `label_type` (default `VERTEX`). It produces one output table per label. Bind each Sink mapping to its table with `sourceTable`, for example `sourceTable = "default.person"`; use the full table name shown in the Writer log for the exact value. Do not reuse the single-label configuration from this section. See the [HugeGraph Source documentation](https://github.com/apache/seatunnel/blob/35b2716cde7d4c91a24fc618a8d9cae90e213db3/docs/en/connectors/source/HugeGraph.md) for other limitations.
 
 ## 6 Common configuration and troubleshooting
 

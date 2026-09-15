@@ -402,7 +402,7 @@ sink {
 
 > **为什么保留 ID？** HugeGraph 的 `PRIMARY_KEY` ID 包含顶点标签的内部 ID，两张图可能不同。例如源图顶点是 `1:marko`，目标图重新按主键生成的可能是 `2:marko`。如果重新生成顶点 ID 后仍复用源图的边端点，边就会连错。本例将原 ID 保存为字符串，因此会改变目标图的 ID 策略。
 
-若要一次读取全部标签，省略 Source 的 `label` 后会按 `label_type` 为每个标签输出一张表；这时需用 `sourceTable` 将各 Sink 映射绑定到对应表，例如 `sourceTable = "person"`。不能直接套用本节的单标签配置。其他限制见 [HugeGraph Source 文档](https://github.com/apache/seatunnel/blob/35b2716cde7d4c91a24fc618a8d9cae90e213db3/docs/zh/connectors/source/HugeGraph.md)。
+若要一次读取全部标签，省略 Source 的 `label` 后会读取 `label_type`（默认 `VERTEX`）下的全部 label，每个 label 输出一张表。这时需用 `sourceTable` 将各 Sink 映射绑定到对应表，例如 `sourceTable = "default.person"`；具体值以 Writer 日志中的完整表名为准。不能直接套用本节的单标签配置。其他限制见 [HugeGraph Source 文档](https://github.com/apache/seatunnel/blob/35b2716cde7d4c91a24fc618a8d9cae90e213db3/docs/zh/connectors/source/HugeGraph.md)。
 
 ## 6 常用配置与排错
 
