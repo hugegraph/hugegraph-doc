@@ -32,30 +32,6 @@ def parse(fragment: str):
 
 
 class SiteOutputSecurityTest(unittest.TestCase):
-    def test_full_validator_limits_seatunnel_language_fallback(self) -> None:
-        with tempfile.TemporaryDirectory() as temp_name:
-            root = pathlib.Path(temp_name)
-            for slug in ("hugegraph-seatunnel-connector", "untranslated-other"):
-                relative = f"cn/docs/quickstart/toolchain/{slug}/index.html"
-                page = root / relative
-                page.parent.mkdir(parents=True, exist_ok=True)
-                url = BASE.geturl() + relative.removesuffix("index.html")
-                page.write_text(
-                    f'<link rel="canonical" href="{url}">'
-                    f'<link rel="alternate" hreflang="en-US" href="{BASE.geturl()}">'
-                    f'<link rel="alternate" hreflang="zh-CN" href="{url}">',
-                    encoding="utf-8",
-                )
-            result = subprocess.run(
-                [sys.executable, str(VALIDATOR_PATH), str(root), BASE.geturl()],
-                capture_output=True, text=True, check=False,
-            )
-            # This minimal fixture lacks the rest of the site. Inspect only the
-            # language contract, retaining rejection for any unlisted page.
-            self.assertEqual(result.returncode, 1)
-            self.assertNotIn("hugegraph-seatunnel-connector/index.html: hreflang", result.stdout)
-            self.assertIn("untranslated-other/index.html: hreflang", result.stdout)
-
     def test_docs_navigation_requires_five_localized_populated_groups(self) -> None:
         for language in ("en", "cn"):
             groups = [

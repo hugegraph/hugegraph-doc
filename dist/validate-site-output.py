@@ -52,8 +52,6 @@ REQUIRED_FILES = (
 )
 
 HREFLANG_FALLBACKS = {
-    # The SeaTunnel guide is intentionally Chinese-only.
-    "cn/docs/quickstart/toolchain/hugegraph-seatunnel-connector/index.html": {"en-US": "/"},
     # The English release note is intentionally draft-only.
     "cn/docs/changelog/hugegraph-0.12.0-release-notes/index.html": {"en-US": "/"},
     # This community page currently has no Chinese source counterpart.
