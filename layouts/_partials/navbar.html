@@ -53,6 +53,13 @@
       {{- /* Right zone: the search box leads as the elastic boundary before
            the fixed controls — version, language, theme, GitHub. */ -}}
       <div class="td-nav-links td-nav-util-zone">
+        {{- if $drawerMode }}
+        <button class="td-nav-util hg-sidebar-restore" type="button" hidden
+          data-td-shell-sidebar-toggle title="{{ T "ui_sidebar_expand" }}"
+          aria-label="{{ T "ui_sidebar_expand" }}" aria-controls="td-shell-sidebar">
+          {{- partialCached "shell/icon.html" "panel-left" "sidebar-restore" -}}
+        </button>
+        {{- end }}
         {{- if $localSearch }}
         <button type="button" class="td-nav-search-box" data-td-shell-search-open
           title="{{ T "ui_search" }}" aria-label="{{ T "ui_search" }}"
@@ -70,21 +77,7 @@
             {{- partialCached "shell/icon.html" "code-branch" "navbar-version-code-branch" -}}
           </button>
           <div class="td-nav-hover-menu__pop" role="group" aria-label="{{ $menuName | plainify }}">
-            {{- range . }}
-            {{- if eq .name "---" }}
-            <hr class="td-nav-hover-menu__divider">
-            {{- else }}
-            {{- $url := strings.TrimSuffix "/" (.url | default "") }}
-            {{- $isActive := or (eq .version $.Site.Params.version) (eq (strings.TrimSuffix "/" $.Site.BaseURL) $url) }}
-            {{- $path := cond (and $.Site.Params.version_menu_pagelinks (ne .pagelinks false)) $.RelPermalink "" }}
-            {{- if $url }}
-            <a class="td-nav-hover-menu__option{{ if $isActive }} td-is-active{{ end }}"
-              {{- if $isActive }} aria-current="page"{{ end }} href="{{ $url }}{{ $path }}">{{ .name | default .version | markdownify }}</a>
-            {{- else }}
-            <span class="td-nav-hover-menu__option td-is-disabled">{{ .name | default .version | markdownify }}</span>
-            {{- end }}
-            {{- end }}
-            {{- end }}
+            {{ partial "version-menu-links.html" (dict "page" $ "versions" . "class" "td-nav-hover-menu__option" "icon" false "key" "navbar") }}
           </div>
         </div>
         {{- end }}
@@ -159,15 +152,7 @@
         </div>
         {{- else if and (eq .Identifier "docs") $.Site.Params.versions }}
         <div class="td-site-drawer__children" aria-label="{{ $.Site.Params.version_menu | default "Version" }}">
-          {{- range $.Site.Params.versions }}
-            {{- $url := strings.TrimSuffix "/" (.url | default "") -}}
-            {{- if $url }}
-            <a class="td-site-nav__menu-link td-site-nav__menu-child" href="{{ $url }}/">
-              <i class="fa-solid fa-code-branch" aria-hidden="true"></i>
-              <span>{{ .name | default .version }}</span>
-            </a>
-            {{- end }}
-          {{- end }}
+          {{ partial "version-menu-links.html" (dict "page" $ "versions" $.Site.Params.versions "class" "td-site-nav__menu-link td-site-nav__menu-child" "key" "landing-mobile") }}
         </div>
         {{- end }}
       {{- end }}

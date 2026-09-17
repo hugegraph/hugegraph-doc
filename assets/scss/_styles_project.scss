@@ -1,6 +1,28 @@
 // HugeGraph homepage: preserve the original product copy and isometric brand
 // artwork while using OINK's accessible navigation and landing primitives.
-$hg-navbar-purple: #532fc9;
+// `params.ui.theme_color` publishes the project accent as this CSS custom
+// property in hooks/head-end.html.
+
+:root {
+  --hg-theme-color-soft: color-mix(
+    in srgb,
+    var(--hg-theme-color) 12%,
+    var(--bs-body-bg)
+  );
+  --hg-theme-color-hover: color-mix(
+    in srgb,
+    var(--hg-theme-color) 18%,
+    var(--bs-body-bg)
+  );
+}
+
+:where(a, button, input, summary):focus-visible {
+  outline-color: var(--hg-theme-color);
+}
+
+::selection {
+  background: var(--hg-theme-color-soft);
+}
 
 .td-home {
   // Keep OINK's display face for headings, but restore the original site's
@@ -39,7 +61,7 @@ $hg-navbar-purple: #532fc9;
   }
 
   &.td-scrolled {
-    background: rgba($hg-navbar-purple, 0.96);
+    background: color-mix(in srgb, var(--hg-theme-color) 96%, transparent);
     box-shadow: 0 6px 22px rgba(20, 17, 73, 0.24);
     -webkit-backdrop-filter: blur(10px);
     backdrop-filter: blur(10px);
@@ -248,7 +270,7 @@ $hg-navbar-purple: #532fc9;
 // OINK's sticky header, search, version, language, theme, and help controls.
 .td-shell-chrome .td-site-header {
   border-block-end-color: rgba(255, 255, 255, 0.22);
-  background: $hg-navbar-purple;
+  background: var(--hg-theme-color);
   color: #fff;
   -webkit-backdrop-filter: none;
   backdrop-filter: none;
@@ -310,9 +332,9 @@ $hg-navbar-purple: #532fc9;
     margin: calc(-1 * #{$spacer}) calc(-1 * #{$spacer}) 0;
     padding-inline: $spacer;
     border-block-end: 1px solid rgba(255, 255, 255, 0.22);
-    background: $hg-navbar-purple;
+    background: var(--hg-theme-color);
     color: #fff;
-    box-shadow: 1px 0 $hg-navbar-purple;
+    box-shadow: 1px 0 var(--hg-theme-color);
 
     .td-shell-wordmark {
       background: none;
@@ -465,7 +487,140 @@ $hg-navbar-purple: #532fc9;
   display: none;
 }
 
+.td-nav-util.hg-sidebar-restore {
+  display: none;
+}
+
+.hg-sidebar-edge {
+  position: fixed;
+  inset-inline-start: 0;
+  top: 64px;
+  bottom: 0;
+  width: 16px;
+  z-index: 121;
+  border-inline-start: 3px solid var(--bs-border-color);
+
+  &:hover { border-inline-start-color: var(--bs-primary); }
+}
+
+@media (min-width: 768px) {
+  [data-td-shell-sidebar='collapsed'] {
+    .td-nav-util.hg-sidebar-restore:not([hidden]) {
+      display: inline-flex;
+    }
+  }
+}
+
+.hg-version-overflow {
+  color: var(--bs-body-color);
+  summary {
+    cursor: pointer;
+    padding: .5rem .75rem;
+    list-style: none;
+    &::-webkit-details-marker { display: none; }
+    &:focus-visible { outline: 2px solid var(--bs-primary); }
+  }
+}
+
+.hg-search-retry {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 0.75rem;
+  margin: 0.5rem 0.75rem 0.75rem;
+  padding: 0.7rem 0.8rem;
+  border: 1px solid var(--bs-border-color);
+  border-radius: 0.6rem;
+  background: var(--bs-tertiary-bg);
+  color: var(--bs-secondary-color);
+  font-size: 0.84rem;
+}
+
+.hg-ai-search-tail {
+  border-block-start: 1px solid var(--bs-border-color);
+
+  &__button {
+    width: 100%;
+    border: 0;
+    background: transparent;
+    color: inherit;
+    text-align: start;
+
+    &:hover,
+    &:focus-visible {
+      background: var(--hg-theme-color-soft);
+      color: inherit;
+    }
+  }
+}
+
+.hg-ask-ai-launcher {
+  position: fixed;
+  z-index: 1040;
+  inset-inline-end: unquote('max(1rem, env(safe-area-inset-right))');
+  inset-block-end: unquote('max(1rem, env(safe-area-inset-bottom))');
+  display: inline-flex;
+  align-items: center;
+  gap: 0.45rem;
+  min-height: 44px;
+  padding: 0.65rem 0.9rem;
+  border: 1px solid color-mix(in srgb, var(--hg-theme-color) 72%, #fff);
+  border-radius: 999px;
+  background: var(--hg-theme-color);
+  box-shadow: 0 8px 24px rgba(20, 17, 73, 0.24);
+  color: #fff;
+  font: 600 0.86rem/1 var(--td-ui-font-family);
+
+  &:hover,
+  &:focus-visible {
+    background: color-mix(in srgb, var(--hg-theme-color) 86%, #000);
+    color: #fff;
+  }
+
+  &[data-hg-ai-state='error'] {
+    border-style: dashed;
+  }
+
+  &[aria-busy='true'] {
+    cursor: wait;
+    opacity: 0.72;
+  }
+}
+
+.hg-ai-status:not(:empty) {
+  position: fixed;
+  z-index: 1039;
+  inset-inline-end: unquote('max(1rem, env(safe-area-inset-right))');
+  inset-block-end: unquote(
+    'calc(max(1rem, env(safe-area-inset-bottom)) + 3.4rem)'
+  );
+  width: unquote('min(18rem, calc(100vw - 2rem))');
+  padding: 0.55rem 0.7rem;
+  border: 1px solid var(--bs-border-color);
+  border-radius: 0.55rem;
+  background: var(--bs-body-bg);
+  box-shadow: 0 6px 18px rgba(0, 0, 0, 0.14);
+  color: var(--bs-body-color);
+  font-size: 0.78rem;
+}
+
 @media (max-width: 767.98px) {
+  .td-shell-chrome .td-site-nav__menu-toggle {
+    border: 1px solid rgba(255, 255, 255, 0.42);
+    background: rgba(20, 17, 73, 0.22);
+    color: #fff;
+  }
+
+  .hg-ask-ai-launcher {
+    min-width: 44px;
+    min-height: 44px;
+    padding: 0.65rem;
+
+    span {
+      @include visually-hidden;
+    }
+  }
+
   .hg-shell-mobile-utils,
   .hg-landing-mobile-utils {
     display: grid;
@@ -499,7 +654,8 @@ $hg-navbar-purple: #532fc9;
     gap: 0.35rem;
 
     > a,
-    > button {
+    > button,
+    > .hg-version-overflow > a {
       display: inline-flex;
       align-items: center;
       gap: 0.4rem;
@@ -514,10 +670,16 @@ $hg-navbar-purple: #532fc9;
     }
 
     > a[aria-current='page'],
+    > .hg-version-overflow > a[aria-current='page'],
     > button[aria-pressed='true'] {
       background: var(--bs-primary-bg-subtle);
       color: var(--bs-primary-text-emphasis);
     }
+  }
+
+  .hg-shell-mobile-utils__links > .hg-version-overflow > a {
+    margin-inline-end: 0.35rem;
+    margin-block-start: 0.35rem;
   }
 
   .hg-shell-mobile-utils__github {
@@ -686,5 +848,58 @@ $hg-navbar-purple: #532fc9;
       box-shadow: none;
       color: #000;
     }
+  }
+}
+
+// ASF download tables (layouts/_partials/asf-downloads.html): keep the cells
+// on one line so the wide table scrolls inside td-asset-list__table-wrap
+// instead of squeezing every column, and lay the release meta out inline.
+.hg-asf-release {
+  // The focusable wrapper owns horizontal scrolling, not td-content's table.
+  .td-asset-list__table-wrap {
+    overflow-x: auto !important;
+    overflow-y: hidden;
+  }
+
+  .td-asset-list__table {
+    display: table !important;
+    width: max-content;
+    min-width: 100%;
+    overflow: visible !important;
+  }
+
+  .td-asset-list__table th,
+  .td-asset-list__table td {
+    white-space: nowrap;
+  }
+}
+
+.hg-asf-release__meta {
+  list-style: none;
+  padding-left: 0;
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.25rem 1.5rem;
+}
+
+
+// Local disclosure renders before any third-party AI resource is requested.
+.hg-ai-consent {
+  width: calc(100% - 2rem);
+  max-width: 28rem;
+  padding: 1.5rem;
+  border: 1px solid var(--bs-border-color);
+  border-radius: .75rem;
+  background: var(--bs-body-bg);
+  color: var(--bs-body-color);
+  box-shadow: 0 .75rem 3rem rgba(0, 0, 0, .2);
+  &::backdrop { background: rgba(0, 0, 0, .4); }
+  h2 { font-size: 1.25rem; }
+  .hg-ai-consent-actions {
+    display: flex;
+    flex-wrap: wrap;
+    justify-content: flex-end;
+    gap: .75rem;
+    margin-top: 1.25rem;
   }
 }
