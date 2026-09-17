@@ -536,7 +536,7 @@ class CommunityContentContractTests(unittest.TestCase):
     def setUpClass(cls):
         cls._site = tempfile.TemporaryDirectory(prefix="community-content-site-")
         hugo_version = subprocess.check_output(["hugo", "version"], text=True)
-        if "hugo v0.165.0+extended" not in hugo_version:
+        if not hugo_version.startswith("hugo v0.165.0") or "+extended" not in hugo_version:
             raise RuntimeError(
                 f"Community render contracts require Hugo v0.165.0 Extended: {hugo_version.strip()}"
             )
