@@ -1,5 +1,6 @@
 ---
 title: "Clients and APIs"
+description: "Connect to HugeGraph with the Java client, REST API, Gremlin Console, and other client libraries."
 linkTitle: "Clients and APIs"
 weight: 5
 search_keywords: [HugeGraph clients, Java client, client libraries]

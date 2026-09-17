@@ -1,5 +1,6 @@
 ---
 title: "客户端与 API"
+description: "通过 Java 客户端、REST API、Gremlin Console 和其他客户端库连接 HugeGraph。"
 linkTitle: "客户端与 API"
 weight: 5
 search_keywords: [HugeGraph 客户端, Java 客户端, 客户端库]
