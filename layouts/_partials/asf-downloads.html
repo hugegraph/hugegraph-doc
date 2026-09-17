@@ -1,0 +1,101 @@
+{{- /* Render ASF release download tables from data/downloads/asf.json.
+
+     The data file is the single source of truth for both languages; this
+     partial only derives presentation. Malformed site-owned data fails the
+     build via errorf so a broken table can never publish silently.
+
+     mode: "latest" renders the one latest release, "archived" renders the
+     rest. The mode is required so a page cannot render duplicate sections
+     (and duplicate element ids) by accident. */ -}}
+{{- $page := .page -}}
+{{- $mode := .mode -}}
+{{- $position := .position | default $page.Path -}}
+{{- if not (in (slice "latest" "archived") $mode) -}}
+  {{- errorf "%s: asf-downloads mode must be latest or archived; got %q" $position $mode -}}
+{{- end -}}
+{{- $data := index (index hugo.Data "downloads" | default dict) "asf" | default dict -}}
+{{- $dist := $data.dist_path | default "" -}}
+{{- $components := $data.components | default dict -}}
+{{- $releases := $data.releases | default slice -}}
+{{- if not (and $dist $components $releases) -}}
+  {{- errorf "%s: data/downloads/asf.json must define dist_path, components, and releases" $position -}}
+{{- end -}}
+{{- $selected := slice -}}
+{{- range $releases -}}
+  {{- $isLatest := .latest | default false -}}
+  {{- if or (and (eq $mode "latest") $isLatest) (and (eq $mode "archived") (not $isLatest)) -}}
+    {{- $selected = $selected | append . -}}
+  {{- end -}}
+{{- end -}}
+{{- range $release := $selected -}}
+{{- $version := $release.version -}}
+{{- if not $version -}}{{- errorf "%s: asf-downloads release without a version" $position -}}{{- end -}}
+{{- $infix := cond ($release.incubating | default false) "-incubating" "" -}}
+{{- $rows := slice -}}
+{{- range $kind := slice "binary" "source" -}}
+  {{- range $componentID := index $release $kind | default slice -}}
+    {{- $component := index $components $componentID -}}
+    {{- if not $component -}}
+      {{- errorf "%s: asf-downloads release %s references unknown component %q" $position $version $componentID -}}
+    {{- end -}}
+    {{- if not (and $component.prefix $component.label_key) -}}
+      {{- errorf "%s: asf-downloads component %q must define prefix and label_key" $position $componentID -}}
+    {{- end -}}
+    {{- $suffix := cond (eq $kind "source") "-src" "" -}}
+    {{- $file := printf "%s%s-%s%s.tar.gz" $component.prefix $infix $version $suffix -}}
+    {{- $rows = $rows | append (dict
+      "label" (T $component.label_key)
+      "kind" $kind
+      "file" $file
+      "mirror" (printf "https://www.apache.org/dyn/closer.lua/%s/%s/%s?action=download" $dist $version $file)
+      "asc" (printf "https://downloads.apache.org/%s/%s/%s.asc" $dist $version $file)
+      "sha512" (printf "https://downloads.apache.org/%s/%s/%s.sha512" $dist $version $file)
+    ) -}}
+  {{- end -}}
+{{- end -}}
+{{- if not $rows -}}{{- errorf "%s: asf-downloads release %s has no artifacts" $position $version -}}{{- end -}}
+<section class="hg-asf-release" id="hg-dl-{{ replace $version "." "-" }}">
+  {{- if ne $mode "latest" }}
+  <h4 class="hg-asf-release__heading">{{ $version }}</h4>
+  {{- end }}
+  <ul class="hg-asf-release__meta">
+    <li><strong>{{ T "download_release_version" }}:</strong> {{ $version }}</li>
+    <li><strong>{{ T "download_release_date" }}:</strong> {{ $release.date }}</li>
+    <li><a href="{{ printf "/docs/changelog/hugegraph-%s-release-notes/" $version | relLangURL }}">{{ T "download_release_notes" }}</a></li>
+  </ul>
+  <div class="td-asset-list td-asset-list--static hg-asf-release__assets">
+    <div class="td-asset-list__table-wrap" tabindex="0" role="region"
+      aria-label="{{ T "ui_assets_download" }} · Apache HugeGraph {{ $version }}">
+      <table class="td-asset-list__table">
+        <caption class="visually-hidden">{{ T "ui_assets_download" }} · Apache HugeGraph {{ $version }}</caption>
+        <thead>
+          <tr>
+            <th scope="col">{{ T "download_table_component" }}</th>
+            <th scope="col">{{ T "download_table_type" }}</th>
+            <th scope="col">{{ T "download_table_mirror" }}</th>
+            <th scope="col">ASC</th>
+            <th scope="col">SHA512</th>
+          </tr>
+        </thead>
+        <tbody>
+          {{- range $row := $rows }}
+          <tr>
+            <td>{{ $row.label }}</td>
+            <td>{{ T (printf "download_type_%s" $row.kind) }}</td>
+            <td class="td-asset-list__file">
+              <a href="{{ $row.mirror }}" dir="auto"
+                aria-label="{{ T "ui_assets_download" }}: {{ $row.file }}"><code>{{ $row.file }}</code></a>
+            </td>
+            <td><a href="{{ $row.asc }}" aria-label="ASC: {{ $row.file }}">ASC</a></td>
+            <td><a href="{{ $row.sha512 }}" aria-label="SHA512: {{ $row.file }}">SHA512</a></td>
+          </tr>
+          {{- end }}
+        </tbody>
+      </table>
+    </div>
+  </div>
+</section>
+{{- end -}}
+{{- if eq $mode "latest" }}
+<p class="hg-asf-release__note">{{ T "download_asf_note" }}</p>
+{{- end -}}

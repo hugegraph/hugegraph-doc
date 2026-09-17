@@ -834,3 +834,21 @@
     }
   }
 }
+
+// ASF download tables (layouts/_partials/asf-downloads.html): keep the cells
+// on one line so the wide table scrolls inside td-asset-list__table-wrap
+// instead of squeezing every column, and lay the release meta out inline.
+.hg-asf-release {
+  .td-asset-list__table th,
+  .td-asset-list__table td {
+    white-space: nowrap;
+  }
+}
+
+.hg-asf-release__meta {
+  list-style: none;
+  padding-left: 0;
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.25rem 1.5rem;
+}

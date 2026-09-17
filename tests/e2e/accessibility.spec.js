@@ -1,7 +1,14 @@
 const { test, expect } = require("./artifact-test");
 const AxeBuilder = require("@axe-core/playwright").default;
 
-for (const route of ["/docs/", "/cn/docs/", "/community/", "/cn/community/"]) {
+for (const route of [
+  "/docs/",
+  "/cn/docs/",
+  "/community/",
+  "/cn/community/",
+  "/docs/download/download/",
+  "/cn/docs/download/download/",
+]) {
   test(`axe WCAG 2.2 AA guard ${route}`, async ({ page }) => {
     await page.emulateMedia({ reducedMotion: "reduce" });
     await page.goto(route);
