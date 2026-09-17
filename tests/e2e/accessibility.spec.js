@@ -29,3 +29,17 @@ for (const route of [
     expect(blocking).toEqual([]);
   });
 }
+
+for (const locale of ["en", "cn"]) {
+  test(`download table scrolls with the keyboard on mobile ${locale}`, async ({ page }) => {
+    await page.setViewportSize({ width: 390, height: 844 });
+    await page.goto(`${locale === "cn" ? "/cn" : ""}/docs/download/download/`);
+    const region = page.locator(".hg-asf-release .td-asset-list__table-wrap").first();
+    await region.scrollIntoViewIfNeeded();
+    await region.focus();
+    await expect(region).toBeFocused();
+    await region.press("ArrowRight");
+    await expect.poll(() => region.evaluate((element) => element.scrollLeft)).toBeGreaterThan(0);
+    await expect.poll(() => page.evaluate(() => document.documentElement.scrollWidth <= innerWidth)).toBe(true);
+  });
+}
