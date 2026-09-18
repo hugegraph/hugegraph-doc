@@ -4,6 +4,7 @@ linkTitle: "RESTful API"
 weight: 1
 search_keywords: [HugeGraph REST API, RESTful API, OpenAPI]
 search_boost: 1.7
+description: "HugeGraph RESTful API reference for graph, schema, vertex, and edge operations."
 ---
 
 > ⚠️ **Version compatibility notes**
