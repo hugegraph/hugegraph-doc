@@ -22,7 +22,7 @@
           <li class="td-landing-contributor hg-community-member">
             {{- $hasGithub := .github -}}
             {{- if $hasGithub }}
-            <a class="hg-community-member__surface hg-community-member__link" href="{{ .profile_url }}" target="_blank" rel="noopener noreferrer" aria-label="{{ .github.login }} on GitHub">
+            <a class="hg-community-member__surface hg-community-member__link" href="{{ .profile_url }}" target="_blank" rel="noopener noreferrer" aria-label="{{ .name }} on GitHub">
             {{- else }}
             <div class="hg-community-member__surface" aria-label="{{ .name }}">
             {{- end }}
