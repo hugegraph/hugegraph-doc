@@ -45,7 +45,7 @@ languages:
         - { identifier: docs-start, parent: docs, name: 开始, pageRef: /docs/quickstart, weight: 11, params: { icon: 'fa-solid fa-rocket' } }
         - { identifier: docs-components, parent: docs, name: 组件, pageRef: /docs/quickstart/hugegraph, weight: 12, params: { icon: 'fa-solid fa-cubes' } }
         - { identifier: docs-develop, parent: docs, name: 开发, pageRef: /docs/clients, weight: 13, params: { icon: 'fa-solid fa-code' } }
-        - { identifier: docs-operate, parent: docs, name: 运维, pageRef: /docs/config, weight: 14, params: { icon: 'fa-solid fa-screwdriver-wrench' } }
+        - { identifier: docs-operate, parent: docs, name: 配置, pageRef: /docs/config, weight: 14, params: { icon: 'fa-solid fa-screwdriver-wrench' } }
         - { identifier: docs-reference, parent: docs, name: 参考, pageRef: /docs/changelog, weight: 15, params: { icon: 'fa-solid fa-book-open' } }
         - { identifier: download, name: 下载, pageRef: /docs/download/download, weight: 20 }
         - { identifier: blog, name: 博客, pageRef: /blog, weight: 30 }
