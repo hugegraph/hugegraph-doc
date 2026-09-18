@@ -1,7 +1,7 @@
 {
   "schema_version": 1,
   "project": "hugegraph",
-  "retrieved_at": "2026-09-18T06:05:57Z",
+  "retrieved_at": "2026-09-18T15:23:55Z",
   "source": {
     "committee": "https://whimsy.apache.org/public/committee-info.json",
     "projects": "https://whimsy.apache.org/public/public_ldap_projects.json",
@@ -61,9 +61,21 @@
         "avatar": "/img/community/avatars/3953b178d91c3cfec7f994316117bfb1d1bbee78ea050d920047f3e9874f81f1.webp"
       },
       {
+        "asf_id": "liyu",
+        "name": "carp84",
+        "initials": "C",
+        "chair": false,
+        "profile_url": "https://github.com/carp84",
+        "github": {
+          "login": "carp84",
+          "user_id": 6239804
+        },
+        "avatar": "/img/community/avatars/7590d40579ad10dacf0a2f9de0439a8cedd7c8ab613b49be5e75991f98c78dac.webp"
+      },
+      {
         "asf_id": "zhaocong",
-        "name": "Cong Zhao",
-        "initials": "CZ",
+        "name": "coderzc",
+        "initials": "C",
         "chair": false,
         "profile_url": "https://github.com/coderzc",
         "github": {
@@ -73,33 +85,9 @@
         "avatar": "/img/community/avatars/d959beeff7a37e2528ca79ee2aa2baadb2b03b284dfb3b6159e792fb9a44e31d.webp"
       },
       {
-        "asf_id": "jin",
-        "name": "Imba Jin",
-        "initials": "IJ",
-        "chair": false,
-        "profile_url": "https://github.com/imbajin",
-        "github": {
-          "login": "imbajin",
-          "user_id": 17706099
-        },
-        "avatar": "/img/community/avatars/d3ecd2b51f116bece9a9c4cd6b6df651b1459206d2973b8bbb5bd302015d1a14.webp"
-      },
-      {
-        "asf_id": "panjuan",
-        "name": "Juan Pan",
-        "initials": "JP",
-        "chair": false,
-        "profile_url": "https://github.com/tristaZero",
-        "github": {
-          "login": "tristaZero",
-          "user_id": 27757146
-        },
-        "avatar": "/img/community/avatars/045e2234792e0baba143f9c0bfd0064d012d3de1d57dec883c3e3fa6901d3f85.webp"
-      },
-      {
         "asf_id": "lidongdai",
-        "name": "Lidong Dai",
-        "initials": "LD",
+        "name": "davidzollo",
+        "initials": "D",
         "chair": false,
         "profile_url": "https://github.com/davidzollo",
         "github": {
@@ -109,9 +97,33 @@
         "avatar": "/img/community/avatars/6962957beb238414dd798740aada61a514377c349d8fed86f091792b303e76e0.webp"
       },
       {
+        "asf_id": "jin",
+        "name": "imbajin",
+        "initials": "I",
+        "chair": false,
+        "profile_url": "https://github.com/imbajin",
+        "github": {
+          "login": "imbajin",
+          "user_id": 17706099
+        },
+        "avatar": "/img/community/avatars/d3ecd2b51f116bece9a9c4cd6b6df651b1459206d2973b8bbb5bd302015d1a14.webp"
+      },
+      {
+        "asf_id": "hxd",
+        "name": "jixuan1989",
+        "initials": "J",
+        "chair": false,
+        "profile_url": "https://github.com/jixuan1989",
+        "github": {
+          "login": "jixuan1989",
+          "user_id": 1021782
+        },
+        "avatar": "/img/community/avatars/266c764e5bf245a1e02fbb808268a96e04b8acb73f1e9dc8a4c1cd9053ce65b0.webp"
+      },
+      {
         "asf_id": "linary",
-        "name": "NingRui Li",
-        "initials": "NL",
+        "name": "Linary",
+        "initials": "L",
         "chair": false,
         "profile_url": "https://github.com/Linary",
         "github": {
@@ -122,8 +134,8 @@
       },
       {
         "asf_id": "ming",
-        "name": "Shiming Zhang",
-        "initials": "SZ",
+        "name": "simon824",
+        "initials": "S",
         "chair": false,
         "profile_url": "https://github.com/simon824",
         "github": {
@@ -131,6 +143,30 @@
           "user_id": 18065113
         },
         "avatar": "/img/community/avatars/c936571abaf109fd7049f976c1767bc21d05f4a7ed018bc232cdc0c83cbf2346.webp"
+      },
+      {
+        "asf_id": "panjuan",
+        "name": "tristaZero",
+        "initials": "T",
+        "chair": false,
+        "profile_url": "https://github.com/tristaZero",
+        "github": {
+          "login": "tristaZero",
+          "user_id": 27757146
+        },
+        "avatar": "/img/community/avatars/045e2234792e0baba143f9c0bfd0064d012d3de1d57dec883c3e3fa6901d3f85.webp"
+      },
+      {
+        "asf_id": "vgalaxies",
+        "name": "VGalaxies",
+        "initials": "V",
+        "chair": false,
+        "profile_url": "https://github.com/VGalaxies",
+        "github": {
+          "login": "VGalaxies",
+          "user_id": 79143929
+        },
+        "avatar": "/img/community/avatars/657d7c6a76e43a96d9da26ab4eab361172ebb3dae217a71f79b7531a7637abdc.webp"
       },
       {
         "asf_id": "ningjiang",
@@ -145,50 +181,31 @@
         "avatar": "/img/community/avatars/df8a3cbc33555abcdef083793429fe405a8846fb2994d700d079b9215786aa17.webp"
       },
       {
-        "asf_id": "hxd",
-        "name": "Xiangdong Huang",
-        "initials": "XH",
-        "chair": false,
-        "profile_url": "https://github.com/jixuan1989",
-        "github": {
-          "login": "jixuan1989",
-          "user_id": 1021782
-        },
-        "avatar": "/img/community/avatars/266c764e5bf245a1e02fbb808268a96e04b8acb73f1e9dc8a4c1cd9053ce65b0.webp"
-      },
-      {
         "asf_id": "vaughn",
-        "name": "Yan Zhang",
-        "initials": "YZ",
+        "name": "zyxxoo",
+        "initials": "Z",
         "chair": false,
-        "profile_url": "https://people.apache.org/phonebook.html?uid=vaughn"
-      },
-      {
-        "asf_id": "liyu",
-        "name": "Yu Li",
-        "initials": "YL",
-        "chair": false,
-        "profile_url": "https://github.com/carp84",
+        "profile_url": "https://github.com/zyxxoo",
         "github": {
-          "login": "carp84",
-          "user_id": 6239804
+          "login": "zyxxoo",
+          "user_id": 11863049
         },
-        "avatar": "/img/community/avatars/7590d40579ad10dacf0a2f9de0439a8cedd7c8ab613b49be5e75991f98c78dac.webp"
-      },
-      {
-        "asf_id": "vgalaxies",
-        "name": "Yuchen Ding",
-        "initials": "YD",
-        "chair": false,
-        "profile_url": "https://github.com/VGalaxies",
-        "github": {
-          "login": "VGalaxies",
-          "user_id": 79143929
-        },
-        "avatar": "/img/community/avatars/657d7c6a76e43a96d9da26ab4eab361172ebb3dae217a71f79b7531a7637abdc.webp"
+        "avatar": "/img/community/avatars/62e0171bfb271e4938963a26876ae28f5f44d874454d197fd5f7a08595f8d7a3.webp"
       }
     ],
     "committers": [
+      {
+        "asf_id": "guoshoujing",
+        "name": "corgiboygsj",
+        "initials": "C",
+        "chair": false,
+        "profile_url": "https://github.com/corgiboygsj",
+        "github": {
+          "login": "corgiboygsj",
+          "user_id": 24729637
+        },
+        "avatar": "/img/community/avatars/ce12f31198b55a4acaf56732f5d00c5701e4384bb4414126ccfccb9dadacfe1a.webp"
+      },
       {
         "asf_id": "yangjiaqi",
         "name": "Jacky Yang",
@@ -209,30 +226,6 @@
         "avatar": "/img/community/avatars/af583d1e4ffed9bc08ef7ec2e555b619058c665b2cc67eadac43df2e454b68e6.webp"
       },
       {
-        "asf_id": "wangjing",
-        "name": "Jing Wang",
-        "initials": "JW",
-        "chair": false,
-        "profile_url": "https://github.com/wanganjuan",
-        "github": {
-          "login": "wanganjuan",
-          "user_id": 10061479
-        },
-        "avatar": "/img/community/avatars/ab585341e46cfbf10b3fe426030f37ae54cdc12eac678debcd8989b12f64ee59.webp"
-      },
-      {
-        "asf_id": "pengjunzhi",
-        "name": "Junzhi Peng",
-        "initials": "JP",
-        "chair": false,
-        "profile_url": "https://github.com/Pengzna",
-        "github": {
-          "login": "Pengzna",
-          "user_id": 78788603
-        },
-        "avatar": "/img/community/avatars/87ba3c0066e31c0f584706ea1b7782a18a74ed0957ca02c1ac16e1bfa58c899f.webp"
-      },
-      {
         "asf_id": "vichayturen",
         "name": "Kaiyichen Wei",
         "initials": "KW",
@@ -240,33 +233,9 @@
         "profile_url": "https://people.apache.org/phonebook.html?uid=vichayturen"
       },
       {
-        "asf_id": "leizou",
-        "name": "Lei Zou",
-        "initials": "LZ",
-        "chair": false,
-        "profile_url": "https://github.com/z7658329",
-        "github": {
-          "login": "z7658329",
-          "user_id": 5474723
-        },
-        "avatar": "/img/community/avatars/2b8f6cf3f85038d5a0668a64df2ef2131eaf935f9e8abf69e468cbeb1474ac75.webp"
-      },
-      {
-        "asf_id": "guoshoujing",
-        "name": "Shoujing Guo",
-        "initials": "SG",
-        "chair": false,
-        "profile_url": "https://github.com/corgiboygsj",
-        "github": {
-          "login": "corgiboygsj",
-          "user_id": 24729637
-        },
-        "avatar": "/img/community/avatars/ce12f31198b55a4acaf56732f5d00c5701e4384bb4414126ccfccb9dadacfe1a.webp"
-      },
-      {
         "asf_id": "liuxiaocs",
-        "name": "Xiao Liu",
-        "initials": "XL",
+        "name": "liuxiaocs7",
+        "initials": "L",
         "chair": false,
         "profile_url": "https://github.com/liuxiaocs7",
         "github": {
@@ -276,11 +245,47 @@
         "avatar": "/img/community/avatars/08f13d01a0fc2048ef26199ee51aee806047a84fecaed5829893494dbd35736b.webp"
       },
       {
+        "asf_id": "pengjunzhi",
+        "name": "Pengzna",
+        "initials": "P",
+        "chair": false,
+        "profile_url": "https://github.com/Pengzna",
+        "github": {
+          "login": "Pengzna",
+          "user_id": 78788603
+        },
+        "avatar": "/img/community/avatars/87ba3c0066e31c0f584706ea1b7782a18a74ed0957ca02c1ac16e1bfa58c899f.webp"
+      },
+      {
+        "asf_id": "wangjing",
+        "name": "wanganjuan",
+        "initials": "W",
+        "chair": false,
+        "profile_url": "https://github.com/wanganjuan",
+        "github": {
+          "login": "wanganjuan",
+          "user_id": 10061479
+        },
+        "avatar": "/img/community/avatars/ab585341e46cfbf10b3fe426030f37ae54cdc12eac678debcd8989b12f64ee59.webp"
+      },
+      {
         "asf_id": "zhangyi89817",
         "name": "Yi Zhang",
         "initials": "YZ",
         "chair": false,
         "profile_url": "https://people.apache.org/phonebook.html?uid=zhangyi89817"
+      },
+      {
+        "asf_id": "leizou",
+        "name": "z7658329",
+        "initials": "Z",
+        "chair": false,
+        "profile_url": "https://github.com/z7658329",
+        "github": {
+          "login": "z7658329",
+          "user_id": 5474723
+        },
+        "avatar": "/img/community/avatars/2b8f6cf3f85038d5a0668a64df2ef2131eaf935f9e8abf69e468cbeb1474ac75.webp"
       },
       {
         "asf_id": "spica",
