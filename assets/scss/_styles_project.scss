@@ -537,6 +537,13 @@
 }
 
 .hg-ai-search-tail {
+  position: sticky;
+  bottom: 0;
+  z-index: 1;
+  margin-inline: -6px;
+  padding-inline: 6px;
+  background: var(--td-shell-popover);
+  box-shadow: 0 -8px 16px color-mix(in srgb, var(--td-shell-popover) 88%, transparent);
   border-block-start: 1px solid var(--bs-border-color);
 
   &__button {
@@ -551,6 +558,17 @@
       background: var(--hg-theme-color-soft);
       color: inherit;
     }
+  }
+}
+
+/* Keep the optional Ask AI tail discoverable without changing the OINK theme. */
+.td-shell-search__panel {
+  max-height: unquote('min(84vh, 720px)');
+}
+
+@media (max-width: 767.98px) {
+  .td-shell-search__panel {
+    max-height: unquote('min(86vh, 680px)');
   }
 }
 
