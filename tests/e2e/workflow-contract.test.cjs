@@ -37,3 +37,11 @@ test("only publish receives write permission", () => {
   );
   assert.doesNotMatch(workflow, /write-all/);
 });
+
+test("staging build consumers check out the reviewed candidate ref", () => {
+  const candidateRef = "github.event_name == 'workflow_dispatch' && inputs.operation == 'staging-next' && inputs.candidate_branch";
+  const refs = [...workflow.matchAll(/^\s+ref: \$\{\{([^}]+)\}\}/gm)].map((match) => match[1]);
+  assert.equal(refs.length, 5);
+  assert.doesNotMatch(refs[0], /candidate_branch/);
+  assert.equal(refs.slice(1).filter((ref) => ref.includes(candidateRef)).length, 4);
+});
