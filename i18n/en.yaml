@@ -4,6 +4,7 @@ ui_ask_ai_description: Powered by Kapa; only your question is sent.
 ui_ask_ai_latest: Answers use the latest documentation
 ui_retry: Retry
 ui_ai_error: AI is temporarily unavailable. Local search is unaffected.
+ui_more_versions: More versions
 download_release_version: Version
 download_release_date: Release Date
 download_release_notes: Release Notes
@@ -20,7 +21,6 @@ download_component_commons: Common
 download_asf_note: All packages on this page are official Apache Software Foundation releases served from ASF mirrors, with signatures and checksums hosted on downloads.apache.org. Source archives generated automatically by GitHub are not ASF releases.
 ui_assets_download: Download asset
 
-ui_more_versions: More versions
 ui_ai_consent_description: "Continuing loads Kapa, a third-party service. Your question will be sent to Kapa to generate an answer."
 ui_ai_consent_continue: "Continue to Ask AI"
 ui_ai_consent_cancel: "Cancel"

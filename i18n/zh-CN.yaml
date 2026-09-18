@@ -240,6 +240,7 @@ ui_ask_ai_description: 由 Kapa 提供；仅发送你的问题。
 ui_ask_ai_latest: 回答基于 latest 文档
 ui_retry: 重试
 ui_ai_error: AI 暂时不可用，本地搜索不受影响。
+ui_more_versions: 更多版本
 download_release_version: 版本
 download_release_date: 发布日期
 download_release_notes: 发布说明
@@ -255,7 +256,6 @@ download_component_computer: Computer
 download_component_commons: Common
 download_asf_note: 本页所列软件包均为 Apache 软件基金会正式发布版本，通过 ASF 镜像分发，签名与校验和托管在 downloads.apache.org。GitHub 自动生成的源码归档不是 ASF 正式发布版本。
 
-ui_more_versions: 更多版本
 ui_ai_consent_description: "继续后将加载第三方服务 Kapa，并将你的问题发送给 Kapa 生成回答。"
 ui_ai_consent_continue: "继续使用 Ask AI"
 ui_ai_consent_cancel: "取消"

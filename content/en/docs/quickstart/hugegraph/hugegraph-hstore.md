@@ -5,6 +5,8 @@ weight: 3
 search_keywords:
   - HugeGraph HStore
   - distributed storage
+  - REST port
+  - Store REST port
   - server.port
 search_boost: 1.6
 ---

@@ -1,4 +1,5 @@
 import json
+import os
 import pathlib
 import re
 import unittest
@@ -12,6 +13,7 @@ PAGES = (
     ROOT / "content" / "cn" / "docs" / "download" / "download.md",
 )
 I18N = (ROOT / "i18n" / "en.yaml", ROOT / "i18n" / "zh-CN.yaml")
+PUBLIC_DIR = pathlib.Path(os.environ["DOWNLOAD_PUBLIC_DIR"]) if os.environ.get("DOWNLOAD_PUBLIC_DIR") else None
 
 # Exact dist state, verified against
 # https://downloads.apache.org/hugegraph/<version>/ on 2026-09-13. The data
@@ -192,6 +194,23 @@ class DownloadDataTest(unittest.TestCase):
         for catalogue in I18N:
             missing = required - i18n_keys(catalogue)
             self.assertEqual(missing, set(), catalogue)
+
+    def test_rendered_download_pages_have_verified_rows(self) -> None:
+        if PUBLIC_DIR is None:
+            self.skipTest("set DOWNLOAD_PUBLIC_DIR after an aggregate build")
+        for relative in ("docs/download/download/index.html", "cn/docs/download/download/index.html"):
+            page = PUBLIC_DIR / relative
+            self.assertTrue(page.is_file(), page)
+            text = page.read_text(encoding="utf-8")
+            self.assertIn("hg-asf-release", text, page)
+            self.assertIn("1.7.0", text, page)
+            for version, expected_files in EXPECTED_ARTIFACTS.items():
+                self.assertIn(f"hugegraph-{version}-release-notes", text, page)
+                for filename in expected_files:
+                    self.assertIn(filename, text, page)
+                    self.assertIn(f"/dyn/closer.lua/hugegraph/{version}/{filename}?action=download", text, page)
+                    self.assertIn(f"downloads.apache.org/hugegraph/{version}/{filename}.asc", text, page)
+                    self.assertIn(f"downloads.apache.org/hugegraph/{version}/{filename}.sha512", text, page)
 
 
 if __name__ == "__main__":

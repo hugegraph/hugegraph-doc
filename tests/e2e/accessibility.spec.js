@@ -11,7 +11,12 @@ for (const route of [
 ]) {
   test(`axe WCAG 2.2 AA guard ${route}`, async ({ page }) => {
     await page.emulateMedia({ reducedMotion: "reduce" });
-    await page.goto(route);
+    const response = await page.goto(route);
+    expect(response && response.ok()).toBeTruthy();
+    if (route.includes("/docs/download/")) {
+      await expect(page.locator(".hg-asf-release").first()).toBeVisible();
+      await expect(page.locator(".hg-asf-release").first()).toContainText("1.7.0");
+    }
     await page.addStyleTag({
       content: "*,*::before,*::after{animation:none!important;transition:none!important}"
     });

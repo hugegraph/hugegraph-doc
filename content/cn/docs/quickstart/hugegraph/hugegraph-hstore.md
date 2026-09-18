@@ -5,6 +5,8 @@ weight: 3
 search_keywords:
   - HugeGraph HStore
   - 分布式存储
+  - REST 端口
+  - Store REST 端口
   - server.port
 search_boost: 1.6
 ---

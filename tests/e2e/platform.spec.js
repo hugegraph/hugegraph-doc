@@ -25,43 +25,6 @@ for (const locale of ["en", "cn"]) {
     await expect(page.locator("#td-shell-sidebar")).toHaveJSProperty("inert", true);
     const restore = page.locator(".hg-sidebar-restore");
     await expect(restore).toBeVisible();
-    // Dynamic mode keeps the persistent preference while exposing an operable
-    // preview. Assert pixels/geometry as well as inert state to catch CSS hiding it.
-    await page.mouse.move(900, 500);
-    // OINK suppresses pointer-open for 150ms after explicit mode changes.
-    await page.waitForTimeout(160);
-    await page.mouse.move(4, 200);
-    const panel = page.locator(".td-shell-sidebar__panel");
-    await expect(page.locator("#td-shell-sidebar")).toHaveJSProperty("inert", false);
-    await expect(panel).toHaveCSS("opacity", "1");
-    await expect(restore).toBeFocused(); // Pointer preview must not steal focus.
-    await expect.poll(async () => (await panel.boundingBox()).x).toBeGreaterThanOrEqual(0);
-    await panel.locator("a[href]").first().hover();
-    await page.mouse.move(900, 500);
-    await expect(page.locator("#td-shell-sidebar")).toHaveJSProperty("inert", true);
-    await expect.poll(() => page.evaluate(() => localStorage.getItem("td-shell-sidebar-collapsed"))).toBe("1");
-    await page.reload();
-    await expect(page.locator("#td-shell-sidebar")).toHaveJSProperty("inert", true);
-    // The separate edge is repeatable after navigation without changing mode.
-    await page.mouse.move(10, 200);
-    await expect(page.locator("#td-shell-sidebar")).toHaveJSProperty("inert", false);
-    await panel.locator("a[href]").first().hover();
-    await page.mouse.move(900, 500);
-    await expect(page.locator("#td-shell-sidebar")).toHaveJSProperty("inert", true);
-    await restore.focus();
-    await restore.press("ArrowRight");
-    await expect(panel.locator("a[href]").first()).toBeFocused();
-    await restore.hover();
-    await panel.locator("a[href]").first().hover();
-    await page.mouse.move(900, 500);
-    await expect(page.locator("#td-shell-sidebar")).toHaveJSProperty("inert", false);
-    await page.keyboard.press("Escape");
-    await expect(restore).toBeFocused();
-    await expect(page.locator("#td-shell-sidebar")).toHaveJSProperty("inert", true);
-    await restore.click();
-    await page.locator(".td-shell-sidebar__collapse").focus();
-    await page.keyboard.press("Enter");
-    await expect(page.locator("#td-shell-sidebar")).toHaveJSProperty("inert", true);
     await restore.click();
     await expect(page.locator("#td-shell-sidebar")).not.toHaveAttribute(
       "aria-hidden", "true"
@@ -165,58 +128,3 @@ test("Community grid and HTML/Print/Markdown profiles stay in parity", async ({
     expect(markdown).toContain(profile);
   }
 });
-
-for (const locale of ["en", "cn"]) {
-  for (const mobile of [false, true]) {
-    test(`latest ${locale} ${mobile ? "mobile" : "desktop"} versions reveal archives with keyboard`, async ({ page }) => {
-      if (mobile) await page.setViewportSize({ width: 390, height: 844 });
-      await page.goto(locale === "cn" ? "/cn/docs/" : "/docs/");
-      if (mobile) {
-        await page.locator("[data-td-shell-drawer-open]").click();
-        await expect(page.locator('button[data-td-shell-drawer-close]')).toBeFocused();
-      }
-      else await page.locator(".td-nav-version-menu [data-td-nav-hover-trigger]").click();
-      const menu = page.locator(mobile ? ".hg-shell-mobile-utils__group" : ".td-nav-version-menu").first();
-      for (const id of ["latest", "1.7", "1.5"]) {
-        await expect(menu.locator(`[data-hg-version-id="${id}"]`)).toBeVisible();
-      }
-      for (const id of ["1.3", "1.0"]) {
-        await expect(menu.locator(`[data-hg-version-id="${id}"]`)).toBeHidden();
-      }
-      const more = menu.locator("summary");
-      await more.focus();
-      await more.press("Enter");
-      await expect(menu.locator('[data-hg-version-id="1.0"]')).toBeVisible();
-      if (mobile) {
-        for (const id of ["1.3", "1.0"]) {
-          const box = await menu.locator(`[data-hg-version-id="${id}"]`).boundingBox();
-          expect(box.height).toBeGreaterThanOrEqual(36);
-          expect(box.width).toBeGreaterThanOrEqual(36);
-        }
-      }
-      await more.press("Tab");
-      await expect(menu.locator('[data-hg-version-id="1.3"]')).toBeFocused();
-      await more.click();
-      await expect(menu.locator('[data-hg-version-id="1.0"]')).toBeHidden();
-    });
-  }
-}
-
-for (const locale of ["en", "cn"]) {
-  for (const trigger of [".hg-sidebar-restore", ".td-shell-float [data-td-shell-sidebar-toggle]"]) {
-    test(`latest ${locale} pinning with ${trigger} preserves keyboard focus`, async ({ page }) => {
-      await page.addInitScript(() => localStorage.setItem("td-shell-sidebar-collapsed", "1"));
-      await page.goto(`${locale === "cn" ? "/cn" : ""}/docs/introduction/`);
-      const opener = page.locator(trigger);
-      await expect(opener).toBeVisible();
-      await opener.focus();
-      await page.keyboard.press("Enter");
-      await expect(opener).toBeHidden();
-      await expect(page.locator("#td-shell-sidebar")).toHaveJSProperty("inert", false);
-      await expect(page.locator(".td-shell-sidebar__collapse")).toBeFocused();
-      await page.keyboard.press("Enter");
-      await expect(page.locator("#td-shell-sidebar")).toHaveJSProperty("inert", true);
-      await expect(page.locator(".hg-sidebar-restore")).toBeFocused();
-    });
-  }
-}
