@@ -5,7 +5,7 @@ weight: 7
 description: "Vertex（顶点）REST 接口:创建、查询、更新和删除图中的顶点数据,支持批量操作和条件过滤。"
 ---
 
-### 2.1 Vertex {#vertex-api}
+## 2.1 Vertex {#vertex-api}
 
 顶点类型中的 `Id` 策略决定了顶点的 `Id` 类型，其对应的 `id` 类型如下：
 

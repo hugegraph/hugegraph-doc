@@ -51,6 +51,7 @@ jobs:
       artifact_prefix: ${{ steps.plan.outputs.artifact_prefix }}
       publish_branch: ${{ steps.plan.outputs.publish_branch }}
       latest_sha: ${{ steps.plan.outputs.latest_sha }}
+      source_sha: ${{ steps.plan.outputs.source_sha }}
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7
         with:
@@ -118,9 +119,9 @@ jobs:
 
             case "$OPERATION" in
               staging-next)
-                # A staging dispatch may run the reviewed candidate workflow
-                # itself, while production refresh remains master-only.
-                test "$GITHUB_REF" = "refs/heads/$candidate"
+                # Dispatches must load this privileged workflow from master;
+                # the candidate is data resolved to an immutable commit below.
+                test "$GITHUB_REF" = "refs/heads/master"
                 test "$CONFIRMATION" = "publish asf-staging-oink"
                 site_origin="$STAGING_ORIGIN"
                 artifact_prefix="staging"
@@ -155,6 +156,7 @@ jobs:
             echo "artifact_prefix=$artifact_prefix"
             echo "publish_branch=$publish_branch"
             echo "latest_sha=$latest_sha"
+            echo "source_sha=$latest_sha"
           } >> "$GITHUB_OUTPUT"
 
       - name: Validate source and version tooling
@@ -196,7 +198,7 @@ jobs:
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7
         with:
-          ref: ${{ github.event_name == 'workflow_dispatch' && inputs.operation == 'staging-next' && inputs.candidate_branch || github.event.pull_request.head.sha || github.sha }}
+          ref: ${{ needs.prepare.outputs.source_sha }}
           fetch-depth: 0
           persist-credentials: false
       - uses: actions/setup-python@ece7cb06caefa5fff74198d8649806c4678c61a1 # v6
@@ -262,7 +264,7 @@ jobs:
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7
         with:
-          ref: ${{ github.event_name == 'workflow_dispatch' && inputs.operation == 'staging-next' && inputs.candidate_branch || github.event.pull_request.head.sha || github.sha }}
+          ref: ${{ needs.prepare.outputs.source_sha }}
           persist-credentials: false
       - uses: actions/setup-python@ece7cb06caefa5fff74198d8649806c4678c61a1 # v6
         with:
@@ -316,7 +318,7 @@ jobs:
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7
         with:
-          ref: ${{ github.event_name == 'workflow_dispatch' && inputs.operation == 'staging-next' && inputs.candidate_branch || github.event.pull_request.head.sha || github.sha }}
+          ref: ${{ needs.prepare.outputs.source_sha }}
           persist-credentials: false
       - uses: actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020 # v4
         with:
@@ -379,7 +381,7 @@ jobs:
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7
         with:
-          ref: ${{ github.event_name == 'workflow_dispatch' && inputs.operation == 'staging-next' && inputs.candidate_branch || github.event.pull_request.head.sha || github.sha }}
+          ref: ${{ needs.prepare.outputs.source_sha }}
           persist-credentials: false
       - uses: actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020 # v4
         with:

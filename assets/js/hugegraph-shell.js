@@ -257,6 +257,8 @@
       if (region.dataset.hgTableScrollBound !== undefined) return;
       region.dataset.hgTableScrollBound = '';
       region.addEventListener('keydown', function (event) {
+        // Keep native keyboard behavior for links and other descendants in the table.
+        if (event.target !== region) return;
         if (region.scrollWidth <= region.clientWidth) return;
         var delta = 0;
         if (event.key === 'ArrowRight') delta = 80;
