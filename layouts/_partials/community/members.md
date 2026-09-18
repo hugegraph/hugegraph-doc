@@ -13,11 +13,14 @@
 ### {{ if eq $role "pmc" }}PMC{{ else }}Committers{{ end }}
 
 {{ range (index $data.roles $role) -}}
-{{- $label := .asf_id -}}
-{{- with .github }}{{ $label = printf "@%s" .login }}{{ end -}}
+{{- $label := .name -}}
 {{- $label = partial "content/markdown-escape.html" $label -}}
+{{- if .github -}}
 {{- $url := partial "content/markdown-url.html" .profile_url -}}
-- [{{ $label }}]({{ $url }}){{ if .chair }} — {{ $copy.chair }}{{ end }}
+- [{{ $label }}]({{ $url }})
+{{- else -}}
+- {{ $label }}
+{{- end }}
 {{ end }}
 
 {{ end -}}

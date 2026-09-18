@@ -117,7 +117,7 @@ test("Community grid and HTML/Print/Markdown profiles stay in parity", async ({
     (await page.locator(".hg-community-members__grid").count()) === 0,
     "PR-B Community section is not integrated in this artifact"
   );
-  for (const [width, columns] of [[1440, 5], [900, 3], [390, 2], [320, 2]]) {
+  for (const [width, columns] of [[1440, 4], [900, 3], [390, 2], [320, 2]]) {
     await page.setViewportSize({ width, height: 900 });
     await page.goto("/community/");
     const grid = page.locator(".hg-community-members__grid").first();
@@ -130,6 +130,14 @@ test("Community grid and HTML/Print/Markdown profiles stay in parity", async ({
   await page.reload();
   await expect(page.locator(".hg-community-member__link").first()).toBeVisible();
   await expect(page.locator(".hg-community-member__initials").first()).toBeAttached();
+  await expect(page.locator(".hg-community-member__role-label")).toHaveCount(0);
+  expect(await page.locator(".hg-community-member__surface:not(.hg-community-member__link)").count()).toBeGreaterThan(0);
+  expect(await page.locator(".hg-community-member__surface:not(.hg-community-member__link) a").count()).toBe(0);
+  const publicNames = await page
+    .locator("#project-members .hg-community-member__identity")
+    .allTextContents();
+  expect(publicNames).toContain("Cong Zhao");
+  expect(publicNames).toContain("Yan Zhang");
 
   const htmlProfiles = await page
     .locator("#project-members .hg-community-member__link")

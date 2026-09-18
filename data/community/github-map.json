@@ -1,4 +1,97 @@
 {
   "schema_version": 1,
-  "mappings": {}
+  "public_names": {
+    "guoshoujing": "Shoujing Guo",
+    "hxd": "Xiangdong Huang",
+    "jin": "Imba Jin",
+    "jermy": "Jermy Li",
+    "jsong010123": "Jason",
+    "leizou": "Lei Zou",
+    "lidongdai": "Lidong Dai",
+    "linary": "NingRui Li",
+    "liuxiaocs": "Xiao Liu",
+    "liyu": "Yu Li",
+    "ming": "Shiming Zhang",
+    "ningjiang": "Willem Ning Jiang",
+    "panjuan": "Juan Pan",
+    "pengjunzhi": "Junzhi Peng",
+    "spica": "Zhe Wang",
+    "vaughn": "Yan Zhang",
+    "vgalaxies": "Yuchen Ding",
+    "vichayturen": "Kaiyichen Wei",
+    "wangjing": "Jing Wang",
+    "yangjiaqi": "Jacky Yang",
+    "zhangyi89817": "Yi Zhang",
+    "zhaocong": "Cong Zhao"
+  },
+  "mappings": {
+    "guoshoujing": {
+      "login": "corgiboygsj",
+      "user_id": 24729637
+    },
+    "hxd": {
+      "login": "jixuan1989",
+      "user_id": 1021782
+    },
+    "jin": {
+      "login": "imbajin",
+      "user_id": 17706099
+    },
+    "jermy": {
+      "login": "javeme",
+      "user_id": 9625821
+    },
+    "jsong010123": {
+      "login": "MrJs133",
+      "user_id": 102796027
+    },
+    "leizou": {
+      "login": "z7658329",
+      "user_id": 5474723
+    },
+    "linary": {
+      "login": "Linary",
+      "user_id": 9151831
+    },
+    "liuxiaocs": {
+      "login": "liuxiaocs7",
+      "user_id": 42756849
+    },
+    "lidongdai": {
+      "login": "davidzollo",
+      "user_id": 15833811
+    },
+    "liyu": {
+      "login": "carp84",
+      "user_id": 6239804
+    },
+    "ming": {
+      "login": "simon824",
+      "user_id": 18065113
+    },
+    "pengjunzhi": {
+      "login": "Pengzna",
+      "user_id": 78788603
+    },
+    "vgalaxies": {
+      "login": "VGalaxies",
+      "user_id": 79143929
+    },
+    "wangjing": {
+      "login": "wanganjuan",
+      "user_id": 10061479
+    },
+    "ningjiang": {
+      "login": "WillemJiang",
+      "user_id": 219644
+    },
+    "panjuan": {
+      "login": "tristaZero",
+      "user_id": 27757146
+    },
+    "zhaocong": {
+      "login": "coderzc",
+      "user_id": 26179648
+    }
+  }
 }

@@ -1,7 +1,13 @@
 .hg-community-members {
-  --hg-community-columns: 5;
+  --hg-community-columns: 4;
   &__role + &__role { margin-top: 2.5rem; }
+  &__header h2 {
+    margin-bottom: .65rem;
+    font-size: clamp(2rem, 3vw, 2.75rem);
+    letter-spacing: -.035em;
+  }
   &__grid {
+    --td-columns: var(--hg-community-columns);
     display: grid;
     grid-template-columns: repeat(var(--hg-community-columns), minmax(0, 1fr));
     gap: 1rem;
@@ -13,29 +19,34 @@
 .hg-community-member {
   min-width: 0;
   padding: 0;
-  &__link {
+  &__surface {
     display: flex;
-    min-height: 100%;
-    flex-direction: column;
+    min-height: 5.25rem;
     align-items: center;
-    gap: .65rem;
-    padding: 1rem .75rem;
+    gap: .9rem;
+    padding: .85rem 1rem;
     color: inherit;
-    text-align: center;
     text-decoration: none;
     border: 1px solid var(--td-border-color);
-    border-radius: var(--td-card-border-radius, .75rem);
+    border-radius: 1rem;
     background: var(--td-card-bg, var(--bs-body-bg));
+    box-shadow: 0 .35rem 1rem rgba(35, 45, 75, .07);
+  }
+  &__link {
+    transition: border-color .18s ease, box-shadow .18s ease, transform .18s ease;
     &:hover, &:focus-visible {
       color: var(--td-link-color, var(--bs-link-color));
       border-color: currentColor;
+      box-shadow: 0 .55rem 1.3rem rgba(35, 45, 75, .13);
+      transform: translateY(-1px);
     }
   }
   &__avatar {
     position: relative;
     display: grid;
-    width: 8rem;
-    height: 8rem;
+    flex: 0 0 3.35rem;
+    width: 3.35rem;
+    height: 3.35rem;
     overflow: hidden;
     place-items: center;
     border-radius: 50%;
@@ -46,17 +57,15 @@
   &__initials {
     display: grid;
     place-items: center;
-    font-size: 1.65rem;
+    font-size: 1rem;
     font-weight: 700;
     color: var(--td-body-color, var(--bs-body-color));
   }
-  &__identity { max-width: 100%; overflow-wrap: anywhere; font-weight: 650; }
-  &__role-label { font-size: .8rem; color: var(--td-secondary-color, var(--bs-secondary-color)); }
+  &__identity { min-width: 0; max-width: 100%; overflow-wrap: anywhere; font-size: .96rem; font-weight: 700; }
 }
 @media (max-width: 1199.98px) {
   .hg-community-members { --hg-community-columns: 3; }
 }
 @media (max-width: 767.98px) {
   .hg-community-members { --hg-community-columns: 2; }
-  .hg-community-member__avatar { width: 6rem; height: 6rem; }
 }
