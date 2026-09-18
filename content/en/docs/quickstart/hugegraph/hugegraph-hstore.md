@@ -3,10 +3,12 @@ title: "HugeGraph-Store Quick Start"
 linkTitle: "Install/Build HugeGraph-Store"
 weight: 3
 search_keywords:
-  - server.port
+  - HugeGraph HStore
+  - distributed storage
   - REST port
   - Store REST port
-search_boost: 1.5
+  - server.port
+search_boost: 1.6
 ---
 
 ### 1 HugeGraph-Store Overview

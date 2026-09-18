@@ -3,10 +3,12 @@ title: "HugeGraph-Store Quick Start"
 linkTitle: "安装/构建 HugeGraph-Store"
 weight: 3
 search_keywords:
-  - server.port
+  - HugeGraph HStore
+  - 分布式存储
   - REST 端口
   - Store REST 端口
-search_boost: 1.5
+  - server.port
+search_boost: 1.6
 ---
 
 ### 1 HugeGraph-Store 概述

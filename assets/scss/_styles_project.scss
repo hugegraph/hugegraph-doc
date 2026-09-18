@@ -491,25 +491,34 @@
   display: none;
 }
 
+.hg-sidebar-edge {
+  position: fixed;
+  inset-inline-start: 0;
+  top: 64px;
+  bottom: 0;
+  width: 16px;
+  z-index: 121;
+  border-inline-start: 3px solid var(--bs-border-color);
+
+  &:hover { border-inline-start-color: var(--bs-primary); }
+}
+
 @media (min-width: 768px) {
   [data-td-shell-sidebar='collapsed'] {
-    #td-shell-sidebar {
-      visibility: hidden;
-      pointer-events: none;
-    }
-
-    // OINK v1.0 exposes a left-edge hover overlay after collapse. HugeGraph's
-    // explicit restore control replaces that hidden target entirely.
-    #td-shell-sidebar.td-shell-sidebar--overlay
-      .td-shell-sidebar__panel {
-      visibility: hidden;
-      transform: translateX(-100%);
-      pointer-events: none;
-    }
-
     .td-nav-util.hg-sidebar-restore:not([hidden]) {
       display: inline-flex;
     }
+  }
+}
+
+.hg-version-overflow {
+  color: var(--bs-body-color);
+  summary {
+    cursor: pointer;
+    padding: .5rem .75rem;
+    list-style: none;
+    &::-webkit-details-marker { display: none; }
+    &:focus-visible { outline: 2px solid var(--bs-primary); }
   }
 }
 
@@ -645,7 +654,8 @@
     gap: 0.35rem;
 
     > a,
-    > button {
+    > button,
+    > .hg-version-overflow > a {
       display: inline-flex;
       align-items: center;
       gap: 0.4rem;
@@ -660,10 +670,16 @@
     }
 
     > a[aria-current='page'],
+    > .hg-version-overflow > a[aria-current='page'],
     > button[aria-pressed='true'] {
       background: var(--bs-primary-bg-subtle);
       color: var(--bs-primary-text-emphasis);
     }
+  }
+
+  .hg-shell-mobile-utils__links > .hg-version-overflow > a {
+    margin-inline-end: 0.35rem;
+    margin-block-start: 0.35rem;
   }
 
   .hg-shell-mobile-utils__github {
@@ -832,5 +848,58 @@
       box-shadow: none;
       color: #000;
     }
+  }
+}
+
+// ASF download tables (layouts/_partials/asf-downloads.html): keep the cells
+// on one line so the wide table scrolls inside td-asset-list__table-wrap
+// instead of squeezing every column, and lay the release meta out inline.
+.hg-asf-release {
+  // The focusable wrapper owns horizontal scrolling, not td-content's table.
+  .td-asset-list__table-wrap {
+    overflow-x: auto !important;
+    overflow-y: hidden;
+  }
+
+  .td-asset-list__table {
+    display: table !important;
+    width: max-content;
+    min-width: 100%;
+    overflow: visible !important;
+  }
+
+  .td-asset-list__table th,
+  .td-asset-list__table td {
+    white-space: nowrap;
+  }
+}
+
+.hg-asf-release__meta {
+  list-style: none;
+  padding-left: 0;
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.25rem 1.5rem;
+}
+
+
+// Local disclosure renders before any third-party AI resource is requested.
+.hg-ai-consent {
+  width: calc(100% - 2rem);
+  max-width: 28rem;
+  padding: 1.5rem;
+  border: 1px solid var(--bs-border-color);
+  border-radius: .75rem;
+  background: var(--bs-body-bg);
+  color: var(--bs-body-color);
+  box-shadow: 0 .75rem 3rem rgba(0, 0, 0, .2);
+  &::backdrop { background: rgba(0, 0, 0, .4); }
+  h2 { font-size: 1.25rem; }
+  .hg-ai-consent-actions {
+    display: flex;
+    flex-wrap: wrap;
+    justify-content: flex-end;
+    gap: .75rem;
+    margin-top: 1.25rem;
   }
 }

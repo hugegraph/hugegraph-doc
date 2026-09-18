@@ -290,6 +290,10 @@ jobs:
             --site-origin "$SITE_ORIGIN" --historical-origin "$HISTORICAL_ORIGIN" \
             --select "$SELECTION" \
             --output "${RUNNER_TEMP}/public-site" "${extra[@]}"
+      - name: Verify rendered download contracts
+        env:
+          DOWNLOAD_PUBLIC_DIR: ${{ runner.temp }}/public-site
+        run: python3 -m unittest scripts.test_download_data.DownloadDataTest.test_rendered_download_pages_have_verified_rows -v
       - name: Upload publishable aggregate
         uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7
         with:
