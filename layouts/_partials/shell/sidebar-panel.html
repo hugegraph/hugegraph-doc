@@ -63,15 +63,7 @@
     <section class="hg-shell-mobile-utils__group" aria-labelledby="hg-mobile-versions">
       <strong id="hg-mobile-versions">{{ $.Site.Params.version_menu | default "Version" }}</strong>
       <div class="hg-shell-mobile-utils__links">
-        {{- range . }}
-          {{- $url := strings.TrimSuffix "/" (.url | default "") -}}
-          {{- if $url }}
-          {{- partial "version-link.html" (dict
-            "page" $ "version" . "active" (eq .version $.Site.Params.version)
-            "class" "" "iconKey" (printf "mobile-version-%s" .version)
-          ) -}}
-          {{- end }}
-        {{- end }}
+        {{ partial "version-menu-links.html" (dict "page" $ "versions" . "class" "" "key" "mobile") }}
       </div>
     </section>
     {{- end }}
