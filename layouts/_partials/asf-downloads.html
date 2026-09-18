@@ -27,6 +27,9 @@
     {{- $selected = $selected | append . -}}
   {{- end -}}
 {{- end -}}
+{{- if and (eq $mode "latest") (not $selected) -}}
+  {{- errorf "%s: asf-downloads latest mode requires one release marked latest" $position -}}
+{{- end -}}
 {{- range $release := $selected -}}
 {{- $version := $release.version -}}
 {{- if not $version -}}{{- errorf "%s: asf-downloads release without a version" $position -}}{{- end -}}
