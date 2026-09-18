@@ -27,6 +27,7 @@ for (const locale of ["en", "cn"]) {
     await expect(restore).toBeVisible();
     const edge = page.locator(".hg-sidebar-edge");
     const panel = page.locator(".td-shell-sidebar__panel");
+    await page.waitForTimeout(200);
     await edge.dispatchEvent("pointerenter", { pointerType: "mouse" });
     await expect(page.locator("#td-shell-sidebar")).toHaveClass(
       /td-shell-sidebar--overlay/
