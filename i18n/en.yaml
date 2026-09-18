@@ -2,6 +2,7 @@ ui_version_fallback: This page is not available in the selected version. You hav
 ui_ask_ai: Ask AI
 ui_ask_ai_description: Powered by Kapa; only your question is sent.
 ui_ask_ai_latest: Answers use the latest documentation
+ui_ask_ai_no_results: No results found. Try AI mode.
 ui_retry: Retry
 ui_ai_error: AI is temporarily unavailable. Local search is unaffected.
 ui_more_versions: More versions
