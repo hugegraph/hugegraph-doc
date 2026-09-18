@@ -254,7 +254,7 @@ download_component_toolchain: Toolchain
 download_component_ai: AI
 download_component_computer: Computer
 download_component_commons: Common
-download_asf_note: 本页所列软件包均为 Apache 软件基金会正式发布版本，通过 ASF 镜像分发，签名与校验和托管在 downloads.apache.org。GitHub 自动生成的源码归档不是 ASF 正式发布版本。
+download_asf_note: 源码归档是 Apache 软件基金会的正式发布物；二进制软件包是基于源码构建的便利用品。所有文件均通过 ASF 镜像分发，签名与校验和托管在 downloads.apache.org。GitHub 自动生成的源码归档不是 ASF 正式发布版本。
 
 ui_ai_consent_description: "继续后将加载第三方服务 Kapa，并将你的问题发送给 Kapa 生成回答。"
 ui_ai_consent_continue: "继续使用 Ask AI"

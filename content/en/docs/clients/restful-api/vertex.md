@@ -42,15 +42,15 @@ schema.vertexLabel("software").properties("name", "lang", "price").primaryKeys("
 schema.indexLabel("personByAge").onV("person").by("age").range().ifNotExist().create();
 ```
 
-#### 2.1.1 Create a vertex {#create-vertex}
+### 2.1.1 Create a vertex {#create-vertex}
 
-##### Method & Url
+#### Method & Url
 
 ```
 POST http://localhost:8080/graphspaces/DEFAULT/graphs/hugegraph/graph/vertices
 ```
 
-##### Request Body
+#### Request Body
 
 ```json {filename="request.json" wrap=true}
 {
@@ -62,13 +62,13 @@ POST http://localhost:8080/graphspaces/DEFAULT/graphs/hugegraph/graph/vertices
 }
 ```
 
-##### Response Status
+#### Response Status
 
 ```json
 201
 ```
 
-##### Response Body
+#### Response Body
 
 ```json {filename="response.json" wrap=true}
 {
@@ -82,15 +82,15 @@ POST http://localhost:8080/graphspaces/DEFAULT/graphs/hugegraph/graph/vertices
 }
 ```
 
-#### 2.1.2 Create multiple vertices
+### 2.1.2 Create multiple vertices
 
-##### Method & Url
+#### Method & Url
 
 ```
 POST http://localhost:8080/graphspaces/DEFAULT/graphs/hugegraph/graph/vertices/batch
 ```
 
-##### Request Body
+#### Request Body
 
 ```json
 [
@@ -112,13 +112,13 @@ POST http://localhost:8080/graphspaces/DEFAULT/graphs/hugegraph/graph/vertices/b
 ]
 ```
 
-##### Response Status
+#### Response Status
 
 ```json
 201
 ```
 
-##### Response Body
+#### Response Body
 
 ```json
 [
@@ -127,15 +127,15 @@ POST http://localhost:8080/graphspaces/DEFAULT/graphs/hugegraph/graph/vertices/b
 ]
 ```
 
-#### 2.1.3 Update vertex properties
+### 2.1.3 Update vertex properties
 
-##### Method & Url
+#### Method & Url
 
 ```
 PUT http://127.0.0.1:8080/graphspaces/DEFAULT/graphs/hugegraph/graph/vertices/"1:marko"?action=append
 ```
 
-##### Request Body
+#### Request Body
 
 ```json
 {
@@ -149,13 +149,13 @@ PUT http://127.0.0.1:8080/graphspaces/DEFAULT/graphs/hugegraph/graph/vertices/"1
 
 > Note: There are three categories for property values: single, set, and list. If it is single, it means adding or updating the property value. If it is set or list, it means appending the property value.
 
-##### Response Status
+#### Response Status
 
 ```json
 200
 ```
 
-##### Response Body
+#### Response Body
 
 ```json
 {
@@ -170,9 +170,9 @@ PUT http://127.0.0.1:8080/graphspaces/DEFAULT/graphs/hugegraph/graph/vertices/"1
 }
 ```
 
-#### 2.1.4 Batch Update Vertex Properties
+### 2.1.4 Batch Update Vertex Properties
 
-##### Function Description
+#### Function Description
 
 Batch update properties of vertices and support various update strategies, including:
 
@@ -225,13 +225,13 @@ Add vertices with the following command:
 curl -H "Content-Type: application/json" -d '[{"label":"person","properties":{"name":"josh","age":32,"city":"Beijing","weight":0.1,"hobby":["reading","football"]}},{"label":"software","properties":{"name":"lop","lang":"java","price":328}}]' http://127.0.0.1:8080/graphspaces/DEFAULT/graphs/hugegraph/graph/vertices/batch
 ```
 
-##### Method & Url
+#### Method & Url
 
 ```
 PUT http://127.0.0.1:8080/graphspaces/DEFAULT/graphs/hugegraph/graph/vertices/batch
 ```
 
-##### Request Body
+#### Request Body
 
 ```json
 {
@@ -269,13 +269,13 @@ PUT http://127.0.0.1:8080/graphspaces/DEFAULT/graphs/hugegraph/graph/vertices/ba
 }
 ```
 
-##### Response Status
+#### Response Status
 
 ```json
 200
 ```
 
-##### Response Body
+#### Response Body
 
 ```json
 {
@@ -321,15 +321,15 @@ Result Analysis:
 
 The usage of other update strategies can be inferred in a similar manner and will not be further elaborated.
 
-#### 2.1.5 Delete Vertex Properties
+### 2.1.5 Delete Vertex Properties
 
-##### Method & Url
+#### Method & Url
 
 ```
 PUT http://127.0.0.1:8080/graphspaces/DEFAULT/graphs/hugegraph/graph/vertices/"1:marko"?action=eliminate
 ```
 
-##### Request Body
+#### Request Body
 
 ```json
 {
@@ -342,13 +342,13 @@ PUT http://127.0.0.1:8080/graphspaces/DEFAULT/graphs/hugegraph/graph/vertices/"1
 
 > Note: Here, the properties (keys and all values) will be directly deleted, regardless of whether the property values are single, set, or list.
 
-##### Response Status
+#### Response Status
 
 ```json
 200
 ```
 
-##### Response Body
+#### Response Body
 
 ```json
 {
@@ -362,9 +362,9 @@ PUT http://127.0.0.1:8080/graphspaces/DEFAULT/graphs/hugegraph/graph/vertices/"1
 }
 ```
 
-#### 2.1.6 Get Vertices that Meet the Criteria
+### 2.1.6 Get Vertices that Meet the Criteria
 
-##### Params
+#### Params
 
 - label: Vertex type
 - properties: Property key-value pairs (precondition: indexes are created for property queries)
@@ -392,19 +392,19 @@ Property key-value pairs consist of the property name and value in JSON format. 
 
 **Query all vertices with age 29 and label person**
 
-##### Method & Url
+#### Method & Url
 
 ```
 GET http://localhost:8080/graphspaces/DEFAULT/graphs/hugegraph/graph/vertices?label=person&properties={"age":29}&limit=1
 ```
 
-##### Response Status
+#### Response Status
 
 ```json
 200
 ```
 
-##### Response Body
+#### Response Body
 
 ```json
 {
@@ -430,19 +430,19 @@ Add vertices with the following command:
 curl -H "Content-Type: application/json" -d '[{"label":"person","properties":{"name":"peter","age":29,"city":"Shanghai"}},{"label":"person","properties":{"name":"vadas","age":27,"city":"Hongkong"}}]' http://localhost:8080/graphspaces/DEFAULT/graphs/hugegraph/graph/vertices/batch
 ```
 
-##### Method & Url
+#### Method & Url
 
 ```
 GET http://localhost:8080/graphspaces/DEFAULT/graphs/hugegraph/graph/vertices?page&limit=3
 ```
 
-##### Response Status
+#### Response Status
 
 ```json
 200
 ```
 
-##### Response Body
+#### Response Body
 
 ```json
 {
@@ -491,19 +491,19 @@ The returned `body` contains information about the page number of the next `page
 
 **Paginate and retrieve all vertices, including the next page (passing the `page` value returned from the previous page), limited to 3 items.**
 
-##### Method & Url
+#### Method & Url
 
 ```
 GET http://localhost:8080/graphspaces/DEFAULT/graphs/hugegraph/graph/vertices?page=CIYxOnBldGVyAAAAAAAAAAM=&limit=3
 ```
 
-##### Response Status
+#### Response Status
 
 ```json
 200
 ```
 
-##### Response Body
+#### Response Body
 
 ```json
 {
@@ -545,21 +545,21 @@ GET http://localhost:8080/graphspaces/DEFAULT/graphs/hugegraph/graph/vertices?pa
 
 At this point, `"page": null` indicates that there are no more pages available. (Note: When using Cassandra as the backend for performance reasons, if the returned page happens to be the last page, the `page` value may not be empty. When requesting the next page using that `page` value, it will return `empty data` and `page = null`. The same applies to other similar situations.)
 
-#### 2.1.7 Retrieve Vertex by ID
+### 2.1.7 Retrieve Vertex by ID
 
-##### Method & Url
+#### Method & Url
 
 ```
 GET http://localhost:8080/graphspaces/DEFAULT/graphs/hugegraph/graph/vertices/"1:marko"
 ```
 
-##### Response Status
+#### Response Status
 
 ```json
 200
 ```
 
-##### Response Body
+#### Response Body
 
 ```json
 {
@@ -573,21 +573,21 @@ GET http://localhost:8080/graphspaces/DEFAULT/graphs/hugegraph/graph/vertices/"1
 }
 ```
 
-#### 2.1.8 Delete Vertex by ID
+### 2.1.8 Delete Vertex by ID
 
-##### Params
+#### Params
 
 - label: Vertex type, optional parameter
 
 **Delete the vertex based on ID only.**
 
-##### Method & Url
+#### Method & Url
 
 ```
 DELETE http://localhost:8080/graphspaces/DEFAULT/graphs/hugegraph/graph/vertices/"1:marko"
 ```
 
-##### Response Status
+#### Response Status
 
 ```json
 204
@@ -597,13 +597,13 @@ DELETE http://localhost:8080/graphspaces/DEFAULT/graphs/hugegraph/graph/vertices
 
 When deleting a vertex by specifying both the Label parameter and the ID, it generally offers better performance compared to deleting by ID alone.
 
-##### Method & Url
+#### Method & Url
 
 ```
 DELETE http://localhost:8080/graphspaces/DEFAULT/graphs/hugegraph/graph/vertices/"1:marko"?label=person
 ```
 
-##### Response Status
+#### Response Status
 
 ```json
 204

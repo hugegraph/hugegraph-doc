@@ -61,16 +61,16 @@
         "avatar": "/img/community/avatars/3953b178d91c3cfec7f994316117bfb1d1bbee78ea050d920047f3e9874f81f1.webp"
       },
       {
-        "asf_id": "liyu",
-        "name": "carp84",
-        "initials": "C",
+        "asf_id": "jin",
+        "name": "Imba Jin",
+        "initials": "IJ",
         "chair": false,
-        "profile_url": "https://github.com/carp84",
+        "profile_url": "https://github.com/imbajin",
         "github": {
-          "login": "carp84",
-          "user_id": 6239804
+          "login": "imbajin",
+          "user_id": 17706099
         },
-        "avatar": "/img/community/avatars/7590d40579ad10dacf0a2f9de0439a8cedd7c8ab613b49be5e75991f98c78dac.webp"
+        "avatar": "/img/community/avatars/d3ecd2b51f116bece9a9c4cd6b6df651b1459206d2973b8bbb5bd302015d1a14.webp"
       },
       {
         "asf_id": "zhaocong",
@@ -97,16 +97,16 @@
         "avatar": "/img/community/avatars/6962957beb238414dd798740aada61a514377c349d8fed86f091792b303e76e0.webp"
       },
       {
-        "asf_id": "jin",
-        "name": "Imba Jin",
-        "initials": "IJ",
+        "asf_id": "liyu",
+        "name": "carp84",
+        "initials": "C",
         "chair": false,
-        "profile_url": "https://github.com/imbajin",
+        "profile_url": "https://github.com/carp84",
         "github": {
-          "login": "imbajin",
-          "user_id": 17706099
+          "login": "carp84",
+          "user_id": 6239804
         },
-        "avatar": "/img/community/avatars/d3ecd2b51f116bece9a9c4cd6b6df651b1459206d2973b8bbb5bd302015d1a14.webp"
+        "avatar": "/img/community/avatars/7590d40579ad10dacf0a2f9de0439a8cedd7c8ab613b49be5e75991f98c78dac.webp"
       },
       {
         "asf_id": "hxd",

@@ -159,6 +159,18 @@ def _validate_mapping(data: dict, roster_ids: set[str] | None = None) -> dict:
             raise RosterError(f"github-map.json: unknown public-name ASF ID {asf_id!r}")
         if not isinstance(public_name, str) or not public_name.strip():
             raise RosterError(f"github-map.json: public name for {asf_id!r} must be non-empty")
+    display_order = data.get("display_order", {})
+    if not isinstance(display_order, dict):
+        raise RosterError("github-map.json: display_order must be an object")
+    for role, ordered_ids in display_order.items():
+        if role not in {"pmc", "committers"} or not isinstance(ordered_ids, list):
+            raise RosterError("github-map.json: display_order must contain PMC/Committers arrays")
+        if any(not isinstance(asf_id, str) or not ASF_ID_PATTERN.fullmatch(asf_id) for asf_id in ordered_ids):
+            raise RosterError(f"github-map.json: display_order.{role} contains an invalid ASF ID")
+        if len(ordered_ids) != len(set(ordered_ids)):
+            raise RosterError(f"github-map.json: display_order.{role} contains duplicate ASF IDs")
+        if roster_ids is not None and any(asf_id not in roster_ids for asf_id in ordered_ids):
+            raise RosterError(f"github-map.json: display_order.{role} contains an unknown ASF ID")
     logins: set[str] = set()
     user_ids: set[int] = set()
     for asf_id, mapping in mappings.items():
@@ -182,6 +194,14 @@ def _validate_mapping(data: dict, roster_ids: set[str] | None = None) -> dict:
         logins.add(login.casefold())
         user_ids.add(user_id)
     return mappings
+
+
+def _ordered_ids(ids: set[str], names: dict[str, str], mapping_data: dict, role: str) -> list[str]:
+    configured = mapping_data.get("display_order", {}).get(role, [])
+    if any(asf_id not in ids for asf_id in configured):
+        raise RosterError(f"github-map.json: display_order.{role} contains an ID outside its role")
+    configured_set = set(configured)
+    return list(configured) + sorted(ids - configured_set, key=lambda item: _sort_key(item, names))
 
 
 def _webp_dimensions(raw: bytes) -> tuple[int, int]:
@@ -362,8 +382,8 @@ def build_roster(committee_data: dict, projects_data: dict, people_data: dict, m
     names = {asf_id: _person_name(people_data, asf_id) for asf_id in member_ids}
     names.update({asf_id: mapping["login"] for asf_id, mapping in mappings.items()})
     names.update({asf_id: public_name for asf_id, public_name in mapping_data.get("public_names", {}).items()})
-    pmc_ids = [chair] + sorted(owner_ids - {chair}, key=lambda item: _sort_key(item, names))
-    committer_ids = sorted(member_ids - owner_ids, key=lambda item: _sort_key(item, names))
+    pmc_ids = [chair] + _ordered_ids(owner_ids - {chair}, names, mapping_data, "pmc")
+    committer_ids = _ordered_ids(member_ids - owner_ids, names, mapping_data, "committers")
     return {
         "schema_version": SCHEMA_VERSION,
         "project": PROJECT,
@@ -450,12 +470,14 @@ def validate_bundle(warn_after_days: int) -> list[str]:
     chairs = [person for person in people if person.get("chair") is True]
     if len(chairs) != 1 or chairs[0].get("asf_id") != chair or pmc[0] != chairs[0]:
         raise RosterError("roster.json: unique Chair must be first in PMC")
-    for role, entries in roles.items():
-        tail = entries[1:] if role == "pmc" else entries
-        actual_order = [(p["name"].casefold(), p["asf_id"].casefold()) for p in tail]
-        if actual_order != sorted(actual_order):
-            raise RosterError(f"roster.json: {role} must be sorted by public name and ASF ID casefold")
     mappings = _validate_mapping(mapping, set(ids))
+    names = {person["asf_id"]: person["name"] for person in people}
+    expected_pmc = [chair] + _ordered_ids(set(owners) - {chair}, names, mapping, "pmc")
+    expected_committers = _ordered_ids(set(members) - set(owners), names, mapping, "committers")
+    if [person["asf_id"] for person in pmc] != expected_pmc:
+        raise RosterError("roster.json: PMC order does not match display_order or sorted by public name")
+    if [person["asf_id"] for person in committers] != expected_committers:
+        raise RosterError("roster.json: Committers order does not match display_order or sorted by public name")
     public_names = mapping.get("public_names", {})
     for person in people:
         if person["asf_id"] in public_names and person["name"] != public_names[person["asf_id"]]:

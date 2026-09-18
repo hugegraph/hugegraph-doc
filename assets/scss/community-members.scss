@@ -5,7 +5,7 @@
     padding-block: 1.5rem;
   }
   &__role + &__role { margin-top: 1rem; }
-  &__header h2 {
+  .td-landing-section__header h2 {
     margin-bottom: .65rem;
     font-size: clamp(2rem, 3vw, 2.75rem);
     letter-spacing: -.035em;
