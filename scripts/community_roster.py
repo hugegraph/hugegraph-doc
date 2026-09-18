@@ -580,6 +580,10 @@ def _unlink(path: pathlib.Path) -> None:
 
 
 def _copy_candidate(raw: bytes, destination: pathlib.Path) -> None:
+    # An interrupted refresh may leave the temporary path behind. Remove only
+    # that exact path (including a symlink) before recreating it exclusively.
+    if destination.exists() or destination.is_symlink():
+        destination.unlink()
     with destination.open("xb") as stream:
         stream.write(raw)
         stream.flush()

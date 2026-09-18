@@ -5,7 +5,7 @@ weight: 7
 description: "Vertex REST API: Create, query, update, and delete vertex data in the graph with support for batch operations and conditional filtering."
 ---
 
-### 2.1 Vertex {#vertex-api}
+## 2.1 Vertex {#vertex-api}
 
 In vertex types, the `Id` strategy determines the type of the vertex `Id`, with the corresponding relationships as follows:
 
