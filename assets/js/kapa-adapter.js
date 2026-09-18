@@ -107,6 +107,9 @@
 
   function createController(windowObject, documentObject, config) {
     var state = 'idle';
+    var consented = false;
+    var pending = null;
+    var consent = documentObject.querySelector('[data-hg-ai-consent]');
     var attempt = 0;
     var timer = 0;
     var lastTrigger = null;
@@ -220,9 +223,8 @@
       documentObject.head.appendChild(script);
     }
 
-    function activate(query, submit, trigger) {
+    function load(query, submit) {
       query = trimmedQuery(query);
-      lastTrigger = trigger || documentObject.activeElement;
       if (state === 'loading') return;
       if (state === 'ready') {
         openWidget(query, Boolean(submit && query));
@@ -235,6 +237,54 @@
         fail(serial);
       }, TIMEOUT_MS);
       ensureScript(serial, query, Boolean(submit && query), retrying);
+    }
+
+    function cancelConsent() {
+      pending = null;
+      renderState('idle', '');
+      if (consent && consent.open) consent.close();
+      restoreFocus();
+    }
+
+    function activate(query, submit, trigger) {
+      if (state === 'loading' || state === 'consent') return;
+      lastTrigger = trigger || documentObject.activeElement;
+      if (consented) {
+        load(query, submit);
+        return;
+      }
+      // Fail closed if the local consent panel is unavailable.
+      if (!consent || typeof consent.showModal !== 'function') {
+        renderState('error', config.labels.error);
+        return;
+      }
+      pending = { query: trimmedQuery(query), submit: submit };
+      renderState('consent', '');
+      consent.showModal();
+    }
+
+    if (consent) {
+      // Keep the underlying search palette from consuming modal keyboard events.
+      consent.addEventListener('keydown', function (event) {
+        event.stopPropagation();
+        if (event.key === 'Escape') {
+          event.preventDefault();
+          cancelConsent();
+        }
+      });
+      consent.querySelector('[data-hg-ai-continue]').addEventListener('click', function () {
+        if (!pending) return;
+        var request = pending;
+        pending = null;
+        consented = true;
+        consent.close();
+        load(request.query, request.submit);
+      });
+      consent.querySelector('[data-hg-ai-cancel]').addEventListener('click', cancelConsent);
+      consent.addEventListener('cancel', function (event) {
+        event.preventDefault();
+        cancelConsent();
+      });
     }
 
     function restoreFocus() {
@@ -333,9 +383,7 @@
       title.textContent = config.labels.ask + ': “' + query + '”';
       var detail = documentObject.createElement('span');
       detail.className = 'td-shell-search__item-ref';
-      detail.textContent =
-        config.labels.description +
-        (config.historical ? ' ' + config.labels.latest + '.' : '');
+      detail.textContent = config.historical ? config.labels.latest + '.' : '';
       meta.appendChild(title);
       meta.appendChild(detail);
       row.appendChild(icon);
