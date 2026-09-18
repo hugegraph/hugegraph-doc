@@ -48,6 +48,9 @@ for (const [locale, route, source, language] of [
     await expect(tail).toHaveCount(0);
     await input.fill("server auth");
     await tail.locator("[data-hg-ask-ai]").click();
+    await expect(page.locator("[data-hg-ai-consent]")).toBeVisible();
+    expect(requests).toEqual([]);
+    await page.locator("[data-hg-ai-consent] [data-hg-ai-continue]").click();
     await expect.poll(() => requests.length).toBe(1);
     await expect.poll(() => page.evaluate(() => window.__kapaCalls || [])).toContainEqual([
       "setSourceGroupIDs", [source]
@@ -78,6 +81,9 @@ test("AI 500 remains non-blocking and retry issues one fresh request", async ({ 
   await page.goto(AI_ORIGIN + "/docs/");
   const launcher = page.locator(".hg-ask-ai-launcher");
   await launcher.dblclick();
+  await expect(page.locator("[data-hg-ai-consent]")).toBeVisible();
+  expect(attempts).toBe(0);
+  await page.locator("[data-hg-ai-consent] [data-hg-ai-continue]").click();
   await expect.poll(() => attempts).toBe(1);
   await expect(launcher).toHaveAttribute("data-hg-ai-state", "error");
   await expect(launcher).toHaveAttribute("title", /unavailable/i);
@@ -107,6 +113,9 @@ test("AI pending timeout discards stale state and retry waits for a fresh bundle
   await page.goto(AI_ORIGIN + "/docs/");
   const launcher = page.locator(".hg-ask-ai-launcher");
   await launcher.click();
+  await expect(page.locator("[data-hg-ai-consent]")).toBeVisible();
+  expect(attempts).toBe(0);
+  await page.locator("[data-hg-ai-consent] [data-hg-ai-continue]").click();
   await expect.poll(() => attempts).toBe(1);
   await expect(launcher).toHaveAttribute("data-hg-ai-state", "error", {
     timeout: 7_000

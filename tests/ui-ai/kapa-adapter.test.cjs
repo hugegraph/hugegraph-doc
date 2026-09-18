@@ -21,10 +21,25 @@ function harness() {
     textContent: '',
     classList: { toggle() {} },
   };
+  const consentListeners = new Map();
+  const continueButton = { addEventListener(name, callback) { consentListeners.set(`continue:${name}`, callback); } };
+  const cancelButton = { addEventListener(name, callback) { consentListeners.set(`cancel:${name}`, callback); } };
+  const consent = {
+    open: false,
+    showModal() { this.open = true; },
+    close() { this.open = false; },
+    addEventListener(name, callback) { consentListeners.set(`dialog:${name}`, callback); },
+    querySelector(selector) {
+      if (selector === '[data-hg-ai-continue]') return continueButton;
+      if (selector === '[data-hg-ai-cancel]') return cancelButton;
+      return null;
+    },
+  };
   const documentObject = {
     activeElement: trigger,
     querySelector(selector) {
       if (selector === '[data-hg-ai-status]') return status;
+      if (selector === '[data-hg-ai-consent]') return consent;
       if (selector === 'script[data-hg-kapa-widget]') {
         return scripts.find((script) => !script.removed) || null;
       }
@@ -85,6 +100,7 @@ function harness() {
     documentObject,
     fireRender(index = renderCallbacks.length - 1) { renderCallbacks[index](); },
     fireTimeout() { Array.from(timers.values()).forEach((callback) => callback()); },
+    continueConsent() { consentListeners.get('continue:click')(); },
     installBundle() {
       const queued =
         windowObject.Kapa && Array.isArray(windowObject.Kapa.q)
@@ -138,6 +154,7 @@ test('sends only the trimmed query after explicit activation and render', () => 
   assert.deepEqual(h.calls.map(([name]) => name), ['onModalClose']);
 
   controller.activate('  how to start?  ', true, h.trigger);
+  h.continueConsent();
   assert.equal(controller.getState(), 'loading');
   assert.deepEqual(h.calls.map(([name]) => name), ['onModalClose', 'render']);
 
@@ -163,6 +180,7 @@ test('ignores duplicate activation and never opens after a late render', () => {
     h.config,
   );
   controller.activate('first', true, h.trigger);
+  h.continueConsent();
   controller.activate('second', true, h.trigger);
   assert.equal(
     h.calls.filter(([name]) => name === 'render').length,
@@ -187,6 +205,7 @@ test('launcher opens a blank session without auto-submit', () => {
     h.config,
   );
   controller.activate('', false, h.trigger);
+  h.continueConsent();
   h.scripts[0].fire('load');
   h.fireRender();
   assert.deepEqual(h.calls.at(-1), [
@@ -203,6 +222,7 @@ test('a pending timeout retries with a fresh script and ignores the late attempt
     h.config,
   );
   controller.activate('first', true, h.trigger);
+  h.continueConsent();
   assert.equal(h.scripts.length, 1);
   const staleRender = h.renderCallbacks[0];
 
