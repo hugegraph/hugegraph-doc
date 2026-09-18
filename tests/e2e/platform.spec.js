@@ -32,6 +32,9 @@ for (const locale of ["en", "cn"]) {
     await expect(page.locator("#td-shell-sidebar")).toHaveClass(
       /td-shell-sidebar--overlay/
     );
+    const previewBox = await page.locator(".td-shell-sidebar__panel").boundingBox();
+    expect(previewBox.x).toBeLessThanOrEqual(1);
+    expect(previewBox.y).toBeLessThanOrEqual(1);
     await panel.dispatchEvent("pointerenter", { pointerType: "mouse" });
     await panel.dispatchEvent("pointerleave", { pointerType: "mouse" });
     await expect.poll(
