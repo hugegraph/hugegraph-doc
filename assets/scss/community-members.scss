@@ -68,4 +68,15 @@
 }
 @media (max-width: 767.98px) {
   .hg-community-members { --hg-community-columns: 2; }
+  .hg-community-members__grid { gap: .75rem; }
+  .hg-community-member__surface { gap: .65rem; padding: .7rem; }
+  .hg-community-member__avatar {
+    flex-basis: 2.8rem;
+    width: 2.8rem;
+    height: 2.8rem;
+  }
+  .hg-community-member__identity {
+    font-size: .9rem;
+    overflow-wrap: break-word;
+  }
 }
