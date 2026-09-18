@@ -103,7 +103,6 @@ jobs:
           latest_sha="$EVENT_SHA"
 
           if [[ "$EVENT_NAME" == workflow_dispatch ]]; then
-            test "$GITHUB_REF" = refs/heads/master
             candidate="$CANDIDATE_BRANCH"
             test -n "$candidate"
             [[ "$candidate" =~ ^[A-Za-z0-9][A-Za-z0-9._/-]*$ ]]
@@ -119,6 +118,9 @@ jobs:
 
             case "$OPERATION" in
               staging-next)
+                # A staging dispatch may run the reviewed candidate workflow
+                # itself, while production refresh remains master-only.
+                test "$GITHUB_REF" = "refs/heads/$candidate"
                 test "$CONFIRMATION" = "publish asf-staging-oink"
                 site_origin="$STAGING_ORIGIN"
                 artifact_prefix="staging"
@@ -131,6 +133,7 @@ jobs:
                 fi
                 ;;
               production-history-refresh)
+                test "$GITHUB_REF" = refs/heads/master
                 test "$CONFIRMATION" = "publish asf-site"
                 test "$candidate" = "$latest_ref"
                 test "$SCOPE" = full
