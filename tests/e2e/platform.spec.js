@@ -138,6 +138,7 @@ test("Community grid and HTML/Print/Markdown profiles stay in parity", async ({
     .allTextContents();
   expect(publicNames).toContain("Cong Zhao");
   expect(publicNames).toContain("Yan Zhang");
+  await expect(page.getByRole("link", { name: "Cong Zhao on GitHub", exact: true })).toBeVisible();
 
   const htmlProfiles = await page
     .locator("#project-members .hg-community-member__link")
