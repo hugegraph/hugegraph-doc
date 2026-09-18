@@ -20,14 +20,18 @@
         <ul class="td-landing-contributor-grid hg-community-members__grid" role="list">
           {{- range $members }}
           <li class="td-landing-contributor hg-community-member">
-            <a class="hg-community-member__link" href="{{ .profile_url }}" aria-label="{{ .name }} ({{ .asf_id }})">
+            {{- $hasGithub := .github -}}
+            {{- if $hasGithub }}
+            <a class="hg-community-member__surface hg-community-member__link" href="{{ .profile_url }}" target="_blank" rel="noopener noreferrer" aria-label="{{ .github.login }} on GitHub">
+            {{- else }}
+            <div class="hg-community-member__surface" aria-label="{{ .name }}">
+            {{- end }}
               <span class="td-landing-contributor__avatar hg-community-member__avatar" aria-hidden="true">
                 <span class="hg-community-member__initials">{{ .initials }}</span>
                 {{- with .avatar }}<img src="{{ . }}" alt="" width="128" height="128" loading="lazy" decoding="async">{{ end }}
               </span>
-              <span class="hg-community-member__identity">{{ with .github }}@{{ .login }}{{ else }}{{ .asf_id }}{{ end }}</span>
-              {{- if .chair }}<span class="hg-community-member__role-label">{{ $copy.chair }}</span>{{ end }}
-            </a>
+              <span class="hg-community-member__identity">{{ .name }}</span>
+            {{- if $hasGithub }}</a>{{ else }}</div>{{ end }}
           </li>
           {{- end }}
         </ul>

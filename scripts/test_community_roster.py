@@ -18,6 +18,14 @@ assert SPEC.loader
 SPEC.loader.exec_module(roster)
 
 
+def strip_github_mappings(candidate: dict) -> dict:
+    for person in candidate["roles"]["pmc"] + candidate["roles"]["committers"]:
+        person.pop("github", None)
+        person.pop("avatar", None)
+        person["profile_url"] = f"https://people.apache.org/phonebook.html?uid={person['asf_id']}"
+    return candidate
+
+
 class FakeResponse:
     def __init__(self, raw, *, url, content_type, status=200):
         self.raw = raw
@@ -206,10 +214,11 @@ print(json.dumps([person["asf_id"] for person in result["roles"]["pmc"]]))
         with tempfile.TemporaryDirectory(prefix="community-profile-test-") as directory:
             root = pathlib.Path(directory)
             candidate = json.loads(roster.ROSTER_PATH.read_text())
+            strip_github_mappings(candidate)
             candidate["roles"]["committers"][0]["profile_url"] = "https://example.invalid/profile"
             roster_path, map_path = root / "roster.json", root / "github-map.json"
             roster_path.write_text(json.dumps(candidate))
-            map_path.write_text(roster.MAP_PATH.read_text())
+            map_path.write_text(json.dumps({"schema_version": 1, "mappings": {}}))
             with mock.patch.object(roster, "ROSTER_PATH", roster_path), \
                  mock.patch.object(roster, "MAP_PATH", map_path), \
                  mock.patch.object(roster, "ROOT", root), \
@@ -236,6 +245,7 @@ print(json.dumps([person["asf_id"] for person in result["roles"]["pmc"]]))
 
     def test_avatar_path_rejects_extra_segments_and_symlinks(self):
         base = json.loads(roster.ROSTER_PATH.read_text())
+        strip_github_mappings(base)
         asf_id = base["roles"]["committers"][0]["asf_id"]
         mapping = {"schema_version": 1, "mappings": {asf_id: {"login": "valid-user", "user_id": 1}}}
         for avatar in (
@@ -302,7 +312,7 @@ print(json.dumps([person["asf_id"] for person in result["roles"]["pmc"]]))
 
     def test_member_name_and_initials_must_be_non_empty_and_derived(self):
         base = json.loads(roster.ROSTER_PATH.read_text())
-        mapping = json.loads(roster.MAP_PATH.read_text())
+        mapping = {"schema_version": 1, "mappings": {}}
         for field, value, message in (
             ("name", "", "name must be non-empty"),
             ("initials", "", "initials mismatch"),
@@ -324,7 +334,7 @@ print(json.dumps([person["asf_id"] for person in result["roles"]["pmc"]]))
 
     def test_local_roster_schema_errors_are_roster_errors(self):
         base = json.loads(roster.ROSTER_PATH.read_text())
-        mapping = json.loads(roster.MAP_PATH.read_text())
+        mapping = {"schema_version": 1, "mappings": {}}
         mutations = (
             ("asf_id", [], "invalid ASF ID"),
             ("name", 123, "name must be non-empty"),
@@ -334,6 +344,7 @@ print(json.dumps([person["asf_id"] for person in result["roles"]["pmc"]]))
             with self.subTest(field=field), tempfile.TemporaryDirectory(prefix="community-schema-") as directory:
                 root = pathlib.Path(directory)
                 candidate = json.loads(json.dumps(base))
+                strip_github_mappings(candidate)
                 if field == "retrieved_at":
                     candidate[field] = value
                 else:
@@ -627,14 +638,14 @@ class CommunityContentContractTests(unittest.TestCase):
         expected = {
             "community/index.md": (
                 "## Join the Apache HugeGraph community",
-                "## Get involved",
                 "## Project members",
+                "## Get involved",
                 "## Learn how the project works",
             ),
             "cn/community/index.md": (
                 "## 加入 Apache HugeGraph 社区",
-                "## 参与社区",
                 "## 项目成员",
+                "## 参与社区",
                 "## 了解项目运作方式",
             ),
         }
