@@ -101,6 +101,9 @@ function harness() {
     fireRender(index = renderCallbacks.length - 1) { renderCallbacks[index](); },
     fireTimeout() { Array.from(timers.values()).forEach((callback) => callback()); },
     continueConsent() { consentListeners.get('continue:click')(); },
+    cancelConsent() { consentListeners.get('cancel:click')(); },
+    escapeConsent() { consentListeners.get('dialog:keydown')({ key: 'Escape', preventDefault() {}, stopPropagation() {} }); },
+    nativeCancel() { consentListeners.get('dialog:cancel')({ preventDefault() {} }); },
     installBundle() {
       const queued =
         windowObject.Kapa && Array.isArray(windowObject.Kapa.q)
@@ -212,6 +215,19 @@ test('launcher opens a blank session without auto-submit', () => {
     'open',
     { mode: 'ai', query: '', submit: false },
   ]);
+});
+
+test('cancel, Escape, and native cancel keep Kapa unloaded and restore focus', () => {
+  for (const close of ['cancelConsent', 'escapeConsent', 'nativeCancel']) {
+    const h = harness();
+    const controller = adapter.createController(h.windowObject, h.documentObject, h.config);
+    controller.activate('private question', true, h.trigger);
+    assert.equal(controller.getState(), 'consent');
+    h[close]();
+    assert.equal(controller.getState(), 'idle');
+    assert.equal(h.scripts.length, 0);
+    assert.equal(h.trigger.focused, true);
+  }
 });
 
 test('a pending timeout retries with a fresh script and ignores the late attempt', () => {

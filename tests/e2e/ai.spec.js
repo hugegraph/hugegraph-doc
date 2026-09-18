@@ -71,6 +71,31 @@ for (const [locale, route, source, language] of [
   });
 }
 
+test("AI consent cancel and Escape keep native search local", async ({ page }) => {
+  const requests = [];
+  await page.route("https://widget.kapa.ai/kapa-widget.bundle.js*", async (route) => {
+    requests.push(route.request().url());
+    await route.fulfill({ status: 200, contentType: "text/javascript", body: mockBundle });
+  });
+  await page.goto(AI_ORIGIN + "/docs/");
+  const launcher = page.locator(".hg-ask-ai-launcher");
+  await launcher.click();
+  const consent = page.locator("[data-hg-ai-consent]");
+  await expect(consent).toBeVisible();
+  await consent.locator("[data-hg-ai-cancel]").click();
+  await expect(consent).toBeHidden();
+  await expect(launcher).toBeFocused();
+  expect(requests).toEqual([]);
+  await launcher.click();
+  await expect(consent).toBeVisible();
+  await consent.press("Escape");
+  await expect(consent).toBeHidden();
+  await expect(launcher).toBeFocused();
+  expect(requests).toEqual([]);
+  await page.locator("[data-td-shell-search-open]").first().click();
+  await expect(page.locator(".td-shell-search__input")).toBeVisible();
+});
+
 test("AI 500 remains non-blocking and retry issues one fresh request", async ({ page }) => {
   let attempts = 0;
   await page.route("https://widget.kapa.ai/kapa-widget.bundle.js*", async (route) => {
