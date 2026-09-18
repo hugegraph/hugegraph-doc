@@ -47,3 +47,13 @@ test("build consumers check out the immutable prepared source SHA", () => {
   assert.doesNotMatch(workflow, /test \"\$GITHUB_REF\" = \"refs\/heads\/\$candidate\"/);
   assert.match(workflow, /test \"\$GITHUB_REF\" = \"refs\/heads\/master\"/);
 });
+
+test("dependency artifacts keep stable names across selective reruns", () => {
+  assert.match(workflow, /name: resolved-versions-\$\{\{ github\.run_id \}\}/);
+  assert.match(workflow, /name: \$\{\{ needs\.prepare\.outputs\.artifact_prefix \}\}-\$\{\{ matrix\.version\.id \}\}-\$\{\{ github\.run_id \}\}/);
+  assert.match(workflow, /pattern: \$\{\{ needs\.prepare\.outputs\.artifact_prefix \}\}-\*-\$\{\{ github\.run_id \}\}/);
+  assert.match(workflow, /--artifact-suffix="-\$\{GITHUB_RUN_ID\}"/);
+  assert.match(workflow, /name: hugegraph-site-\$\{\{ needs\.prepare\.outputs\.artifact_prefix \}\}-\$\{\{ github\.run_id \}\}/);
+  assert.doesNotMatch(workflow, /name: (?:resolved-versions|hugegraph-site-[^\n]+)-\$\{\{ github\.run_id \}\}-\$\{\{ github\.run_attempt \}\}/);
+  assert.equal((workflow.match(/\n\s+overwrite: true/g) ?? []).length, 3);
+});
