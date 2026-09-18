@@ -204,9 +204,13 @@ class DownloadDataTest(unittest.TestCase):
             text = page.read_text(encoding="utf-8")
             self.assertIn("hg-asf-release", text, page)
             self.assertIn("1.7.0", text, page)
-            self.assertGreaterEqual(text.count("downloads.apache.org"), 31, page)
-            self.assertGreaterEqual(text.count("dyn/closer.lua"), 31, page)
-            self.assertGreaterEqual(text.count(".sha512"), 31, page)
+            for version, expected_files in EXPECTED_ARTIFACTS.items():
+                self.assertIn(f"hugegraph-{version}-release-notes", text, page)
+                for filename in expected_files:
+                    self.assertIn(filename, text, page)
+                    self.assertIn(f"/dyn/closer.lua/hugegraph/{version}/{filename}?action=download", text, page)
+                    self.assertIn(f"downloads.apache.org/hugegraph/{version}/{filename}.asc", text, page)
+                    self.assertIn(f"downloads.apache.org/hugegraph/{version}/{filename}.sha512", text, page)
 
 
 if __name__ == "__main__":
