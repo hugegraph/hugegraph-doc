@@ -1,7 +1,7 @@
 {
   "schema_version": 1,
   "project": "hugegraph",
-  "retrieved_at": "2026-09-18T15:38:33Z",
+  "retrieved_at": "2026-09-18T18:07:38Z",
   "source": {
     "committee": "https://whimsy.apache.org/public/committee-info.json",
     "projects": "https://whimsy.apache.org/public/public_ldap_projects.json",
@@ -211,7 +211,12 @@
         "name": "Jacky Yang",
         "initials": "JY",
         "chair": false,
-        "profile_url": "https://people.apache.org/phonebook.html?uid=yangjiaqi"
+        "profile_url": "https://github.com/JackyYangPassion",
+        "github": {
+          "login": "JackyYangPassion",
+          "user_id": 13795366
+        },
+        "avatar": "/img/community/avatars/55d7d9385e8d21e38d7cfcdadfc559f0002ef1b63a2a517fda0cd5a09f4a820d.webp"
       },
       {
         "asf_id": "jsong010123",

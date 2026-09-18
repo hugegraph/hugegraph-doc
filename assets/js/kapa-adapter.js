@@ -324,6 +324,19 @@
     }
     documentObject.querySelectorAll('[data-hg-ask-ai]').forEach(bind);
 
+    // Keep the OINK palette untouched: only intercept Enter when local search
+    // is empty and the site-owned Ask AI tail is the available follow-up.
+    input.addEventListener('keydown', function (event) {
+      if (event.isComposing || event.keyCode === 229 || event.key !== 'Enter') return;
+      var empty = list.querySelector('.td-shell-search__empty');
+      var localRow = list.querySelector('.td-shell-search__item:not(.hg-ai-search-tail__button)');
+      var tailButton = list.querySelector('[data-hg-ai-search-tail] [data-hg-ask-ai]');
+      if (!empty || localRow || !tailButton) return;
+      event.preventDefault();
+      event.stopImmediatePropagation();
+      controller.activate(input.value, true, tailButton);
+    }, true);
+
     function syncTail() {
       syncing = false;
       if (!root || !input || !list || root.hidden) return;
@@ -333,6 +346,8 @@
         if (old) old.remove();
         return;
       }
+      var empty = list.querySelector('.td-shell-search__empty');
+      if (empty && config.labels.noResults) empty.textContent = config.labels.noResults;
       var choiceLabel = root.dataset.tdTChoice || '';
       if (
         choiceLabel &&
