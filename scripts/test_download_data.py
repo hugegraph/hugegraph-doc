@@ -196,7 +196,8 @@ class DownloadDataTest(unittest.TestCase):
             self.assertEqual(missing, set(), catalogue)
 
     def test_rendered_download_pages_have_verified_rows(self) -> None:
-        self.skipTest("set DOWNLOAD_PUBLIC_DIR after an aggregate build") if PUBLIC_DIR is None else None
+        if PUBLIC_DIR is None:
+            self.skipTest("set DOWNLOAD_PUBLIC_DIR after an aggregate build")
         for relative in ("docs/download/download/index.html", "cn/docs/download/download/index.html"):
             page = PUBLIC_DIR / relative
             self.assertTrue(page.is_file(), page)
