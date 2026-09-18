@@ -176,6 +176,7 @@
       panel.addEventListener('pointerenter', function () {
         windowObject.clearTimeout(closeTimer);
       });
+      panel.addEventListener('pointerleave', closePreview);
       panel.addEventListener('focusout', closePreview);
       panel.addEventListener('keydown', function (event) {
         if (event.key !== 'Escape' || !dynamic()) return;
