@@ -98,8 +98,8 @@
       },
       {
         "asf_id": "jin",
-        "name": "imbajin",
-        "initials": "I",
+        "name": "Imba Jin",
+        "initials": "IJ",
         "chair": false,
         "profile_url": "https://github.com/imbajin",
         "github": {
@@ -257,6 +257,13 @@
         "avatar": "/img/community/avatars/87ba3c0066e31c0f584706ea1b7782a18a74ed0957ca02c1ac16e1bfa58c899f.webp"
       },
       {
+        "asf_id": "spica",
+        "name": "Thespica",
+        "initials": "T",
+        "chair": false,
+        "profile_url": "https://people.apache.org/phonebook.html?uid=spica"
+      },
+      {
         "asf_id": "wangjing",
         "name": "wanganjuan",
         "initials": "W",
@@ -286,13 +293,6 @@
           "user_id": 5474723
         },
         "avatar": "/img/community/avatars/2b8f6cf3f85038d5a0668a64df2ef2131eaf935f9e8abf69e468cbeb1474ac75.webp"
-      },
-      {
-        "asf_id": "spica",
-        "name": "Zhe Wang",
-        "initials": "ZW",
-        "chair": false,
-        "profile_url": "https://people.apache.org/phonebook.html?uid=spica"
       }
     ]
   }
