@@ -35,8 +35,7 @@ sections:
 
             - [GitHub](https://github.com/apache/hugegraph) — development takes place in the Apache HugeGraph repositories.
             - [Developer mailing list](/docs/contribution-guidelines/subscribe/) — discuss project and community topics.
-            - [Security mailing list](mailto:security@hugegraph.apache.org) — report security issues privately.
-            - [Security policy](/docs/guides/security/) — follow the project's security reporting process.
+            - [Security reporting](mailto:security@hugegraph.apache.org) and [security policy](/docs/guides/security/) — report issues and follow the project's process.
             - [Contribution guidelines](/docs/contribution-guidelines/) — learn how to contribute code and documentation.
             - [How to become a HugeGraph Committer](/docs/contribution-guidelines/committer-guidelines/) — understand the Apache nomination and election process.
             - [Committer resources](https://infra.apache.org/committers.html) — Apache Committers and PMC members can check and apply for open source programs or member benefits from OpenAI, Anthropic, GitHub, JetBrains, and other providers, subject to each program's eligibility and terms.
