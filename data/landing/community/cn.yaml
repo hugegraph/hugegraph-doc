@@ -37,8 +37,7 @@ sections:
             - [开发者邮件列表](/cn/docs/contribution-guidelines/subscribe/) — 讨论项目开发和社区事务。
             - [安全报告](mailto:security@hugegraph.apache.org) 与 [安全策略](/cn/docs/guides/security/) — 私下报告安全问题并了解处理流程。
             - [贡献指南](/cn/docs/contribution-guidelines/) — 了解如何贡献代码和文档。
-            - [如何成为 HugeGraph Committer](/cn/docs/contribution-guidelines/committer-guidelines/) — 了解 Apache Committer 的提名与选举流程。
-            - [Committer 资源](https://infra.apache.org/committers.html) — Apache Committer 和 PMC 成员可根据各项目的资格与条款，关注并申请 OpenAI、Anthropic、GitHub、JetBrains 等厂商提供的开源计划或会员权益。
+            - [Committer 资源](https://infra.apache.org/committers.html) — OpenAI、Anthropic、GitHub、JetBrains 等开源权益，按各项目资格与条款申请。
 
   - type: markdown
     data:

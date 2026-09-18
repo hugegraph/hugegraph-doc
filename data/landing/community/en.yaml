@@ -37,8 +37,7 @@ sections:
             - [Developer mailing list](/docs/contribution-guidelines/subscribe/) — discuss project and community topics.
             - [Security reporting](mailto:security@hugegraph.apache.org) and [security policy](/docs/guides/security/) — report issues and follow the project's process.
             - [Contribution guidelines](/docs/contribution-guidelines/) — learn how to contribute code and documentation.
-            - [How to become a HugeGraph Committer](/docs/contribution-guidelines/committer-guidelines/) — understand the Apache nomination and election process.
-            - [Committer resources](https://infra.apache.org/committers.html) — Apache Committers and PMC members can check and apply for open source programs or member benefits from OpenAI, Anthropic, GitHub, JetBrains, and other providers, subject to each program's eligibility and terms.
+            - [Committer resources](https://infra.apache.org/committers.html) — open source benefits from OpenAI, Anthropic, GitHub, JetBrains, and others, subject to each program's eligibility and terms.
 
   - type: cta
     data:

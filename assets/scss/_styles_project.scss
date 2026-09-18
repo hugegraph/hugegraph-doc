@@ -596,7 +596,10 @@
   position: fixed;
   z-index: 1040;
   inset-inline-end: unquote('max(1rem, env(safe-area-inset-right))');
-  inset-block-end: unquote('max(1rem, env(safe-area-inset-bottom))');
+  // Keep the launcher clear of the footer while preserving the safe-area
+  // inset on mobile. The offset is intentionally site-owned so OINK upgrades
+  // do not require changing the widget or theme source.
+  inset-block-end: unquote('calc(max(1rem, env(safe-area-inset-bottom)) + 4rem)');
   display: inline-flex;
   align-items: center;
   gap: 0.45rem;
@@ -630,7 +633,7 @@
   z-index: 1039;
   inset-inline-end: unquote('max(1rem, env(safe-area-inset-right))');
   inset-block-end: unquote(
-    'calc(max(1rem, env(safe-area-inset-bottom)) + 3.4rem)'
+    'calc(max(1rem, env(safe-area-inset-bottom)) + 6.8rem)'
   );
   width: unquote('min(18rem, calc(100vw - 2rem))');
   padding: 0.55rem 0.7rem;
