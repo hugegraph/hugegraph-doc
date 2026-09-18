@@ -352,6 +352,26 @@
       }
     }
   }
+
+  // A hover preview is a continuation of the global header, rather than a
+  // second offset card. Align its panel to the same top and left edges so the
+  // brand row and navbar read as one surface while the normal sidebar keeps
+  // its authored overlay geometry.
+  [data-td-shell-sidebar='collapsed']
+    .td-shell-sidebar--overlay
+    .td-shell-sidebar__panel {
+    inset-block-start: 0;
+    transform: translateX(0);
+    border-block-start: 0;
+    border-start-start-radius: 0;
+    border-start-end-radius: 0;
+  }
+
+  [dir='rtl'][data-td-shell-sidebar='collapsed']
+    .td-shell-sidebar--overlay
+    .td-shell-sidebar__panel {
+    transform: translateX(0);
+  }
 }
 
 @media (forced-colors: active) and (min-width: 768px) {
