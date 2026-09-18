@@ -61,6 +61,20 @@ class CommunityRosterTests(unittest.TestCase):
         self.assertEqual(["other"], [p["asf_id"] for p in candidate["roles"]["committers"]])
         self.assertTrue(candidate["roles"]["pmc"][0]["chair"])
 
+    def test_github_login_is_default_display_name_with_explicit_name_override(self):
+        committee, projects, people, _ = self.fixture()
+        mapping = {
+            "schema_version": 1,
+            "mappings": {"zeta": {"login": "willem-user", "user_id": 1}},
+        }
+        candidate = roster.build_roster(committee, projects, people, mapping)
+        zeta = next(person for person in candidate["roles"]["pmc"] if person["asf_id"] == "zeta")
+        self.assertEqual("willem-user", zeta["name"])
+        mapping["public_names"] = {"zeta": "Willem Jiang"}
+        candidate = roster.build_roster(committee, projects, people, mapping)
+        zeta = next(person for person in candidate["roles"]["pmc"] if person["asf_id"] == "zeta")
+        self.assertEqual("Willem Jiang", zeta["name"])
+
     def test_same_names_use_asf_id_tiebreaker_across_hash_seeds(self):
         program = f"""
 import importlib.util, json

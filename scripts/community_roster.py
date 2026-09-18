@@ -360,6 +360,7 @@ def build_roster(committee_data: dict, projects_data: dict, people_data: dict, m
         raise RosterError("committee roster and LDAP owners disagree")
     mappings = _validate_mapping(mapping_data, member_ids)
     names = {asf_id: _person_name(people_data, asf_id) for asf_id in member_ids}
+    names.update({asf_id: mapping["login"] for asf_id, mapping in mappings.items()})
     names.update({asf_id: public_name for asf_id, public_name in mapping_data.get("public_names", {}).items()})
     pmc_ids = [chair] + sorted(owner_ids - {chair}, key=lambda item: _sort_key(item, names))
     committer_ids = sorted(member_ids - owner_ids, key=lambda item: _sort_key(item, names))

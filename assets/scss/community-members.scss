@@ -1,6 +1,10 @@
 .hg-community-members {
   --hg-community-columns: 4;
-  &__role + &__role { margin-top: 2.5rem; }
+  padding-block: 3rem;
+  &__role {
+    padding-block: 1.5rem;
+  }
+  &__role + &__role { margin-top: 1rem; }
   &__header h2 {
     margin-bottom: .65rem;
     font-size: clamp(2rem, 3vw, 2.75rem);
@@ -16,9 +20,15 @@
     list-style: none;
   }
 }
+.td-default main .hg-community-members { padding: 3rem 0; }
+.td-default main .hg-community-members__role { padding: 1.5rem 0; }
 .hg-community-member {
   min-width: 0;
   padding: 0;
+  border: 0;
+  border-radius: 0;
+  background: transparent;
+  box-shadow: none;
   &__surface {
     display: flex;
     min-height: 5.25rem;
@@ -27,7 +37,7 @@
     padding: .85rem 1rem;
     color: inherit;
     text-decoration: none;
-    border: 1px solid var(--td-border-color);
+    border: 1px solid var(--td-line, var(--bs-border-color));
     border-radius: 1rem;
     background: var(--td-card-bg, var(--bs-body-bg));
     box-shadow: 0 .35rem 1rem rgba(35, 45, 75, .07);
@@ -67,7 +77,12 @@
   .hg-community-members { --hg-community-columns: 3; }
 }
 @media (max-width: 767.98px) {
-  .hg-community-members { --hg-community-columns: 2; }
+  .hg-community-members {
+    --hg-community-columns: 2;
+    padding: 2rem 0;
+  }
+  .td-default main .hg-community-members { padding: 2rem 0; }
+  .td-default main .hg-community-members__role { padding: 1rem 0; }
   .hg-community-members__grid { gap: .75rem; }
   .hg-community-member__surface { gap: .65rem; padding: .7rem; }
   .hg-community-member__avatar {
