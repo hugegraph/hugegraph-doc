@@ -75,6 +75,16 @@ class CommunityRosterTests(unittest.TestCase):
         zeta = next(person for person in candidate["roles"]["pmc"] if person["asf_id"] == "zeta")
         self.assertEqual("Willem Jiang", zeta["name"])
 
+    def test_display_order_can_override_public_name_sorting(self):
+        committee, projects, people, _ = self.fixture()
+        projects["projects"]["hugegraph"]["owners"] = ["zeta", "chair", "alpha"]
+        projects["projects"]["hugegraph"]["members"] = ["other", "zeta", "chair", "alpha"]
+        committee["committees"]["hugegraph"]["roster"]["alpha"] = {}
+        people["people"]["alpha"] = {"name": "Carp84"}
+        mapping = {"schema_version": 1, "mappings": {}, "display_order": {"pmc": ["zeta", "alpha"]}}
+        candidate = roster.build_roster(committee, projects, people, mapping)
+        self.assertEqual(["chair", "zeta", "alpha"], [p["asf_id"] for p in candidate["roles"]["pmc"]])
+
     def test_same_names_use_asf_id_tiebreaker_across_hash_seeds(self):
         program = f"""
 import importlib.util, json
@@ -232,7 +242,7 @@ print(json.dumps([person["asf_id"] for person in result["roles"]["pmc"]]))
             candidate["roles"]["committers"][0]["profile_url"] = "https://example.invalid/profile"
             roster_path, map_path = root / "roster.json", root / "github-map.json"
             roster_path.write_text(json.dumps(candidate))
-            map_path.write_text(json.dumps({"schema_version": 1, "mappings": {}}))
+            map_path.write_text(json.dumps({"schema_version": 1, "mappings": {}, "display_order": {"pmc": ["jin", "zhaocong", "lidongdai", "liyu"]}}))
             with mock.patch.object(roster, "ROSTER_PATH", roster_path), \
                  mock.patch.object(roster, "MAP_PATH", map_path), \
                  mock.patch.object(roster, "ROOT", root), \
@@ -261,7 +271,7 @@ print(json.dumps([person["asf_id"] for person in result["roles"]["pmc"]]))
         base = json.loads(roster.ROSTER_PATH.read_text())
         strip_github_mappings(base)
         asf_id = base["roles"]["committers"][0]["asf_id"]
-        mapping = {"schema_version": 1, "mappings": {asf_id: {"login": "valid-user", "user_id": 1}}}
+        mapping = {"schema_version": 1, "mappings": {asf_id: {"login": "valid-user", "user_id": 1}}, "display_order": {"pmc": ["jin", "zhaocong", "lidongdai", "liyu"]}}
         for avatar in (
             "/img/community/avatars/extra/" + "a" * 64 + ".webp",
             "/img/community/avatars/../" + "a" * 64 + ".webp",
@@ -326,7 +336,7 @@ print(json.dumps([person["asf_id"] for person in result["roles"]["pmc"]]))
 
     def test_member_name_and_initials_must_be_non_empty_and_derived(self):
         base = json.loads(roster.ROSTER_PATH.read_text())
-        mapping = {"schema_version": 1, "mappings": {}}
+        mapping = {"schema_version": 1, "mappings": {}, "display_order": {"pmc": ["jin", "zhaocong", "lidongdai", "liyu"]}}
         for field, value, message in (
             ("name", "", "name must be non-empty"),
             ("initials", "", "initials mismatch"),
@@ -348,7 +358,7 @@ print(json.dumps([person["asf_id"] for person in result["roles"]["pmc"]]))
 
     def test_local_roster_schema_errors_are_roster_errors(self):
         base = json.loads(roster.ROSTER_PATH.read_text())
-        mapping = {"schema_version": 1, "mappings": {}}
+        mapping = {"schema_version": 1, "mappings": {}, "display_order": {"pmc": ["jin", "zhaocong", "lidongdai", "liyu"]}}
         mutations = (
             ("asf_id", [], "invalid ASF ID"),
             ("name", 123, "name must be non-empty"),

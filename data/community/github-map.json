@@ -8,6 +8,9 @@
     "spica": "Thespica",
     "yangjiaqi": "Jacky Yang"
   },
+  "display_order": {
+    "pmc": ["jin", "zhaocong", "lidongdai", "liyu"]
+  },
   "mappings": {
     "guoshoujing": {
       "login": "corgiboygsj",
