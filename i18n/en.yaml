@@ -4,6 +4,7 @@ ui_ask_ai_description: Powered by Kapa; only your question is sent.
 ui_ask_ai_latest: Answers use the latest documentation
 ui_retry: Retry
 ui_ai_error: AI is temporarily unavailable. Local search is unaffected.
+ui_more_versions: More versions
 download_release_version: Version
 download_release_date: Release Date
 download_release_notes: Release Notes

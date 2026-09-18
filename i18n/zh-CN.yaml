@@ -240,6 +240,7 @@ ui_ask_ai_description: 由 Kapa 提供；仅发送你的问题。
 ui_ask_ai_latest: 回答基于 latest 文档
 ui_retry: 重试
 ui_ai_error: AI 暂时不可用，本地搜索不受影响。
+ui_more_versions: 更多版本
 download_release_version: 版本
 download_release_date: 发布日期
 download_release_notes: 发布说明
