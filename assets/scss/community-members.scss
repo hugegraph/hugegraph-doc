@@ -23,6 +23,7 @@
 .td-default main .hg-community-members { padding: 3rem 0; }
 .td-default main .hg-community-members__role { padding: 1.5rem 0; }
 .hg-community-member {
+  display: block;
   min-width: 0;
   padding: 0;
   border: 0;
@@ -31,6 +32,7 @@
   box-shadow: none;
   &__surface {
     display: flex;
+    width: 100%;
     min-height: 5.25rem;
     align-items: center;
     gap: .9rem;
