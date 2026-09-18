@@ -4,7 +4,7 @@ for (const locale of ["en", "cn"]) {
   const prefix = locale === "cn" ? "/cn" : "";
   test(`latest ${locale} sidebar persists and isolates collapse`, async ({ page }) => {
     await page.goto(`${prefix}/docs/introduction/`);
-    const key = `oink.sidebar.v1.latest.${locale}`;
+    const key = `oink.sidebar.v2.latest.${locale}`;
     await expect.poll(() => page.evaluate((name) => localStorage.getItem(name), key))
       .not.toBeNull();
     const toggle = page
@@ -54,6 +54,32 @@ for (const locale of ["en", "cn"]) {
     await expect(page.locator("#td-shell-sidebar")).toHaveJSProperty("inert", true);
     await expect(opener).toBeFocused();
     await expect(page.locator("html")).not.toHaveAttribute("data-td-shell-lock", "");
+  });
+}
+
+for (const locale of ["en", "cn"]) {
+  const prefix = locale === "cn" ? "/cn" : "";
+  test(`latest ${locale} docs home opens start and components by default`, async ({ page }) => {
+    const key = `oink.sidebar.v2.latest.${locale}`;
+    await page.goto(`${prefix}/docs/`);
+    await page.evaluate((name) => localStorage.removeItem(name), key);
+    await page.reload();
+    const start = page.locator(
+      '#td-shell-sidebar [data-td-shell-tree-toggle][aria-controls$="_navstart-children"]',
+    );
+    const components = page.locator(
+      '#td-shell-sidebar [data-td-shell-tree-toggle][aria-controls$="_navcomponents-children"]',
+    );
+    const develop = page.locator(
+      '#td-shell-sidebar [data-td-shell-tree-toggle][aria-controls$="_navdevelop-children"]',
+    );
+    await expect(start).toHaveAttribute("aria-expanded", "true");
+    await expect(components).toHaveAttribute("aria-expanded", "true");
+    await expect(develop).toHaveAttribute("aria-expanded", "false");
+    await start.click();
+    await page.reload();
+    await expect(page.locator(`[aria-controls="${await start.getAttribute("aria-controls")}"]`))
+      .toHaveAttribute("aria-expanded", "false");
   });
 }
 
