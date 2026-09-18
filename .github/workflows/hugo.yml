@@ -51,6 +51,7 @@ jobs:
       artifact_prefix: ${{ steps.plan.outputs.artifact_prefix }}
       publish_branch: ${{ steps.plan.outputs.publish_branch }}
       latest_sha: ${{ steps.plan.outputs.latest_sha }}
+      source_sha: ${{ steps.plan.outputs.source_sha }}
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7
         with:
@@ -103,7 +104,6 @@ jobs:
           latest_sha="$EVENT_SHA"
 
           if [[ "$EVENT_NAME" == workflow_dispatch ]]; then
-            test "$GITHUB_REF" = refs/heads/master
             candidate="$CANDIDATE_BRANCH"
             test -n "$candidate"
             [[ "$candidate" =~ ^[A-Za-z0-9][A-Za-z0-9._/-]*$ ]]
@@ -119,6 +119,9 @@ jobs:
 
             case "$OPERATION" in
               staging-next)
+                # Dispatches must load this privileged workflow from master;
+                # the candidate is data resolved to an immutable commit below.
+                test "$GITHUB_REF" = "refs/heads/master"
                 test "$CONFIRMATION" = "publish asf-staging-oink"
                 site_origin="$STAGING_ORIGIN"
                 artifact_prefix="staging"
@@ -131,6 +134,7 @@ jobs:
                 fi
                 ;;
               production-history-refresh)
+                test "$GITHUB_REF" = refs/heads/master
                 test "$CONFIRMATION" = "publish asf-site"
                 test "$candidate" = "$latest_ref"
                 test "$SCOPE" = full
@@ -152,6 +156,7 @@ jobs:
             echo "artifact_prefix=$artifact_prefix"
             echo "publish_branch=$publish_branch"
             echo "latest_sha=$latest_sha"
+            echo "source_sha=$latest_sha"
           } >> "$GITHUB_OUTPUT"
 
       - name: Validate source and version tooling
@@ -193,7 +198,7 @@ jobs:
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7
         with:
-          ref: ${{ github.event.pull_request.head.sha || github.sha }}
+          ref: ${{ needs.prepare.outputs.source_sha }}
           fetch-depth: 0
           persist-credentials: false
       - uses: actions/setup-python@ece7cb06caefa5fff74198d8649806c4678c61a1 # v6
@@ -259,7 +264,7 @@ jobs:
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7
         with:
-          ref: ${{ github.event.pull_request.head.sha || github.sha }}
+          ref: ${{ needs.prepare.outputs.source_sha }}
           persist-credentials: false
       - uses: actions/setup-python@ece7cb06caefa5fff74198d8649806c4678c61a1 # v6
         with:
@@ -290,6 +295,10 @@ jobs:
             --site-origin "$SITE_ORIGIN" --historical-origin "$HISTORICAL_ORIGIN" \
             --select "$SELECTION" \
             --output "${RUNNER_TEMP}/public-site" "${extra[@]}"
+      - name: Verify rendered download contracts
+        env:
+          DOWNLOAD_PUBLIC_DIR: ${{ runner.temp }}/public-site
+        run: python3 -m unittest scripts.test_download_data.DownloadDataTest.test_rendered_download_pages_have_verified_rows -v
       - name: Upload publishable aggregate
         uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7
         with:
@@ -309,7 +318,7 @@ jobs:
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7
         with:
-          ref: ${{ github.event.pull_request.head.sha || github.sha }}
+          ref: ${{ needs.prepare.outputs.source_sha }}
           persist-credentials: false
       - uses: actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020 # v4
         with:
@@ -372,7 +381,7 @@ jobs:
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7
         with:
-          ref: ${{ github.event.pull_request.head.sha || github.sha }}
+          ref: ${{ needs.prepare.outputs.source_sha }}
           persist-credentials: false
       - uses: actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020 # v4
         with:

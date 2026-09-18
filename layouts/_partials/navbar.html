@@ -77,23 +77,7 @@
             {{- partialCached "shell/icon.html" "code-branch" "navbar-version-code-branch" -}}
           </button>
           <div class="td-nav-hover-menu__pop" role="group" aria-label="{{ $menuName | plainify }}">
-            {{- range . }}
-            {{- if eq .name "---" }}
-            <hr class="td-nav-hover-menu__divider">
-            {{- else }}
-            {{- $url := strings.TrimSuffix "/" (.url | default "") }}
-            {{- $isActive := or (eq .version $.Site.Params.version) (eq (strings.TrimSuffix "/" $.Site.BaseURL) $url) }}
-            {{- if $url }}
-            {{- partial "version-link.html" (dict
-              "page" $ "version" . "active" $isActive "icon" false
-              "class" (printf "td-nav-hover-menu__option%s" (cond $isActive " td-is-active" ""))
-              "iconKey" (printf "navbar-version-%s" .version)
-            ) -}}
-            {{- else }}
-            <span class="td-nav-hover-menu__option td-is-disabled">{{ .name | default .version | markdownify }}</span>
-            {{- end }}
-            {{- end }}
-            {{- end }}
+            {{ partial "version-menu-links.html" (dict "page" $ "versions" . "class" "td-nav-hover-menu__option" "icon" false "key" "navbar") }}
           </div>
         </div>
         {{- end }}
@@ -168,16 +152,7 @@
         </div>
         {{- else if and (eq .Identifier "docs") $.Site.Params.versions }}
         <div class="td-site-drawer__children" aria-label="{{ $.Site.Params.version_menu | default "Version" }}">
-          {{- range $.Site.Params.versions }}
-            {{- $url := strings.TrimSuffix "/" (.url | default "") -}}
-            {{- if $url }}
-            {{- partial "version-link.html" (dict
-              "page" $ "version" . "active" (eq .version $.Site.Params.version)
-              "class" "td-site-nav__menu-link td-site-nav__menu-child"
-              "iconKey" (printf "landing-mobile-version-%s" .version)
-            ) -}}
-            {{- end }}
-          {{- end }}
+          {{ partial "version-menu-links.html" (dict "page" $ "versions" $.Site.Params.versions "class" "td-site-nav__menu-link td-site-nav__menu-child" "key" "landing-mobile") }}
         </div>
         {{- end }}
       {{- end }}

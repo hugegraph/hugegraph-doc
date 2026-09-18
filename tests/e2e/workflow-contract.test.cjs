@@ -37,3 +37,13 @@ test("only publish receives write permission", () => {
   );
   assert.doesNotMatch(workflow, /write-all/);
 });
+
+test("build consumers check out the immutable prepared source SHA", () => {
+  assert.match(workflow, /echo "source_sha=\$latest_sha"/);
+  const refs = [...workflow.matchAll(/^\s+ref: \$\{\{([^}]+)\}\}/gm)].map((match) => match[1]);
+  assert.equal(refs.length, 5);
+  assert.doesNotMatch(refs[0], /candidate_branch/);
+  assert.equal(refs.slice(1).filter((ref) => ref.includes("needs.prepare.outputs.source_sha")).length, 4);
+  assert.doesNotMatch(workflow, /test \"\$GITHUB_REF\" = \"refs\/heads\/\$candidate\"/);
+  assert.match(workflow, /test \"\$GITHUB_REF\" = \"refs\/heads\/master\"/);
+});

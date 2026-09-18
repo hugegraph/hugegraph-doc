@@ -96,8 +96,8 @@ test('shell persistence uses the version and locale scoped key', () => {
 test('all three version selector surfaces expose one stable route contract', () => {
   const navbar = read('layouts/_partials/navbar.html');
   const sidebar = read('layouts/_partials/shell/sidebar-panel.html');
-  assert.equal((navbar.match(/partial "version-link\.html"/g) || []).length, 2);
-  assert.equal((sidebar.match(/partial "version-link\.html"/g) || []).length, 1);
+  assert.equal((navbar.match(/partial "version-menu-links\.html"/g) || []).length, 2);
+  assert.equal((sidebar.match(/partial "version-menu-links\.html"/g) || []).length, 1);
   assert.match(
     read('layouts/_partials/version-link.html'),
     /data-hg-version-id=/,

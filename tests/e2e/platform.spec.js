@@ -25,6 +25,19 @@ for (const locale of ["en", "cn"]) {
     await expect(page.locator("#td-shell-sidebar")).toHaveJSProperty("inert", true);
     const restore = page.locator(".hg-sidebar-restore");
     await expect(restore).toBeVisible();
+    const edge = page.locator(".hg-sidebar-edge");
+    const panel = page.locator(".td-shell-sidebar__panel");
+    await page.waitForTimeout(200);
+    await edge.dispatchEvent("pointerenter", { pointerType: "mouse" });
+    await expect(page.locator("#td-shell-sidebar")).toHaveClass(
+      /td-shell-sidebar--overlay/
+    );
+    await panel.dispatchEvent("pointerenter", { pointerType: "mouse" });
+    await panel.dispatchEvent("pointerleave", { pointerType: "mouse" });
+    await expect.poll(
+      () => page.locator("#td-shell-sidebar").getAttribute("class"),
+      { timeout: 1500 }
+    ).not.toContain("td-shell-sidebar--overlay");
     await restore.click();
     await expect(page.locator("#td-shell-sidebar")).not.toHaveAttribute(
       "aria-hidden", "true"

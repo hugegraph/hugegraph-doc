@@ -166,6 +166,7 @@ test("historical selectors preserve the readme route across desktop, mobile, and
   const mobile = page.locator(
     "#td-shell-sidebar a[data-hg-version-id='1.3']"
   );
+  await page.locator("#td-shell-sidebar .hg-version-overflow summary").click();
   await mobile.click();
   await expect(page).toHaveURL((url) =>
     url.pathname === "/versions/1.3/cn/docs/introduction/readme/" &&
@@ -230,6 +231,7 @@ test("introduction aliases resolve bidirectionally without merging canonical pag
   await page.setViewportSize({ width: 390, height: 844 });
   await page.goto("/cn/docs/introduction/?query=history#overview");
   await page.locator("[data-td-shell-drawer-open]").click();
+  await page.locator("#td-shell-sidebar .hg-version-overflow summary").click();
   await page
     .locator("#td-shell-sidebar a[data-hg-version-id='1.3']")
     .click();
