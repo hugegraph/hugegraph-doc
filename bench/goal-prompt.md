@@ -24,12 +24,14 @@ Host: library (12 threads i5-11400H, 15G RAM, about 13G available, 107G free dis
 - The stopped wearwise-* and f1-* containers, their volumes and their images stay exactly as they are: never start, remove or prune them, never `docker compose down` the wearwise-live project, never `kind delete` f1, never `docker volume prune` or `docker system prune`.
 - Work under ~/hg-bench on library. Remove only the benchmark's own images, containers and volumes at the end. Leave wearwise and f1 stopped; the owner restarts them.
 
-Record in bench/ on this branch:
+Record in bench/ on this branch. One concern per file, never lumped into the handoff:
 
-- env.md: hardware, OS, kernel, JVM, docker, each system version, every config delta from default, exact invocation lines
-- run-log.md: date, system, dataset, wall time per test, anomalies
+- env.md: hardware, OS, kernel, JVM, docker versions, one section per system with its version, config deltas from default and exact invocation lines
+- setup-<system>.md: how that system was installed and started, one file each (hugegraph-single, hugegraph-cluster, neo4j, janusgraph)
+- run-log.md: date, system, dataset, wall time per test, one line per run
 - results/: raw output per run, csv or json, named <system>-<dataset>-<test>-<n>
-- handoff.md: current state and next step, updated at every stop
+- notes/<topic>.md: anomalies, deviations from this prompt, reimplementation details, anything that needs more than a line
+- handoff.md: ONLY current state and next step, a few lines, updated at every stop. No data, no logs, no results in it; link the file that has them
 
 Git: commits via git commit-tree as Himanshu Verma, no AI references anywhere, push only this branch, never force-push. No PR until told.
 
