@@ -1,0 +1,23 @@
+{
+ "system": "hugegraph-single",
+ "image": "sha256:18751704849e6b113791914b4e710a64afe41182208c7ff0af417c554ef323f9",
+ "dataset": "enron",
+ "test": "cw",
+ "run": "3",
+ "wall_seconds": 3.037,
+ "ops": 367662,
+ "timestamp": "2026-09-19T19:59:04+0530",
+ "params": {
+  "batch": 500,
+  "siw_edges": 10000,
+  "fs_targets": 100,
+  "fs_max_depth": 6,
+  "fs_timeout_s": 60,
+  "seed": 42
+ },
+ "detail": {
+  "edges_read": 367662,
+  "communities": 1264,
+  "modularity": 0.6114
+ }
+}

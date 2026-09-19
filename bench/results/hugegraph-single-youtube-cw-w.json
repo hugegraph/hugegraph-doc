@@ -1,0 +1,23 @@
+{
+ "system": "hugegraph-single",
+ "image": "sha256:18751704849e6b113791914b4e710a64afe41182208c7ff0af417c554ef323f9",
+ "dataset": "youtube",
+ "test": "cw",
+ "run": "w",
+ "wall_seconds": 37.47,
+ "ops": 2987624,
+ "timestamp": "2026-09-19T20:19:17+0530",
+ "params": {
+  "batch": 500,
+  "siw_edges": 10000,
+  "fs_targets": 100,
+  "fs_max_depth": 6,
+  "fs_timeout_s": 60,
+  "seed": 42
+ },
+ "detail": {
+  "edges_read": 2987624,
+  "communities": 7032,
+  "modularity": 0.7182
+ }
+}

@@ -1,5 +1,6 @@
 # Handoff
 
-State: harness built, hugegraph-single validated, runs starting.
-Next: run all datasets on hugegraph-single, commit, push.
-Substance: [env.md](env.md), [notes/method.md](notes/method.md), [notes/datasets.md](notes/datasets.md).
+State: hugegraph-single complete (all 4 datasets, all 6 tests, no gaps);
+raw runs in [results/](results/), timings in [run-log.md](run-log.md).
+Next: bring up the PD+Store+Server hstore cluster (compose in
+[runner/hstore-compose.yml](runner/hstore-compose.yml)) and run it.

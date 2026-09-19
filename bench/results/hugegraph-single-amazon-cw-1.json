@@ -1,0 +1,23 @@
+{
+ "system": "hugegraph-single",
+ "image": "sha256:18751704849e6b113791914b4e710a64afe41182208c7ff0af417c554ef323f9",
+ "dataset": "amazon",
+ "test": "cw",
+ "run": "1",
+ "wall_seconds": 38.467,
+ "ops": 3387388,
+ "timestamp": "2026-09-19T20:08:23+0530",
+ "params": {
+  "batch": 500,
+  "siw_edges": 10000,
+  "fs_targets": 100,
+  "fs_max_depth": 6,
+  "fs_timeout_s": 60,
+  "seed": 42
+ },
+ "detail": {
+  "edges_read": 3387388,
+  "communities": 188,
+  "modularity": 0.8932
+ }
+}

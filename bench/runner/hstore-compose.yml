@@ -1,0 +1,87 @@
+# Benchmark variant of apache/hugegraph docker/docker-compose-hstore.yml:
+# 1 PD + 1 Store + 1 Server, hubble removed, explicit heap caps
+# (pd 1g / store 4g / server 4g -- 15G host, three JVMs, cap is 8G per
+# process), server on host port 18081.
+name: hg-bench-hstore
+
+networks:
+  hg-net:
+
+volumes:
+  hg-bench-pd-data:
+  hg-bench-store-data:
+
+services:
+  pd:
+    image: hugegraph/pd:latest
+    restart: unless-stopped
+    networks: [hg-net]
+    environment:
+      HG_PD_GRPC_HOST: pd
+      HG_PD_GRPC_PORT: "8686"
+      HG_PD_REST_PORT: "8620"
+      HG_PD_RAFT_ADDRESS: pd:8610
+      HG_PD_RAFT_PEERS_LIST: pd:8610
+      HG_PD_INITIAL_STORE_LIST: store:8500
+      HG_PD_DATA_PATH: /hugegraph-pd/pd_data
+      HG_PD_AUTH_SECRET_KEY: hgbench-secret
+      JAVA_OPTS: "-Xms512m -Xmx1g"
+    volumes:
+      - hg-bench-pd-data:/hugegraph-pd/pd_data
+    healthcheck:
+      test: ["CMD-SHELL", "curl -fsS http://localhost:8620/v1/health >/dev/null"]
+      interval: 10s
+      timeout: 5s
+      retries: 12
+      start_period: 30s
+
+  store:
+    image: hugegraph/store:latest
+    restart: unless-stopped
+    networks: [hg-net]
+    depends_on:
+      pd:
+        condition: service_healthy
+    environment:
+      HG_STORE_PD_ADDRESS: pd:8686
+      HG_STORE_GRPC_HOST: store
+      HG_STORE_GRPC_PORT: "8500"
+      HG_STORE_REST_PORT: "8520"
+      HG_STORE_RAFT_ADDRESS: store:8510
+      HG_STORE_DATA_PATH: /hugegraph-store/storage
+      JAVA_OPTS: "-Xms2g -Xmx4g"
+    volumes:
+      - hg-bench-store-data:/hugegraph-store/storage
+    healthcheck:
+      test: ["CMD-SHELL", "curl -fsS http://localhost:8520/v1/health >/dev/null"]
+      interval: 10s
+      timeout: 10s
+      retries: 30
+      start_period: 60s
+
+  server:
+    image: hugegraph/server:latest
+    restart: unless-stopped
+    networks: [hg-net]
+    depends_on:
+      store:
+        condition: service_healthy
+    environment:
+      HG_SERVER_BACKEND: hstore
+      HG_SERVER_PD_PEERS: pd:8686
+      HG_SERVER_CLUSTER: hg
+      HG_SERVER_USE_PD: "true"
+      HG_SERVER_REST_URL: http://server:8080
+      HG_SERVER_MIN_FREE_MEMORY: "0"
+      HG_SERVER_INIT_STORE_ENABLED: "false"
+      HG_SERVER_STARTUP_TIMEOUT_S: "120"
+      PD_AUTH_PASSWORD: hgbench-secret
+      JAVA_OPTS: "-Xms2g -Xmx4g"
+    ports:
+      - "18081:8080"
+    healthcheck:
+      test: ["CMD-SHELL", "curl -fsS http://server:8080/versions >/dev/null"]
+      interval: 10s
+      timeout: 5s
+      retries: 30
+      start_period: 60s

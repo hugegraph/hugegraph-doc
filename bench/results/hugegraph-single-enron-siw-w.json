@@ -1,0 +1,22 @@
+{
+ "system": "hugegraph-single",
+ "image": "sha256:18751704849e6b113791914b4e710a64afe41182208c7ff0af417c554ef323f9",
+ "dataset": "enron",
+ "test": "siw",
+ "run": "w",
+ "wall_seconds": 20.094,
+ "ops": 14692,
+ "timestamp": "2026-09-19T19:57:14+0530",
+ "params": {
+  "batch": 500,
+  "siw_edges": 10000,
+  "fs_targets": 100,
+  "fs_max_depth": 6,
+  "fs_timeout_s": 60,
+  "seed": 42
+ },
+ "detail": {
+  "vertices": 4692,
+  "edges": 10000
+ }
+}

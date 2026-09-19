@@ -1,0 +1,22 @@
+{
+ "system": "hugegraph-single",
+ "image": "sha256:18751704849e6b113791914b4e710a64afe41182208c7ff0af417c554ef323f9",
+ "dataset": "lj",
+ "test": "siw",
+ "run": "1",
+ "wall_seconds": 19.408,
+ "ops": 18431,
+ "timestamp": "2026-09-19T20:22:17+0530",
+ "params": {
+  "batch": 500,
+  "siw_edges": 10000,
+  "fs_targets": 100,
+  "fs_max_depth": 6,
+  "fs_timeout_s": 60,
+  "seed": 42
+ },
+ "detail": {
+  "vertices": 8431,
+  "edges": 10000
+ }
+}

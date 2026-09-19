@@ -1,0 +1,22 @@
+{
+ "system": "hugegraph-single",
+ "image": "sha256:18751704849e6b113791914b4e710a64afe41182208c7ff0af417c554ef323f9",
+ "dataset": "enron",
+ "test": "fs",
+ "run": "3",
+ "wall_seconds": 3.825,
+ "ops": 100,
+ "timestamp": "2026-09-19T19:58:52+0530",
+ "params": {
+  "batch": 500,
+  "siw_edges": 10000,
+  "fs_targets": 100,
+  "fs_max_depth": 6,
+  "fs_timeout_s": 60,
+  "seed": 42
+ },
+ "detail": {
+  "found": 85,
+  "timeout_or_unreached": 15
+ }
+}
