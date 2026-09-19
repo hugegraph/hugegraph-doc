@@ -52,7 +52,7 @@
     if (!buttons.length) return;
     var storage = safeStorage(windowObject);
     var key =
-      'oink.sidebar.v1.' +
+      'oink.sidebar.v2.' +
       String(config.version || 'latest') +
       '.' +
       String(config.locale || 'en');
@@ -62,9 +62,12 @@
       }),
     );
     var saved = [];
+    var hasSavedState = false;
     if (storage) {
       try {
-        var parsed = JSON.parse(storage.getItem(key) || '[]');
+        var stored = storage.getItem(key);
+        hasSavedState = stored !== null;
+        var parsed = JSON.parse(stored || '[]');
         if (Array.isArray(parsed)) {
           saved = parsed.filter(function (id) {
             return typeof id === 'string' && valid.has(id);
@@ -75,13 +78,19 @@
       }
     }
     var remembered = new Set(saved);
+    var docsRoot = /(?:^|\/)(?:cn\/)?docs\/?$/.test(windowObject.location.pathname);
 
     buttons.forEach(function (button) {
       var item = button.closest('li');
       var activePath = item && item.classList.contains('td-active-path');
+      var control = button.getAttribute('aria-controls') || '';
+      var defaultOpen =
+        !hasSavedState &&
+        docsRoot &&
+        /_nav(?:start|components)-children$/.test(control);
       setTreeExpanded(
         button,
-        Boolean(activePath || remembered.has(button.getAttribute('aria-controls'))),
+        Boolean(activePath || remembered.has(control) || defaultOpen),
         documentObject,
       );
       button.addEventListener('click', function () {
@@ -108,11 +117,22 @@
       });
     });
 
-    // Rewriting the filtered set removes stale node IDs after navigation
-    // changes without retaining a second schema/version marker.
-    if (storage) {
+    // Seed the new persistence schema once so the docs-home defaults survive
+    // reloads; later clicks replace this set with the user's choices.
+    if (storage && !hasSavedState) {
       try {
-        storage.setItem(key, JSON.stringify(saved));
+        var initial = buttons
+          .filter(function (button) {
+            var item = button.closest('li');
+            return (
+              button.getAttribute('aria-expanded') === 'true' &&
+              !(item && item.classList.contains('td-active-path'))
+            );
+          })
+          .map(function (button) {
+            return button.getAttribute('aria-controls');
+          });
+        storage.setItem(key, JSON.stringify(initial));
       } catch (_) {
         /* Ignore storage becoming unavailable after the probe. */
       }

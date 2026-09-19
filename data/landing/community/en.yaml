@@ -8,6 +8,11 @@ sections:
         - { label: Contribute, url: /docs/contribution-guidelines/, icon: fa-solid fa-code-pull-request, style: primary }
         - { label: View on GitHub, url: 'https://github.com/apache/hugegraph', icon: fa-brands fa-github, external: true, style: ghost }
 
+  - type: community-members
+    partial: landing/sections/community-members.html
+    data:
+      id: project-members
+
   - type: cards
     data:
       title: Get involved
@@ -30,14 +35,9 @@ sections:
 
             - [GitHub](https://github.com/apache/hugegraph) — development takes place in the Apache HugeGraph repositories.
             - [Developer mailing list](/docs/contribution-guidelines/subscribe/) — discuss project and community topics.
-            - [Security mailing list](mailto:security@hugegraph.apache.org) — report security issues privately.
-            - [Security policy](/docs/guides/security/) — follow the project's security reporting process.
+            - [Security reporting](mailto:security@hugegraph.apache.org) and [security policy](/docs/guides/security/) — report issues and follow the project's process.
             - [Contribution guidelines](/docs/contribution-guidelines/) — learn how to contribute code and documentation.
-
-  - type: community-members
-    partial: landing/sections/community-members.html
-    data:
-      id: project-members
+            - [Committer resources](https://infra.apache.org/committers.html) — ASF tools, services, and guidance for project committers.
 
   - type: cta
     data:

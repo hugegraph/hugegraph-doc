@@ -123,7 +123,7 @@ LANGUAGE_OPTION_TITLES = {"en-US": "English", "zh-CN": "简体中文"}
 DOCS_NAV_GROUP_IDS = ("start", "components", "develop", "operate", "reference")
 DOCS_NAV_GROUP_TITLES = {
     "en": ("Get Started", "Components", "Develop", "Operate", "Reference"),
-    "cn": ("开始", "组件", "开发", "运维", "参考"),
+    "cn": ("开始", "组件", "开发", "配置", "参考"),
 }
 DOCS_NAV_EXPECTED_STATS = {
     "latest": {

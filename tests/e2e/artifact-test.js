@@ -15,16 +15,22 @@ const test = base.test.extend({
         return;
       }
       const local = new URL(requested.pathname + requested.search, LOCAL_ARTIFACT_ORIGIN);
-      const response = await route.fetch({ url: local.href });
-      await route.fulfill({
-        response,
-        headers: {
-          ...response.headers(),
-          "access-control-allow-origin": "*"
-        }
-      });
+      try {
+        const response = await route.fetch({ url: local.href });
+        await route.fulfill({
+          response,
+          headers: {
+            ...response.headers(),
+            "access-control-allow-origin": "*"
+          }
+        });
+      } catch (error) {
+        if (String(error).includes("Test ended")) return;
+        throw error;
+      }
     });
     await use(page);
+    await page.unrouteAll({ behavior: "ignoreErrors" });
   }
 });
 

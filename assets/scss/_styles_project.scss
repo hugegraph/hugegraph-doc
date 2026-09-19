@@ -352,6 +352,26 @@
       }
     }
   }
+
+  // A hover preview is a continuation of the global header, rather than a
+  // second offset card. Align its panel to the same top and left edges so the
+  // brand row and navbar read as one surface while the normal sidebar keeps
+  // its authored overlay geometry.
+  [data-td-shell-sidebar='collapsed']
+    .td-shell-sidebar--overlay
+    .td-shell-sidebar__panel {
+    inset-block-start: 0;
+    transform: translateX(0);
+    border-block-start: 0;
+    border-start-start-radius: 0;
+    border-start-end-radius: 0;
+  }
+
+  [dir='rtl'][data-td-shell-sidebar='collapsed']
+    .td-shell-sidebar--overlay
+    .td-shell-sidebar__panel {
+    transform: translateX(0);
+  }
 }
 
 @media (forced-colors: active) and (min-width: 768px) {
@@ -537,6 +557,13 @@
 }
 
 .hg-ai-search-tail {
+  position: sticky;
+  bottom: 0;
+  z-index: 1;
+  margin-inline: -6px;
+  padding-inline: 6px;
+  background: var(--td-shell-popover);
+  box-shadow: 0 -8px 16px color-mix(in srgb, var(--td-shell-popover) 88%, transparent);
   border-block-start: 1px solid var(--bs-border-color);
 
   &__button {
@@ -554,11 +581,25 @@
   }
 }
 
+/* Keep the optional Ask AI tail discoverable without changing the OINK theme. */
+.td-shell-search__panel {
+  max-height: unquote('min(84vh, 720px)');
+}
+
+@media (max-width: 767.98px) {
+  .td-shell-search__panel {
+    max-height: unquote('min(86vh, 680px)');
+  }
+}
+
 .hg-ask-ai-launcher {
   position: fixed;
   z-index: 1040;
   inset-inline-end: unquote('max(1rem, env(safe-area-inset-right))');
-  inset-block-end: unquote('max(1rem, env(safe-area-inset-bottom))');
+  // Keep the launcher clear of the footer while preserving the safe-area
+  // inset on mobile. The offset is intentionally site-owned so OINK upgrades
+  // do not require changing the widget or theme source.
+  inset-block-end: unquote('calc(max(1rem, env(safe-area-inset-bottom)) + 4rem)');
   display: inline-flex;
   align-items: center;
   gap: 0.45rem;
@@ -592,7 +633,7 @@
   z-index: 1039;
   inset-inline-end: unquote('max(1rem, env(safe-area-inset-right))');
   inset-block-end: unquote(
-    'calc(max(1rem, env(safe-area-inset-bottom)) + 3.4rem)'
+    'calc(max(1rem, env(safe-area-inset-bottom)) + 6.8rem)'
   );
   width: unquote('min(18rem, calc(100vw - 2rem))');
   padding: 0.55rem 0.7rem;

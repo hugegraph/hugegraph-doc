@@ -162,6 +162,7 @@ jobs:
       - name: Validate source and version tooling
         run: |
           bash dist/validate-links.sh
+          go mod download
           PYTHONDONTWRITEBYTECODE=1 \
             python3 -m unittest discover -s scripts -p 'test_*.py' -v
       - name: Resolve immutable version matrix
@@ -177,10 +178,12 @@ jobs:
       - name: Upload resolved version manifest
         uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7
         with:
-          name: resolved-versions-${{ github.run_id }}-${{ github.run_attempt }}
+          # Keep dependency artifact names stable across selective job reruns.
+          name: resolved-versions-${{ github.run_id }}
           path: resolved-versions.json
           retention-days: 7
           if-no-files-found: error
+          overwrite: true
 
   build:
     needs: prepare
@@ -250,11 +253,12 @@ jobs:
       - name: Upload isolated version artifact
         uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7
         with:
-          name: ${{ needs.prepare.outputs.artifact_prefix }}-${{ matrix.version.id }}-${{ github.run_id }}-${{ github.run_attempt }}
+          name: ${{ needs.prepare.outputs.artifact_prefix }}-${{ matrix.version.id }}-${{ github.run_id }}
           path: ${{ runner.temp }}/version-public
           include-hidden-files: true
           retention-days: 1
           if-no-files-found: error
+          overwrite: true
 
   aggregate:
     needs: [prepare, build]
@@ -271,11 +275,11 @@ jobs:
           python-version: "3.13"
       - uses: actions/download-artifact@3e5f45b2cfb9172054b4087a40e8e0b5a5461e7c # v8
         with:
-          name: resolved-versions-${{ github.run_id }}-${{ github.run_attempt }}
+          name: resolved-versions-${{ github.run_id }}
           path: resolved
       - uses: actions/download-artifact@3e5f45b2cfb9172054b4087a40e8e0b5a5461e7c # v8
         with:
-          pattern: ${{ needs.prepare.outputs.artifact_prefix }}-*-${{ github.run_id }}-${{ github.run_attempt }}
+          pattern: ${{ needs.prepare.outputs.artifact_prefix }}-*-${{ github.run_id }}
           path: version-artifacts
       - name: Assemble publishable site
         env:
@@ -290,7 +294,7 @@ jobs:
           fi
           python3 scripts/versioning.py aggregate \
             --artifacts version-artifacts --artifact-prefix "$PREFIX-" \
-            --artifact-suffix="-${GITHUB_RUN_ID}-${GITHUB_RUN_ATTEMPT}" \
+            --artifact-suffix="-${GITHUB_RUN_ID}" \
             --resolved-manifest resolved/resolved-versions.json \
             --site-origin "$SITE_ORIGIN" --historical-origin "$HISTORICAL_ORIGIN" \
             --select "$SELECTION" \
@@ -302,11 +306,12 @@ jobs:
       - name: Upload publishable aggregate
         uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7
         with:
-          name: hugegraph-site-${{ needs.prepare.outputs.artifact_prefix }}-${{ github.run_id }}-${{ github.run_attempt }}
+          name: hugegraph-site-${{ needs.prepare.outputs.artifact_prefix }}-${{ github.run_id }}
           path: ${{ runner.temp }}/public-site
           include-hidden-files: true
           retention-days: ${{ github.event_name == 'pull_request' && 1 || 7 }}
           if-no-files-found: error
+          overwrite: true
 
   e2e:
     needs: [prepare, aggregate]
@@ -336,7 +341,7 @@ jobs:
           extended: true
       - uses: actions/download-artifact@3e5f45b2cfb9172054b4087a40e8e0b5a5461e7c # v8
         with:
-          name: hugegraph-site-${{ needs.prepare.outputs.artifact_prefix }}-${{ github.run_id }}-${{ github.run_attempt }}
+          name: hugegraph-site-${{ needs.prepare.outputs.artifact_prefix }}-${{ github.run_id }}
           path: public-site
       - name: Install Chromium test workspace
         working-directory: tests/e2e
@@ -390,7 +395,7 @@ jobs:
           cache-dependency-path: tests/e2e/package-lock.json
       - uses: actions/download-artifact@3e5f45b2cfb9172054b4087a40e8e0b5a5461e7c # v8
         with:
-          name: hugegraph-site-${{ needs.prepare.outputs.artifact_prefix }}-${{ github.run_id }}-${{ github.run_attempt }}
+          name: hugegraph-site-${{ needs.prepare.outputs.artifact_prefix }}-${{ github.run_id }}
           path: public-site
       - name: Capture advisory visual states
         working-directory: tests/e2e
@@ -438,7 +443,7 @@ jobs:
     steps:
       - uses: actions/download-artifact@3e5f45b2cfb9172054b4087a40e8e0b5a5461e7c # v8
         with:
-          name: hugegraph-site-${{ needs.prepare.outputs.artifact_prefix }}-${{ github.run_id }}-${{ github.run_attempt }}
+          name: hugegraph-site-${{ needs.prepare.outputs.artifact_prefix }}-${{ github.run_id }}
           path: public-site
       - name: Verify fixed publication target
         env:
