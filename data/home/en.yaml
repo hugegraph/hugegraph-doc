@@ -56,7 +56,8 @@ community:
   items:
     - title: Get The **Toolchain**
       icon: fa-solid fa-screwdriver-wrench
-      desc: '[It](https://github.com/apache/hugegraph-toolchain) includes graph loader & dashboard & backup tools'
+      url: /docs/quickstart/toolchain/
+      desc: Explore graph loading, visualization, backup, restore, and migration tools.
     - title: Efficient
       icon: fa-brands fa-github
       url: https://github.com/apache/hugegraph

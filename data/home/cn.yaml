@@ -56,7 +56,8 @@ community:
   items:
     - title: 使用易用的**工具链**
       icon: fa-solid fa-screwdriver-wrench
-      desc: 可从[此](https://github.com/apache/hugegraph-toolchain)获取图数据导入工具, 可视化界面以及备份还原迁移工具, 欢迎使用
+      url: /cn/docs/quickstart/toolchain/
+      desc: 获取图数据导入工具、可视化界面以及备份还原迁移工具，欢迎使用。
     - title: 参与开源
       icon: fa-brands fa-github
       url: https://github.com/apache/hugegraph
@@ -64,10 +65,10 @@ community:
       desc: 我们可以在 **Github** 上提交 [Pull Request](https://github.com/apache/hugegraph/pulls). 热烈欢迎大家加入!
     - title: 关注微信
       icon: fa-brands fa-weixin
+      url: https://the-asf.slack.com/archives/C059UU2FJ23
+      external: true
       desc: |-
         关注微信公众号 "HugeGraph" 获取最新动态
-
-        也可以加入 [ASF Slack 频道](https://the-asf.slack.com/archives/C059UU2FJ23)参与讨论
 
 welcome:
   class: hg-home-band hg-home-welcome
