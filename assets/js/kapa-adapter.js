@@ -348,8 +348,6 @@
         if (old) old.remove();
         return;
       }
-      var empty = list.querySelector('.td-shell-search__empty');
-      if (empty && config.labels.noResults) empty.textContent = config.labels.noResults;
       var choiceLabel = root.dataset.tdTChoice || '';
       if (
         choiceLabel &&
@@ -372,6 +370,8 @@
         if (old) old.remove();
         return;
       }
+      var empty = list.querySelector('.td-shell-search__empty');
+      if (empty && config.labels.noResults) empty.textContent = config.labels.noResults;
       var oldButton = old && old.querySelector('[data-hg-ask-ai]');
       if (oldButton && oldButton.dataset.hgAiQuery === query) return;
       if (old) old.remove();
