@@ -295,3 +295,114 @@ test('init succeeds without search shell and binds standalone triggers', () => {
   assert.equal(h.trigger.dataset.hgAiBound, '');
 });
 
+test('init wires search shell Enter handler and updates noResults text', () => {
+  global.MutationObserver = class {
+    observe() {}
+    disconnect() {}
+  };
+  const h = harness();
+  h.trigger.addEventListener = (name, cb) => {};
+  const configNode = {
+    textContent: JSON.stringify({
+      websiteId: 'test-id',
+      sourceGroupId: 'test-group',
+      locale: 'en',
+      themeColor: '#532fc9',
+      historical: false,
+      labels: { ask: 'Ask AI', noResults: 'No documentation results found' },
+    }),
+  };
+  const emptyNode = {
+    className: 'td-shell-search__empty',
+    textContent: 'old empty',
+  };
+  const tailBtn = {
+    dataset: { hgAskAi: '' },
+    addEventListener() {},
+  };
+  const tailGroup = {
+    dataset: { hgAiSearchTail: '' },
+    querySelector(sel) {
+      if (sel === '[data-hg-ask-ai]') return tailBtn;
+      return null;
+    },
+    remove() {},
+  };
+  const list = {
+    className: 'td-shell-search__list',
+    querySelector(sel) {
+      if (sel === '.td-shell-search__empty') return emptyNode;
+      if (sel === '.td-shell-search__item:not(.hg-ai-search-tail__button)') return null;
+      if (sel === '[data-hg-ai-search-tail] [data-hg-ask-ai]') return tailBtn;
+      if (sel === '[data-hg-ai-search-tail]') return tailGroup;
+      return null;
+    },
+    querySelectorAll(sel) {
+      if (sel === '.td-shell-search__empty') return [emptyNode];
+      if (sel === '.td-shell-search__group-label') return [];
+      return [];
+    },
+    appendChild() {},
+  };
+  const inputListeners = new Map();
+  const input = {
+    value: 'graph query',
+    addEventListener(event, handler) {
+      inputListeners.set(event, handler);
+    },
+  };
+  const root = {
+    dataset: {},
+    hidden: false,
+    querySelector(sel) {
+      if (sel === '.td-shell-search__input') return input;
+      if (sel === '.td-shell-search__list') return list;
+      return null;
+    },
+  };
+  const doc = {
+    ...h.documentObject,
+    getElementById(id) {
+      if (id === 'hg-ai-config') return configNode;
+      if (id === 'td-shell-search') return root;
+      return null;
+    },
+    createElement(name) {
+      if (name === 'script') return h.documentObject.createElement('script');
+      return {
+        className: '',
+        dataset: {},
+        setAttribute() {},
+        appendChild() {},
+        addEventListener() {},
+      };
+    },
+  };
+
+  const controller = adapter.init(h.windowObject, doc);
+  assert.ok(controller);
+
+  // Assert empty node text was updated
+  assert.equal(emptyNode.textContent, 'No documentation results found');
+
+  // Trigger Enter on input
+  const keydown = inputListeners.get('keydown');
+  assert.ok(keydown);
+  let prevented = false;
+  keydown({
+    key: 'Enter',
+    preventDefault() { prevented = true; },
+    stopImmediatePropagation() {},
+  });
+  assert.equal(prevented, true);
+  h.continueConsent();
+  h.installBundle();
+  h.scripts[0].fire('load');
+  h.fireRender();
+  assert.deepEqual(h.calls.at(-1), [
+    'open',
+    { mode: 'ai', query: 'graph query', submit: true },
+  ]);
+});
+
+

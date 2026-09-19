@@ -66,9 +66,9 @@
     if (storage) {
       try {
         var stored = storage.getItem(key);
-        hasSavedState = stored !== null;
         var parsed = JSON.parse(stored || '[]');
         if (Array.isArray(parsed)) {
+          hasSavedState = stored !== null;
           saved = parsed.filter(function (id) {
             return typeof id === 'string' && valid.has(id);
           });
