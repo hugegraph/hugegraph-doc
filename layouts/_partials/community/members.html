@@ -1,8 +1,8 @@
 {{- $page := .page -}}
 {{- $data := hugo.Data.community.roster -}}
 {{- $labels := dict
-  "en" (dict "title" "Project members" "lead" "Current Apache HugeGraph PMC members and Committers, sourced from ASF records." "guide" "How to become a HugeGraph Committer (Apache nomination and election)" "chair" "Chair" "pmc" "PMC" "committers" "Committers" "github" "on GitHub")
-  "cn" (dict "title" "项目成员" "lead" "Apache HugeGraph 当前的 PMC 成员与 Committers，数据来自 ASF 记录。" "guide" "如何成为 HugeGraph Committer（注：需经 Apache 提名与选举）" "chair" "主席" "pmc" "PMC" "committers" "Committers" "github" "的 GitHub 主页")
+  "en" (dict "title" "Project members" "lead" "Current Apache HugeGraph PMC members and Committers, sourced from ASF records." "guide" "How to become a HugeGraph Committer" "guideNote" "(Apache nomination and election)" "chair" "Chair" "pmc" "PMC" "committers" "Committers" "github" "on GitHub")
+  "cn" (dict "title" "项目成员" "lead" "Apache HugeGraph 当前的 PMC 成员与 Committers，数据来自 ASF 记录。" "guide" "如何成为 HugeGraph Committer" "guideNote" "（注：需经阿帕奇提名与选举）" "chair" "主席" "pmc" "PMC" "committers" "Committers" "github" "的 GitHub 主页")
 -}}
 {{- $copy := index $labels $page.Language.Lang | default (index $labels "en") -}}
 {{- $style := resources.Get "scss/community-members.scss" | toCSS | minify | fingerprint -}}
@@ -11,7 +11,7 @@
   <div class="td-site-container">
     <div class="td-landing-section__header hg-community-members__header">
       <h2 id="project-members-title">{{ $copy.title }}</h2>
-      <p>{{ $copy.lead }} <a href="{{ if eq $page.Language.Lang "cn" }}/cn{{ end }}/docs/contribution-guidelines/committer-guidelines/">{{ $copy.guide }}</a></p>
+      <p>{{ $copy.lead }} <a href="{{ if eq $page.Language.Lang "cn" }}/cn{{ end }}/docs/contribution-guidelines/committer-guidelines/">{{ $copy.guide }}</a><span class="hg-community-members__guide-note">{{ $copy.guideNote }}</span></p>
     </div>
     {{- range $role := slice "pmc" "committers" }}
       {{- $members := index $data.roles $role }}
