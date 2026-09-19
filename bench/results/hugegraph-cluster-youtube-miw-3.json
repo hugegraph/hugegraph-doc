@@ -1,0 +1,22 @@
+{
+ "system": "hugegraph-cluster",
+ "image": "sha256:bcc673884668c66350db87a18d5ffab250451d76a3edbbcf57649c1c44ec5690",
+ "dataset": "youtube",
+ "test": "miw",
+ "run": "3",
+ "wall_seconds": 251.645,
+ "ops": 4122514,
+ "timestamp": "2026-09-19T23:45:48+0530",
+ "params": {
+  "batch": 500,
+  "siw_edges": 10000,
+  "fs_targets": 100,
+  "fs_max_depth": 6,
+  "fs_timeout_s": 60,
+  "seed": 42
+ },
+ "detail": {
+  "vertices": 1134890,
+  "edges": 2987624
+ }
+}

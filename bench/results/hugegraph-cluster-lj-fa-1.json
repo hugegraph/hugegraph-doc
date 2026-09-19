@@ -1,0 +1,22 @@
+{
+ "system": "hugegraph-cluster",
+ "image": "sha256:bcc673884668c66350db87a18d5ffab250451d76a3edbbcf57649c1c44ec5690",
+ "dataset": "lj",
+ "test": "fa",
+ "run": "1",
+ "wall_seconds": 92.297,
+ "ops": 5000000,
+ "timestamp": "2026-09-20T03:14:09+0530",
+ "params": {
+  "batch": 500,
+  "siw_edges": 10000,
+  "fs_targets": 100,
+  "fs_max_depth": 6,
+  "fs_timeout_s": 60,
+  "seed": 42
+ },
+ "detail": {
+  "edges_scanned": 5000000,
+  "cap": 5000000
+ }
+}

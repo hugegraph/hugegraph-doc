@@ -1,0 +1,23 @@
+{
+ "system": "hugegraph-cluster",
+ "image": "sha256:bcc673884668c66350db87a18d5ffab250451d76a3edbbcf57649c1c44ec5690",
+ "dataset": "amazon",
+ "test": "cw",
+ "run": "w",
+ "wall_seconds": 79.853,
+ "ops": 3387388,
+ "timestamp": "2026-09-19T23:20:16+0530",
+ "params": {
+  "batch": 500,
+  "siw_edges": 10000,
+  "fs_targets": 100,
+  "fs_max_depth": 6,
+  "fs_timeout_s": 60,
+  "seed": 42
+ },
+ "detail": {
+  "edges_read": 3387388,
+  "communities": 198,
+  "modularity": 0.8927
+ }
+}

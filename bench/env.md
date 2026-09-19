@@ -40,3 +40,13 @@ snap.stanford.edu, sha256 in [notes/datasets.md](notes/datasets.md)):
   `docker run -d --name hg-bench-server -p 18080:8080 -e JAVA_OPTS="-Xms2g -Xmx8g" hugegraph/hugegraph:latest`
 - Note: in this 1.7.0 image the REST root is `/` (not `/apis`), paths are
   graphspace-scoped: `/graphspaces/DEFAULT/graphs/hugegraph/...`
+
+## hugegraph-cluster
+
+- 1 PD + 1 Store + 1 Server, backend hstore, official `:latest` images
+  (digests in [setup-hugegraph-cluster.md](setup-hugegraph-cluster.md)),
+  server core 1.7.0
+- Heaps: pd 1g, store 4g, server 4g (three JVMs on one 15G host; per-
+  process cap 8G respected)
+- Invocation: `docker compose -f bench/runner/hstore-compose.yml up -d`,
+  server API on `http://localhost:18081`

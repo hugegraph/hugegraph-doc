@@ -1,0 +1,22 @@
+{
+ "system": "hugegraph-cluster",
+ "image": "sha256:bcc673884668c66350db87a18d5ffab250451d76a3edbbcf57649c1c44ec5690",
+ "dataset": "youtube",
+ "test": "fs",
+ "run": "1",
+ "wall_seconds": 23.159,
+ "ops": 100,
+ "timestamp": "2026-09-20T00:55:57+0530",
+ "params": {
+  "batch": 500,
+  "siw_edges": 10000,
+  "fs_targets": 100,
+  "fs_max_depth": 6,
+  "fs_timeout_s": 60,
+  "seed": 42
+ },
+ "detail": {
+  "found": 99,
+  "timeout_or_unreached": 1
+ }
+}

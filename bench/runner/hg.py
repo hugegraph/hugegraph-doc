@@ -18,9 +18,11 @@ class HG:
         self.alias = f"__g_{graphspace}-{graph}"
         self.s = requests.Session()
 
-    def _post(self, url, payload, timeout=300):
+    def _post(self, url, payload, timeout=300, ignore_existed=False):
         r = self.s.post(url, json=payload, timeout=timeout)
         if r.status_code >= 300:
+            if ignore_existed and "ExistedException" in r.text:
+                return None
             raise RuntimeError(f"POST {url} -> {r.status_code}: {r.text[:300]}")
         return r.json() if r.text else None
 
@@ -47,11 +49,11 @@ class HG:
         self._post(f"{self.g}/schema/vertexlabels", {
             "name": "node", "id_strategy": "CUSTOMIZE_NUMBER",
             "properties": [], "primary_keys": [], "nullable_keys": [],
-            "enable_label_index": False})
+            "enable_label_index": False}, ignore_existed=True)
         self._post(f"{self.g}/schema/edgelabels", {
             "name": "link", "source_label": "node", "target_label": "node",
             "frequency": "SINGLE", "properties": [], "sort_keys": [],
-            "nullable_keys": [], "enable_label_index": False})
+            "nullable_keys": [], "enable_label_index": False}, ignore_existed=True)
 
     # -- inserts --
 

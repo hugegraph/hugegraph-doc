@@ -35,6 +35,8 @@ FS_TARGETS = 100     # shortest-path target count
 FS_MAX_DEPTH = 6
 FS_TIMEOUT = 60      # seconds per shortest-path query
 LONG_RUN_S = 2700    # 45 min: adaptive cutoff, see notes/method.md
+TIME_CAP_S = 3600    # hard per-run cap: no run may exceed 60 minutes
+FN_SAMPLE_N = 500_000  # fns test: fixed vertex sample (seed 42), lj only
 SEED = 42
 
 DATASETS = {
@@ -99,21 +101,59 @@ def batched(it, n):
 
 
 # ---- workloads: each returns (ops_count, extra_dict) ----
+# Streaming workloads stop cleanly at TIME_CAP_S and flag the cap.
+
+def _deadline():
+    return time.monotonic() + TIME_CAP_S
+
 
 def miw(adapter, ds):
+    stop = _deadline()
     nv = ne = 0
+    capped = False
     for chunk in batched(iter(ds.vertices), BATCH):
         adapter.insert_vertices_batch(chunk)
         nv += len(chunk)
-    for chunk in batched(ds.edges(), BATCH):
+        if time.monotonic() > stop:
+            capped = True
+            break
+    if not capped:
+        for chunk in batched(ds.edges(), BATCH):
+            adapter.insert_edges_batch(chunk)
+            ne += len(chunk)
+            if time.monotonic() > stop:
+                capped = True
+                break
+    extra = {"vertices": nv, "edges": ne}
+    if capped:
+        extra["time_capped_at_s"] = TIME_CAP_S
+    return nv + ne, extra
+
+
+def miw_topup(adapter, ds, extra):
+    """After a time-capped final miw run: finish the load, untimed, so the
+    query tests still see the complete graph. Not a test run."""
+    nv, ne = extra["vertices"], extra["edges"]
+    if nv < len(ds.vertices):
+        for chunk in batched(iter(ds.vertices[nv:]), BATCH):
+            adapter.insert_vertices_batch(chunk)
+            nv += len(chunk)
+    skip = ne
+    def rest():
+        for i, e in enumerate(ds.edges()):
+            if i >= skip:
+                yield e
+    for chunk in batched(rest(), BATCH):
         adapter.insert_edges_batch(chunk)
         ne += len(chunk)
-    return nv + ne, {"vertices": nv, "edges": ne}
+    return nv + ne, {"vertices": nv, "edges": ne, "setup_topup": True}
 
 
 def siw(adapter, ds):
+    stop = _deadline()
     seen = set()
     ne = nv = 0
+    capped = False
     for a, b in ds.edges():
         for v in (a, b):
             if v not in seen:
@@ -124,16 +164,44 @@ def siw(adapter, ds):
         ne += 1
         if ne >= SIW_EDGES:
             break
-    return nv + ne, {"vertices": nv, "edges": ne}
+        if ne % 100 == 0 and time.monotonic() > stop:
+            capped = True
+            break
+    extra = {"vertices": nv, "edges": ne}
+    if capped:
+        extra["time_capped_at_s"] = TIME_CAP_S
+    return nv + ne, extra
+
+
+def _fn_over(adapter, ids):
+    stop = _deadline()
+    total = nv = 0
+    capped = False
+    for chunk in batched(iter(ids), BATCH):
+        total += adapter.fn_batch(chunk)
+        nv += len(chunk)
+        if time.monotonic() > stop:
+            capped = True
+            break
+    extra = {"vertices_traversed": nv, "neighbors_seen": total}
+    if capped:
+        extra["time_capped_at_s"] = TIME_CAP_S
+    return nv, extra
 
 
 def fn(adapter, ds):
-    total = 0
-    nv = 0
-    for chunk in batched(iter(ds.vertices), BATCH):
-        total += adapter.fn_batch(chunk)
-        nv += len(chunk)
-    return nv, {"vertices_traversed": nv, "neighbors_seen": total}
+    return _fn_over(adapter, ds.vertices)
+
+
+def fns(adapter, ds):
+    """FN on a fixed random vertex sample (seed 42): for datasets where a
+    full FN pass would exceed the 60-minute run cap on the slower systems.
+    Same sample for every system."""
+    rng = random.Random(SEED)
+    ids = rng.sample(ds.vertices, FN_SAMPLE_N)
+    n, extra = _fn_over(adapter, ids)
+    extra.update({"sample_size": FN_SAMPLE_N, "sample_seed": SEED})
+    return n, extra
 
 
 def fa(adapter, ds):
@@ -142,35 +210,60 @@ def fa(adapter, ds):
 
 
 def fs(adapter, ds):
-    found = timeout = 0
+    stop = _deadline()
+    found = timeout = done = 0
+    capped = False
     for s, t in ds.fs_pairs():
         r = adapter.fs(s, t)
+        done += 1
         if r is None:
             timeout += 1
         else:
             found += 1
-    return FS_TARGETS, {"found": found, "timeout_or_unreached": timeout}
+        if time.monotonic() > stop:
+            capped = True
+            break
+    extra = {"found": found, "timeout_or_unreached": timeout,
+             "queries_done": done}
+    if capped:
+        extra["time_capped_at_s"] = TIME_CAP_S
+    return done, extra
 
 
 def cw(adapter, ds):
     import igraph
     import numpy as np
+    stop = _deadline()
+
+    capped = []
+
+    def read():
+        for e in adapter.edge_pairs(None):
+            yield e
+            if time.monotonic() > stop:
+                capped.append(True)
+                return
+
     pairs = np.fromiter(
-        (x for e in adapter.edge_pairs(None) for x in e), dtype=np.int64
+        (x for e in read() for x in e), dtype=np.int64
     ).reshape(-1, 2)
     ids = np.unique(pairs)
     idx = {int(v): i for i, v in enumerate(ids)}
     el = [(idx[int(a)], idx[int(b)]) for a, b in pairs]
     g = igraph.Graph(n=len(ids), edges=el, directed=False)
     comm = g.community_multilevel()
-    return len(el), {
+    extra = {
         "edges_read": len(el),
         "communities": len(comm),
         "modularity": round(comm.modularity, 4),
     }
+    if capped:
+        extra["time_capped_at_s"] = TIME_CAP_S
+    return len(el), extra
 
 
-TESTS = {"siw": siw, "miw": miw, "fn": fn, "fa": fa, "fs": fs, "cw": cw}
+TESTS = {"siw": siw, "miw": miw, "fn": fn, "fns": fns, "fa": fa,
+         "fs": fs, "cw": cw}
 # tests that require an empty graph and leave it loaded (miw) or dirty (siw)
 LOADERS = {"siw", "miw"}
 
@@ -207,6 +300,7 @@ def run_dataset(adapter, system, digest, dsname,
     for test in tests:
         fun = TESTS[test]
         long_hit = False
+        last_extra = None
         for r in ("w", "1", "2", "3"):
             if long_hit and r in ("2", "3"):
                 print(f"  adaptive: {test}/{dsname} run exceeded {LONG_RUN_S}s,"
@@ -218,7 +312,16 @@ def run_dataset(adapter, system, digest, dsname,
             ops, extra = fun(adapter, ds)
             wall = time.monotonic() - t0
             record(system, digest, dsname, test, r, wall, ops, extra)
+            last_extra = extra
             if wall > LONG_RUN_S:
                 long_hit = True
+        if test == "miw" and last_extra and "time_capped_at_s" in last_extra:
+            # finish the interrupted load so query tests see the full graph
+            print(f"  topup: completing capped miw load for {dsname}",
+                  flush=True)
+            t0 = time.monotonic()
+            ops, extra = miw_topup(adapter, ds, last_extra)
+            record(system, digest, dsname, test, "t",
+                   time.monotonic() - t0, ops, extra)
         # after siw the graph holds partial data; miw wipes first anyway
     # leave graph loaded (last miw run data is used by fn/fa/fs/cw)

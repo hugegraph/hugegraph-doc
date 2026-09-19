@@ -1,0 +1,22 @@
+{
+ "system": "hugegraph-cluster",
+ "image": "sha256:bcc673884668c66350db87a18d5ffab250451d76a3edbbcf57649c1c44ec5690",
+ "dataset": "enron",
+ "test": "miw",
+ "run": "1",
+ "wall_seconds": 13.734,
+ "ops": 404354,
+ "timestamp": "2026-09-19T22:33:14+0530",
+ "params": {
+  "batch": 500,
+  "siw_edges": 10000,
+  "fs_targets": 100,
+  "fs_max_depth": 6,
+  "fs_timeout_s": 60,
+  "seed": 42
+ },
+ "detail": {
+  "vertices": 36692,
+  "edges": 367662
+ }
+}
