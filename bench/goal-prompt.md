@@ -18,7 +18,7 @@ Tests, same shapes as docs/performance/hugegraph-benchmark-0.5.6:
 
 Harness: try socialsensor/graphdb-benchmark first. It predates every current client, so expect to reimplement the same operations with current drivers instead. If reimplementing: one thin runner per system, identical operation counts and datasets, warmup pass then 3 measured runs, report the median.
 
-Host: library (12 threads i5-11400H, 15G RAM, about 13G available, 107G free disk, Docker 29.5.3, Java 17). The wearwise stack and the f1 kind cluster are stopped for this work. Rules:
+Host: you are running ON library itself (12 threads i5-11400H, 15G RAM, about 13G available, 107G free disk, Docker 29.5.3, Java 17). No ssh anywhere; everything is local. The wearwise stack and the f1 kind cluster are stopped for this work. Rules:
 
 - One system under test at a time. Heap cap 8G. Stop its containers before starting the next.
 - The stopped wearwise-* and f1-* containers, their volumes and their images stay exactly as they are: never start, remove or prune them, never `docker compose down` the wearwise-live project, never `kind delete` f1, never `docker volume prune` or `docker system prune`.
@@ -33,7 +33,7 @@ Record in bench/ on this branch. One concern per file, never lumped into the han
 - notes/<topic>.md: anomalies, deviations from this prompt, reimplementation details, anything that needs more than a line
 - handoff.md: ONLY current state and next step, a few lines, updated at every stop. No data, no logs, no results in it; link the file that has them
 
-Git: commits via git commit-tree as Himanshu Verma, no AI references anywhere, push only this branch, never force-push. No PR until told.
+Git: work in ~/hg-bench/hugegraph-doc, cloned from git@github.com:hugegraph/hugegraph-doc.git (this host's SSH key authenticates as bitflicker64; no gh here). Commit via git commit-tree with GIT_AUTHOR_NAME='Himanshu Verma' and GIT_AUTHOR_EMAIL='himnshuverma10152006@gmail.com' set explicitly; the host's global git name is not the right authorship. No AI references anywhere. Push only this branch by explicit SHA refspec, never force-push. No PR until told.
 
 Blocked means: a dataset refuses to load into a system after 3 attempts, or disk runs out. Record it in handoff.md and move on.
 
