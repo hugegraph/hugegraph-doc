@@ -63,12 +63,14 @@ community:
       url: https://github.com/apache/hugegraph
       external: true
       desc: 我们可以在 **Github** 上提交 [Pull Request](https://github.com/apache/hugegraph/pulls). 热烈欢迎大家加入!
-    - title: 关注微信
-      icon: fa-brands fa-weixin
+    - title: 加入 Slack 频道
+      icon: fa-brands fa-slack
       url: https://the-asf.slack.com/archives/C059UU2FJ23
       external: true
       desc: |-
-        关注微信公众号 "HugeGraph" 获取最新动态
+        加入 [ASF Slack 频道](https://the-asf.slack.com/archives/C059UU2FJ23)参与社区讨论
+
+        也可以关注微信公众号 "HugeGraph" 获取最新动态
 
 welcome:
   class: hg-home-band hg-home-welcome

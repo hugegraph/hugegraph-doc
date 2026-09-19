@@ -268,3 +268,30 @@ test('a pending timeout retries with a fresh script and ignores the late attempt
     { mode: 'ai', query: 'second', submit: true },
   ]);
 });
+
+test('init succeeds without search shell and binds standalone triggers', () => {
+  const h = harness();
+  const configNode = {
+    textContent: JSON.stringify({
+      websiteId: 'test-id',
+      sourceGroupId: 'test-group',
+      locale: 'en',
+      themeColor: '#532fc9',
+      historical: false,
+      labels: { ask: 'Ask AI' },
+    }),
+  };
+  const doc = {
+    ...h.documentObject,
+    getElementById(id) {
+      if (id === 'hg-ai-config') return configNode;
+      if (id === 'td-shell-search') return null;
+      return null;
+    },
+  };
+  h.trigger.addEventListener = (name, cb) => {};
+  const controller = adapter.init(h.windowObject, doc);
+  assert.ok(controller);
+  assert.equal(h.trigger.dataset.hgAiBound, '');
+});
+

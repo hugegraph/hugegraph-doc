@@ -20,8 +20,8 @@ history. Leave an ASF ID unmapped until a maintainer has confirmed the account.
 
 Mapped avatars are downloaded during refresh, converted with `cwebp` when
 needed, stripped of metadata, checked as 128 by 128 WebP, and stored under a
-SHA-256 content-addressed filename. Unmapped members render initials and link
-to the ASF phonebook without requiring JavaScript.
+SHA-256 content-addressed filename. Unmapped members render initials as static
+cards without requiring JavaScript.
 
 The fixed `validate` command is fully offline and checks checked-in data,
 identity rules, and local avatar files. Render the site separately, then opt in
