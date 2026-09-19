@@ -78,7 +78,7 @@
       }
     }
     var remembered = new Set(saved);
-    var docsRoot = /\/(?:cn\/)?docs\/?$/.test(windowObject.location.pathname);
+    var docsRoot = /(?:^|\/)(?:cn\/)?docs\/?$/.test(windowObject.location.pathname);
 
     buttons.forEach(function (button) {
       var item = button.closest('li');
