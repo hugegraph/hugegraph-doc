@@ -37,7 +37,7 @@ sections:
             - [Developer mailing list](/docs/contribution-guidelines/subscribe/) — discuss project and community topics.
             - [Security reporting](mailto:security@hugegraph.apache.org) and [security policy](/docs/guides/security/) — report issues and follow the project's process.
             - [Contribution guidelines](/docs/contribution-guidelines/) — learn how to contribute code and documentation.
-            - [Committer resources](https://infra.apache.org/committers.html) — open source benefits from OpenAI, Anthropic, GitHub, JetBrains, and others, subject to each program's eligibility and terms.
+            - [Committer resources](https://infra.apache.org/committers.html) — ASF tools, services, and guidance for project committers.
 
   - type: cta
     data:

@@ -324,6 +324,8 @@
     }
     documentObject.querySelectorAll('[data-hg-ask-ai]').forEach(bind);
 
+    if (!input || !list) return controller;
+
     // Keep the OINK palette untouched: only intercept Enter when local search
     // is empty and the site-owned Ask AI tail is the available follow-up.
     input.addEventListener('keydown', function (event) {
