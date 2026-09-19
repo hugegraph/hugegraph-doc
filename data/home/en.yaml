@@ -70,8 +70,6 @@ community:
       desc: |-
         Join the [ASF Slack channel](https://the-asf.slack.com/archives/C059UU2FJ23) for community discussions
 
-        Could also follow the WeChat account "HugeGraph" for updates
-
 welcome:
   class: hg-home-band hg-home-welcome
   title: Welcome to the HugeGraph open source community!
