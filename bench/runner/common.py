@@ -206,7 +206,10 @@ def fns(adapter, ds):
 
 def fa(adapter, ds):
     n = adapter.fa_scan(ds.fa_cap)
-    return n, {"edges_scanned": n, "cap": ds.fa_cap}
+    extra = {"edges_scanned": n, "cap": ds.fa_cap}
+    if getattr(adapter, "scan_complete", True) is False:
+        extra["scan_incomplete"] = True
+    return n, extra
 
 
 def fs(adapter, ds):
@@ -259,6 +262,8 @@ def cw(adapter, ds):
     }
     if capped:
         extra["time_capped_at_s"] = TIME_CAP_S
+    if getattr(adapter, "scan_complete", True) is False:
+        extra["scan_incomplete"] = True
     return len(el), extra
 
 

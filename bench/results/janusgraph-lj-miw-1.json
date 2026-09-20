@@ -3,10 +3,10 @@
  "image": "sha256:75f57aff4b152ca86b4cdaeefb5335154d7fad412cffef75fa44c7504adc96d4",
  "dataset": "lj",
  "test": "miw",
- "run": "w",
- "wall_seconds": 1939.037,
+ "run": "1",
+ "wall_seconds": 1972.403,
  "ops": 38679151,
- "timestamp": "2026-09-20T21:56:47+0530",
+ "timestamp": "2026-09-20T22:29:56+0530",
  "params": {
   "batch": 500,
   "siw_edges": 10000,

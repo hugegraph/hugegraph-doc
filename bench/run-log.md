@@ -396,3 +396,14 @@ One line per run. Wall time in seconds.
 | 2026-09-20 19:43 | janusgraph | lj | siw | 2 | 33.31 |
 | 2026-09-20 19:44 | janusgraph | lj | siw | 3 | 33.228 |
 | 2026-09-20 20:17 | janusgraph | lj | miw | w | 1999.488 |
+| 2026-09-20 21:56 | janusgraph | lj | miw | w | 1939.037 |
+| 2026-09-20 22:29 | janusgraph | lj | miw | 1 | 1972.403 |
+| 2026-09-20 22:30 | janusgraph | lj | fns | w | 20.462 |
+| 2026-09-20 22:30 | janusgraph | lj | fns | 1 | 19.545 |
+| 2026-09-20 22:30 | janusgraph | lj | fns | 2 | 19.485 |
+| 2026-09-20 22:31 | janusgraph | lj | fns | 3 | 19.559 |
+| 2026-09-20 23:37 | janusgraph | lj | fa | w | 72.377 |
+| 2026-09-20 23:39 | janusgraph | lj | fa | 1 | 71.982 |
+| 2026-09-20 23:40 | janusgraph | lj | fa | 2 | 71.093 |
+| 2026-09-20 23:41 | janusgraph | lj | fa | 3 | 70.772 |
+| 2026-09-21 01:57 | janusgraph | lj | cw | w | 3934.317 |

@@ -2,11 +2,11 @@
  "system": "janusgraph",
  "image": "sha256:75f57aff4b152ca86b4cdaeefb5335154d7fad412cffef75fa44c7504adc96d4",
  "dataset": "lj",
- "test": "miw",
- "run": "w",
- "wall_seconds": 1939.037,
- "ops": 38679151,
- "timestamp": "2026-09-20T21:56:47+0530",
+ "test": "fa",
+ "run": "1",
+ "wall_seconds": 71.982,
+ "ops": 5000000,
+ "timestamp": "2026-09-20T23:39:07+0530",
  "params": {
   "batch": 500,
   "siw_edges": 10000,
@@ -16,7 +16,7 @@
   "seed": 42
  },
  "detail": {
-  "vertices": 3997962,
-  "edges": 34681189
+  "edges_scanned": 5000000,
+  "cap": 5000000
  }
 }
