@@ -44,7 +44,13 @@ class Neo:
     def _start_fresh(self):
         subprocess.run(["docker", "rm", "-f", CONTAINER],
                        capture_output=True)
-        subprocess.run(["rm", "-rf", DATA_DIR])
+        # data dir is owned by the container's uid 7474: clear it as root
+        # inside a throwaway container, never on the host
+        subprocess.run(["docker", "run", "--rm", "-u", "0",
+                        "--entrypoint", "sh",
+                        "-v", f"{DATA_DIR}:/wipe", self.image,
+                        "-c", "rm -rf /wipe/* /wipe/.[!.]* 2>/dev/null; true"],
+                       check=True, capture_output=True)
         subprocess.run(["mkdir", "-p", DATA_DIR], check=True)
         subprocess.run([
             "docker", "run", "-d", "--name", CONTAINER,

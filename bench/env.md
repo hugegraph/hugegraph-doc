@@ -50,3 +50,10 @@ snap.stanford.edu, sha256 in [notes/datasets.md](notes/datasets.md)):
   process cap 8G respected)
 - Invocation: `docker compose -f bench/runner/hstore-compose.yml up -d`,
   server API on `http://localhost:18081`
+
+## neo4j
+
+- Image: `neo4j:5.26.30-community` (current LTS), digest
+  `sha256:3388e05ee53c8313d01acdf33e63ad175af95a92226dc8551160564439ce2c8c`
+- Config delta from default: heap 2g/8g, pagecache 2g, auth set
+- Invocation and operations: [setup-neo4j.md](setup-neo4j.md)

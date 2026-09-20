@@ -1,0 +1,22 @@
+{
+ "system": "neo4j",
+ "image": "sha256:3388e05ee53c8313d01acdf33e63ad175af95a92226dc8551160564439ce2c8c",
+ "dataset": "enron",
+ "test": "fa",
+ "run": "1",
+ "wall_seconds": 5.332,
+ "ops": 367662,
+ "timestamp": "2026-09-20T04:34:40+0530",
+ "params": {
+  "batch": 500,
+  "siw_edges": 10000,
+  "fs_targets": 100,
+  "fs_max_depth": 6,
+  "fs_timeout_s": 60,
+  "seed": 42
+ },
+ "detail": {
+  "edges_scanned": 367662,
+  "cap": null
+ }
+}
