@@ -11,7 +11,7 @@ HERE = os.path.dirname(os.path.abspath(__file__))
 RESULTS = os.path.join(os.path.dirname(HERE), "results")
 
 DS_ORDER = ["enron", "amazon", "youtube", "lj"]
-TEST_ORDER = ["miw", "siw", "fn", "fa", "fs", "cw"]
+TEST_ORDER = ["miw", "siw", "fn", "fns", "fa", "fs", "cw"]
 
 
 def main():

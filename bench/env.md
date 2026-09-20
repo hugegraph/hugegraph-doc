@@ -57,3 +57,14 @@ snap.stanford.edu, sha256 in [notes/datasets.md](notes/datasets.md)):
   `sha256:3388e05ee53c8313d01acdf33e63ad175af95a92226dc8551160564439ce2c8c`
 - Config delta from default: heap 2g/8g, pagecache 2g, auth set
 - Invocation and operations: [setup-neo4j.md](setup-neo4j.md)
+
+## janusgraph
+
+- Image: `janusgraph/janusgraph:latest`, digest
+  `sha256:75f57aff4b152ca86b4cdaeefb5335154d7fad412cffef75fa44c7504adc96d4`
+  (JanusGraph 1.1.0, Gremlin 3.7.3), backend BerkeleyJE 18.3.12
+- Config delta from default: BerkeleyJE template, heap 2g/8g,
+  `replace-instance-if-exists=true`
+- Client: gremlinpython 3.7.3 (version-matched to the server; the 3.8.x
+  driver cannot talk to a 3.7.3 server)
+- Invocation and operations: [setup-janusgraph.md](setup-janusgraph.md)

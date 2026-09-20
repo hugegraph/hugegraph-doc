@@ -101,10 +101,12 @@ class Janus:
 
     # -- inserts --
 
+    OP_TIMEOUT_MS = 900_000
+
     def insert_vertices_batch(self, ids):
         vids = self._submit(
             "ids.collect { g.addV('node').property('nid', it).id().next() }",
-            {"ids": list(ids)})
+            {"ids": list(ids)}, timeout_ms=self.OP_TIMEOUT_MS)
         for n, v in zip(ids, vids):
             self.vid[n] = v
 
@@ -112,22 +114,24 @@ class Janus:
         vp = [[self.vid[a], self.vid[b]] for a, b in pairs]
         self._submit(
             "vp.each { g.V(it[0]).addE('link').to(__.V(it[1])).iterate() };"
-            "vp.size()", {"vp": vp})
+            "vp.size()", {"vp": vp}, timeout_ms=self.OP_TIMEOUT_MS)
 
     def insert_vertex(self, i):
         vids = self._submit("[g.addV('node').property('nid', n).id().next()]",
-                            {"n": i})
+                            {"n": i}, timeout_ms=self.OP_TIMEOUT_MS)
         self.vid[i] = vids[0]
 
     def insert_edge(self, a, b):
         self._submit("g.V(s).addE('link').to(__.V(t)).iterate(); 1",
-                     {"s": self.vid[a], "t": self.vid[b]})
+                     {"s": self.vid[a], "t": self.vid[b]},
+                     timeout_ms=self.OP_TIMEOUT_MS)
 
     # -- queries --
 
     def fn_batch(self, ids):
         vids = [self.vid[i] for i in ids]
-        r = self._submit("g.V(vids).both().count()", {"vids": vids})
+        r = self._submit("g.V(vids).both().count()", {"vids": vids},
+                         timeout_ms=self.OP_TIMEOUT_MS)
         return int(r[0])
 
     # g.E() would return Edge objects whose RelationIdentifier id is a
