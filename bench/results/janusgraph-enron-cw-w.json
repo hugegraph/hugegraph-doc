@@ -4,9 +4,9 @@
  "dataset": "enron",
  "test": "cw",
  "run": "w",
- "wall_seconds": 6.173,
+ "wall_seconds": 5.772,
  "ops": 367662,
- "timestamp": "2026-09-20T10:51:00+0530",
+ "timestamp": "2026-09-20T16:26:05+0530",
  "params": {
   "batch": 500,
   "siw_edges": 10000,
@@ -17,7 +17,7 @@
  },
  "detail": {
   "edges_read": 367662,
-  "communities": 1267,
-  "modularity": 0.6127
+  "communities": 1241,
+  "modularity": 0.609
  }
 }

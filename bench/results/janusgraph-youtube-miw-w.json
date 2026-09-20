@@ -1,12 +1,12 @@
 {
  "system": "janusgraph",
  "image": "sha256:75f57aff4b152ca86b4cdaeefb5335154d7fad412cffef75fa44c7504adc96d4",
- "dataset": "enron",
- "test": "fn",
+ "dataset": "youtube",
+ "test": "miw",
  "run": "w",
- "wall_seconds": 2.246,
- "ops": 36692,
- "timestamp": "2026-09-20T16:17:53+0530",
+ "wall_seconds": 172.276,
+ "ops": 4122514,
+ "timestamp": "2026-09-20T16:32:53+0530",
  "params": {
   "batch": 500,
   "siw_edges": 10000,
@@ -16,7 +16,7 @@
   "seed": 42
  },
  "detail": {
-  "vertices_traversed": 36692,
-  "neighbors_seen": 735324
+  "vertices": 1134890,
+  "edges": 2987624
  }
 }

@@ -4,9 +4,9 @@
  "dataset": "enron",
  "test": "siw",
  "run": "1",
- "wall_seconds": 27.22,
+ "wall_seconds": 27.928,
  "ops": 14692,
- "timestamp": "2026-09-20T09:23:33+0530",
+ "timestamp": "2026-09-20T16:14:02+0530",
  "params": {
   "batch": 500,
   "siw_edges": 10000,

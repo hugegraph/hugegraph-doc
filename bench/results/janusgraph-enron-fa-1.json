@@ -4,9 +4,9 @@
  "dataset": "enron",
  "test": "fa",
  "run": "1",
- "wall_seconds": 5.322,
+ "wall_seconds": 5.141,
  "ops": 367662,
- "timestamp": "2026-09-20T09:27:33+0530",
+ "timestamp": "2026-09-20T16:18:08+0530",
  "params": {
   "batch": 500,
   "siw_edges": 10000,
