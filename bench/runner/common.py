@@ -308,6 +308,9 @@ def run_dataset(adapter, system, digest, dsname,
                 break
             if test in LOADERS:
                 adapter.wipe()
+            if test == "fs" and hasattr(adapter, "prepare_fs"):
+                # id resolution is setup, never part of the measurement
+                adapter.prepare_fs(ds.fs_pairs())
             t0 = time.monotonic()
             ops, extra = fun(adapter, ds)
             wall = time.monotonic() - t0

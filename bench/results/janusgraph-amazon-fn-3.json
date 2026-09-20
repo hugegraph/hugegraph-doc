@@ -1,0 +1,22 @@
+{
+ "system": "janusgraph",
+ "image": "sha256:75f57aff4b152ca86b4cdaeefb5335154d7fad412cffef75fa44c7504adc96d4",
+ "dataset": "amazon",
+ "test": "fn",
+ "run": "3",
+ "wall_seconds": 12.585,
+ "ops": 403394,
+ "timestamp": "2026-09-20T11:06:49+0530",
+ "params": {
+  "batch": 500,
+  "siw_edges": 10000,
+  "fs_targets": 100,
+  "fs_max_depth": 6,
+  "fs_timeout_s": 60,
+  "seed": 42
+ },
+ "detail": {
+  "vertices_traversed": 403394,
+  "neighbors_seen": 6774776
+ }
+}

@@ -1,0 +1,23 @@
+{
+ "system": "janusgraph",
+ "image": "sha256:75f57aff4b152ca86b4cdaeefb5335154d7fad412cffef75fa44c7504adc96d4",
+ "dataset": "amazon",
+ "test": "fs",
+ "run": "w",
+ "wall_seconds": 840.444,
+ "ops": 100,
+ "timestamp": "2026-09-20T15:25:48+0530",
+ "params": {
+  "batch": 500,
+  "siw_edges": 10000,
+  "fs_targets": 100,
+  "fs_max_depth": 6,
+  "fs_timeout_s": 60,
+  "seed": 42
+ },
+ "detail": {
+  "found": 81,
+  "timeout_or_unreached": 19,
+  "queries_done": 100
+ }
+}

@@ -55,7 +55,13 @@ class Janus:
 
     def _start_fresh(self):
         subprocess.run(["docker", "rm", "-f", CONTAINER], capture_output=True)
-        subprocess.run(["rm", "-rf", DATA_DIR])
+        # data dir files are owned by the container user: clear as root
+        # inside a throwaway container, never on the host
+        subprocess.run(["docker", "run", "--rm", "-u", "0",
+                        "--entrypoint", "sh",
+                        "-v", f"{DATA_DIR}:/wipe", self.image,
+                        "-c", "rm -rf /wipe/* /wipe/.[!.]* 2>/dev/null; true"],
+                       check=True, capture_output=True)
         subprocess.run(["mkdir", "-p", DATA_DIR], check=True)
         subprocess.run(["chmod", "777", DATA_DIR], check=True)
         subprocess.run([
@@ -63,6 +69,9 @@ class Janus:
             "-p", "18182:8182",
             "-v", f"{DATA_DIR}:/var/lib/janusgraph",
             "-e", "JANUS_PROPS_TEMPLATE=berkeleyje",
+            # a crashed client would otherwise leave a stale instance-id
+            # registration that blocks the next startup
+            "-e", "janusgraph.graph.replace-instance-if-exists=true",
             "-e", "JAVA_OPTIONS=-Xms2g -Xmx8g",
             self.image], check=True, capture_output=True)
         self._connect()
@@ -121,12 +130,40 @@ class Janus:
         r = self._submit("g.V(vids).both().count()", {"vids": vids})
         return int(r[0])
 
+    # g.E() would return Edge objects whose RelationIdentifier id is a
+    # custom graphbinary type the python driver cannot decode; project
+    # the endpoint ids to plain longs instead.
+    _EDGE_SCAN = "g.E().project('o','i').by(outV().id()).by(inV().id())"
+
+    def _resolve_vids(self, nids):
+        """One full-scan lookup for nids missing from the cache (used only
+        when resuming query tests in a fresh process against an already
+        loaded graph; there is no nid index, so this is a single scan)."""
+        missing = [n for n in nids if n not in self.vid]
+        if not missing:
+            return
+        rows = self._submit(
+            "g.V().has('nid', within(ns))"
+            ".project('n','v').by(values('nid')).by(id())",
+            {"ns": missing}, timeout_ms=common.TIME_CAP_S * 1000)
+        for m in rows:
+            self.vid[m["n"]] = m["v"]
+
+    def prepare_fs(self, pairs):
+        nids = set()
+        for s, t in pairs:
+            nids.add(s)
+            nids.add(t)
+        self._resolve_vids(sorted(nids))
+
     def fa_scan(self, cap):
         n = 0
-        rs = self.client.submit("g.E()")
+        rs = self.client.submit(
+            self._EDGE_SCAN,
+            request_options={"evaluationTimeout": common.TIME_CAP_S * 1000})
         for batch in rs:
             for e in batch:
-                _ = e.outV.id, e.inV.id
+                _ = e["o"], e["i"]
                 n += 1
             if cap and n >= cap:
                 rs.close()
@@ -136,8 +173,13 @@ class Janus:
     def fs(self, src, dst):
         s, t = self.vid[src], self.vid[dst]
         try:
+            # dedup() inside the repeat keeps this a breadth-first walk
+            # over distinct vertices. The simplePath() form it replaces
+            # enumerated every simple path to depth 6 whenever a target
+            # was unreachable, which exhausted the heap and turned real
+            # paths into false negatives -- see notes/janusgraph-fs.md.
             r = self._submit(
-                "g.V(s).repeat(both().simplePath()).until(hasId(t).or()"
+                "g.V(s).repeat(both().dedup()).until(hasId(t).or()"
                 f".loops().is({common.FS_MAX_DEPTH})).hasId(t)"
                 ".limit(1).path().count(local)",
                 {"s": s, "t": t}, timeout_ms=common.FS_TIMEOUT * 1000)
@@ -147,10 +189,12 @@ class Janus:
 
     def edge_pairs(self, cap):
         n = 0
-        rs = self.client.submit("g.E()")
+        rs = self.client.submit(
+            self._EDGE_SCAN,
+            request_options={"evaluationTimeout": common.TIME_CAP_S * 1000})
         for batch in rs:
             for e in batch:
-                yield e.outV.id, e.inV.id
+                yield e["o"], e["i"]
                 n += 1
                 if cap and n >= cap:
                     rs.close()
