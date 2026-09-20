@@ -12,6 +12,7 @@ import subprocess
 import time
 
 from gremlin_python.driver.client import Client
+from gremlin_python.statics import long
 
 import common
 
@@ -111,7 +112,7 @@ class Janus:
             self.vid[n] = v
 
     def insert_edges_batch(self, pairs):
-        vp = [[self.vid[a], self.vid[b]] for a, b in pairs]
+        vp = [[long(self.vid[a]), long(self.vid[b])] for a, b in pairs]
         self._submit(
             "vp.each { g.V(it[0]).addE('link').to(__.V(it[1])).iterate() };"
             "vp.size()", {"vp": vp}, timeout_ms=self.OP_TIMEOUT_MS)
@@ -123,13 +124,13 @@ class Janus:
 
     def insert_edge(self, a, b):
         self._submit("g.V(s).addE('link').to(__.V(t)).iterate(); 1",
-                     {"s": self.vid[a], "t": self.vid[b]},
+                     {"s": long(self.vid[a]), "t": long(self.vid[b])},
                      timeout_ms=self.OP_TIMEOUT_MS)
 
     # -- queries --
 
     def fn_batch(self, ids):
-        vids = [self.vid[i] for i in ids]
+        vids = [long(self.vid[i]) for i in ids]
         r = self._submit("g.V(vids).both().count()", {"vids": vids},
                          timeout_ms=self.OP_TIMEOUT_MS)
         return int(r[0])
@@ -175,7 +176,7 @@ class Janus:
         return n
 
     def fs(self, src, dst):
-        s, t = self.vid[src], self.vid[dst]
+        s, t = long(self.vid[src]), long(self.vid[dst])
         try:
             # dedup() inside the repeat keeps this a breadth-first walk
             # over distinct vertices. The simplePath() form it replaces
