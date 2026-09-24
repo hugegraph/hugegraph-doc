@@ -22,7 +22,9 @@ Helm chart 在 Kubernetes 上部署一套分布式 HugeGraph 集群：PD、Store
 
 分布式 HugeGraph 集群有一套启动约定（Server 不执行 `init-store`、每个 Server 都通过 PD 读写图元数据、Store 等待 PD
 形成多数派、一个 PD REST 密钥由三个组件共用）。chart 把这套约定固化下来，运维人员无需手工处理；细节见
-[chart README](https://github.com/apache/hugegraph/tree/master/helm/hugegraph#chart-details)。
+[chart README](https://github.com/apache/hugegraph/tree/master/helm/hugegraph#chart-details)。日常运维（NetworkPolicy
+细节、灾难恢复、伸缩、安全滚动 Store、在集群外运行 Hubble）见
+[运维页](/cn/docs/quickstart/hugegraph/hugegraph-helm-operations/)。
 
 ```mermaid
 flowchart LR
@@ -93,15 +95,17 @@ chart 附带三个 values 文件：
 |------|------|----------|
 | `values.yaml` | 3 PD + 3 Store + 3 Server | 默认；preferred 反亲和，认证开启，Hubble 关闭 |
 | `values-single.yaml` | 1 + 1 + 1 | 单节点开发与 CI；PVC 更小 |
-| `values-cluster.yaml` | 3 + 3 + 3 | 生产起点：JVM 堆与资源设置、PD/Store PodDisruptionBudget、`required` 反亲和 |
+| `values-cluster.yaml` | 3 + 3 + 3 | 生产起点：JVM 堆与资源设置、PD/Store PodDisruptionBudget、`required` 反亲和、NetworkPolicy 开启 |
 
 ```bash
 helm install hugegraph ./helm/hugegraph --namespace hugegraph --create-namespace \
     -f helm/hugegraph/values-single.yaml --wait --timeout 15m
 ```
 
-`values-cluster.yaml` 是起点而非容量保证：请按图规模和流量重新核算资源。完整参数参考（每个组件的探针、调度、Secret
-配置项）见 [chart README](https://github.com/apache/hugegraph/tree/master/helm/hugegraph#configuration)。
+`values-cluster.yaml` 是起点而非容量保证：请按图规模和流量重新核算资源。其中一个数字值得说明：它给每个 Store 申请
+5Gi、限制 8Gi 内存，远高于 1Gi 的堆，因为 Store 的 RocksDB 缓存在 JVM 堆之外（4Gi 的限制在约 1 GB 数据后就把
+Store OOM 杀掉了）。两个数字要随数据量一起放大。完整参数参考（每个组件的探针、调度、Secret 配置项）见
+[chart README](https://github.com/apache/hugegraph/tree/master/helm/hugegraph#configuration)。
 
 #### 3.4 验证安装
 
@@ -154,8 +158,11 @@ PD 暴露两个健康端点，chart 有意同时使用两者：
 - `/v1/ready` 在 PD Raft 组选出 leader 之前返回 503，反映的是多数派状态而不只是进程存活。
 
 chart 把 PD 的**就绪探测**和 Store init 容器的等待放在 `/v1/ready` 上：Store 只有在多数 PD 成为多数派成员后才启动，
-失去 leader 的 PD 会退出 Service 端点，直到 leader 恢复。PD 的**启动和存活探测**则特意留在 `/v1/health` 上：只是失去
-leader 的 PD 仍是健康的 Raft 成员，重启它只会让故障恶化。
+失去 leader 的 PD 会退出 Service 端点，直到 leader 恢复。PD 的**启动和存活探测**按副本数推导（`pd.livenessPath`
+可覆盖）。多副本时特意留在 `/v1/health` 上：只是失去 leader 的 PD 仍是健康的 Raft 成员，重启它只会让故障恶化。
+单副本 PD 是例外，推导为 `/v1/ready`：它没有选举可失去，而一个永久退位的 PD（例如磁盘写满导致 Raft 快照失败之后，
+[apache/hugegraph#3222](https://github.com/apache/hugegraph/issues/3222)）会一直用 `/v1/health` 返回 200 却不再
+服务写入；改用 `/v1/ready` 让 kubelet 把它重启。
 
 Server 的启动获得相同的预算：镜像默认会在 120 秒后杀掉仍在启动的 Server，chart 因此从启动探针推导
 `HG_SERVER_STARTUP_TIMEOUT_S`（默认 450 秒），配置的探针预算低于该下限时会被抬高。如果存储层启动更慢，调大
@@ -190,8 +197,11 @@ helm upgrade hugegraph ./helm/hugegraph --namespace hugegraph --reuse-values
 - **全新安装后的第一次升级会让 PD、Server、Hubble 各滚动一次**，因为跟踪 Secret 的注解第一次观察到安装时创建的
   Secret。Store 不受影响。
 - **Store 的滚动更新以监听检查推进，而不是以分片恢复推进**，因此控制器可能在上一个 Store 尚未重新加入分片组时就替换
-  下一个。生产环境滚动镜像时，设置 `store.updateStrategy.type=OnDelete`，逐个替换 Store Pod，并在替换下一个之前确认上
-  一个在 PD 中显示 `Up`；PD 本来就逐个重启，`pd.updateStrategy.type=OnDelete` 为维护窗口提供同样的手工控制。
+  下一个。生产环境滚动镜像时，设置 `store.updateStrategy.type=OnDelete`，逐个替换 Store Pod。PD 里的 `Up` 不是两次
+  替换之间的检查：PD 在注册时就把 Store 标为 `Up`，此时分区尚未恢复，已停止的 Store 也要等 300 秒 keep-alive 过期
+  才离开 `Up`。应等被替换的 Pod 变为 `Ready`，再确认每个分片组都报告完整分片数和一个 leader；完整流程见
+  [运维页](/cn/docs/quickstart/hugegraph/hugegraph-helm-operations/)。PD 本来就逐个重启，
+  `pd.updateStrategy.type=OnDelete` 为维护窗口提供同样的手工控制。
 - **升级不能修改 PVC 大小**：Kubernetes 禁止修改 StatefulSet 的 `volumeClaimTemplates`，带新 `storage.size` 的升级会
   被整体拒绝。chart README 记录了支持卷扩容的 StorageClass 上的扩容步骤。
 
@@ -211,16 +221,21 @@ helm uninstall hugegraph --namespace hugegraph
 
 ### 9 限制
 
-- 尚无 NetworkPolicy 资源。PD 的 Raft IP 白名单在集群内被关闭（Pod IP 会变化；白名单只在启动时解析一次对端，之后就会
-  拦截它们），集群内的网络访问控制目前由运维方负责。
+- `networkPolicy.enabled` 为每个组件渲染只放行本 release 流量的 NetworkPolicy；默认关闭，`values-cluster.yaml`
+  中开启。它之所以重要，是因为 chart 在集群内关闭了 PD 的 Raft IP 白名单（Pod IP 会变化；白名单只在启动时解析一次
+  对端，之后就会拦截它们），raft 与 gRPC 端口的访问限制由这些策略承担。策略需要强制执行 NetworkPolicy 的网络插件
+  （Calico、Cilium、kind v0.25 及以上、k3s），所有外部调用方（包括 Ingress 控制器）都必须列入
+  `networkPolicy.<component>.extraIngress`，否则渲染失败。细节见
+  [运维页](/cn/docs/quickstart/hugegraph/hugegraph-helm-operations/)。
 - 镜像 tag 跟踪 `latest`，直到下一个 HugeGraph 版本发布带版本号的镜像；长期运行的环境请固定 tag 或 digest。
 - 创建图之后，其他 Server 副本在短暂窗口内可能尚未收敛，路由到这类副本的查询可能报 `Could not rebind [g]` 之类的
   错误。请带退避重试，或对"创建后立即查询"的流程使用会话粘滞路由；集群级图就绪在
   [#3137](https://github.com/apache/hugegraph/issues/3137) 跟踪。
 - 当前版本的 Store 恢复由运维人员触发：Store 丢失后的副本重建、leader 均衡、分区再均衡都只在调用 PD 的 REST API 时
-  执行。chart README 的
-  [Disaster Recovery](https://github.com/apache/hugegraph/tree/master/helm/hugegraph#disaster-recovery) 一节即操作
-  手册。
+  执行。丢失了卷的 Store 只有在携带
+  [apache/hugegraph#3234](https://github.com/apache/hugegraph/pull/3234)（2026-09-24 合入，尚未进入任何发布版本）
+  的镜像上才能原地恢复；更早的镜像上，替换 Store Pod 时请保留它的 PVC。操作手册见
+  [运维页](/cn/docs/quickstart/hugegraph/hugegraph-helm-operations/)的灾难恢复一节。
 - 集群内无 TLS 终结，无备份工具，无 Operator，无内置监控栈。
 
 ### 10 排障

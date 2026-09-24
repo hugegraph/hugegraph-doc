@@ -25,6 +25,9 @@ A distributed HugeGraph cluster has a startup contract (no `init-store` on Serve
 metadata, Store waiting for a PD quorum, one PD REST secret shared by three readers). The chart encodes that
 contract so operators do not have to; the details are in the
 [chart README](https://github.com/apache/hugegraph/tree/master/helm/hugegraph#chart-details).
+Day-2 work (NetworkPolicy details, disaster recovery, scaling, safe Store
+rolls, running Hubble outside the cluster) is on the
+[operations page](/docs/quickstart/hugegraph/hugegraph-helm-operations/).
 
 ```mermaid
 flowchart LR
@@ -101,7 +104,7 @@ The chart ships three values files:
 |------|----------|--------------|
 | `values.yaml` | 3 PD + 3 Store + 3 Server | Default; preferred anti-affinity, auth on, Hubble off |
 | `values-single.yaml` | 1 + 1 + 1 | Single-node development and CI; smaller PVCs |
-| `values-cluster.yaml` | 3 + 3 + 3 | Production starting point: JVM heap and resource settings, PD/Store PodDisruptionBudgets, `required` anti-affinity |
+| `values-cluster.yaml` | 3 + 3 + 3 | Production starting point: JVM heap and resource settings, PD/Store PodDisruptionBudgets, `required` anti-affinity, NetworkPolicy on |
 
 ```bash
 helm install hugegraph ./helm/hugegraph --namespace hugegraph --create-namespace \
@@ -109,7 +112,10 @@ helm install hugegraph ./helm/hugegraph --namespace hugegraph --create-namespace
 ```
 
 `values-cluster.yaml` is a starting point, not a capacity guarantee: recalculate resources for your graph size and
-traffic. The full parameter reference (every component, probe, scheduling, and Secret knob) is kept in the
+traffic. One of its numbers deserves a note: it requests 5Gi and limits at 8Gi of memory per Store, well above the
+1Gi heap, because the Store's RocksDB caches live outside the JVM heap (a 4Gi limit OOM-killed Stores after about
+1 GB of data). Scale both numbers with data size. The full parameter reference (every component, probe,
+scheduling, and Secret knob) is kept in the
 [chart README](https://github.com/apache/hugegraph/tree/master/helm/hugegraph#configuration).
 
 #### 3.4 Verify the install
@@ -170,8 +176,12 @@ PD exposes two health endpoints, and the chart deliberately uses both:
 
 The chart puts PD **readiness** and the Store init-container wait on `/v1/ready`: a Store only starts once a
 majority of PD peers are quorum members, and a PD that lost its leader drops out of Service endpoints until a
-leader is back. PD **startup and liveness** stay on `/v1/health` on purpose: a PD that merely lost its leader is
-still a healthy Raft member, and restarting it would make the outage worse.
+leader is back. PD **startup and liveness** derive from the replica count (`pd.livenessPath` overrides the
+choice). With more than one PD they stay on `/v1/health` on purpose: a PD that merely lost its leader is still a
+healthy Raft member, and restarting it would make the outage worse. A single PD is the exception and derives to
+`/v1/ready`: it has no election to lose, and one that steps down for good, as after a failed Raft snapshot on a
+full disk ([apache/hugegraph#3222](https://github.com/apache/hugegraph/issues/3222)), would answer `/v1/health`
+forever while serving no writes; the kubelet restarts it instead.
 
 Server startup gets a matching budget: the image would normally kill a Server still starting after 120 seconds, so
 the chart derives `HG_SERVER_STARTUP_TIMEOUT_S` from the startup probe (450 seconds by default) and raises a lower
@@ -210,9 +220,12 @@ defaults. Any upgrade that changes a Pod template rolls that workload once. Poin
   annotations first observe the install-created Secrets. Store is untouched.
 - **Store rolling updates advance on a listener check, not on shard recovery**, so the controller can replace the
   next Store while the previous one is still rejoining its shard groups. For a production image roll, set
-  `store.updateStrategy.type=OnDelete` and replace Store pods one at a time, confirming the previous Store shows
-  `Up` in PD before the next; PD restarts are one pod at a time either way, and `pd.updateStrategy.type=OnDelete`
-  gives the same manual control for maintenance windows.
+  `store.updateStrategy.type=OnDelete` and replace Store pods one at a time. `Up` in PD is not the between-pods
+  check: PD marks a Store `Up` at registration, before it restores partitions, and a stopped Store stays `Up`
+  until a 300 s keep-alive expires. Wait for the replaced Pod to be `Ready`, then confirm every shard group
+  reports its full shard count with one leader; the full procedure is on the
+  [operations page](/docs/quickstart/hugegraph/hugegraph-helm-operations/). PD restarts are one pod at a time
+  either way, and `pd.updateStrategy.type=OnDelete` gives the same manual control for maintenance windows.
 - **PVC sizes cannot be changed by upgrade**: Kubernetes forbids changing StatefulSet `volumeClaimTemplates`, so an
   upgrade with a new `storage.size` is rejected in full. The chart README documents the resize procedure for
   StorageClasses that support volume expansion.
@@ -235,9 +248,13 @@ later install under the same release name comes back with the same credentials.
 
 ### 9 Limitations
 
-- No NetworkPolicy resources yet. With the PD Raft IP allowlist disabled in-cluster (pod IPs change; the allowlist
-  resolves peers once at boot and then blocks them), in-cluster network access control is currently the operator's
-  responsibility.
+- `networkPolicy.enabled` renders one NetworkPolicy per component that admits only the release's own traffic; it
+  is off by default and on in `values-cluster.yaml`. It matters because the chart disables the PD Raft IP
+  allowlist in-cluster (pod IPs change; the allowlist resolves peers once at boot and then blocks them), so the
+  policies are what restricts the raft and gRPC ports. They need a network plugin that enforces NetworkPolicy
+  (Calico, Cilium, kind v0.25 or later, k3s), and every outside client, the Ingress controller included, must be
+  listed in `networkPolicy.<component>.extraIngress` or the render fails. Details are on the
+  [operations page](/docs/quickstart/hugegraph/hugegraph-helm-operations/).
 - Image tags track `latest` until the next HugeGraph release publishes versioned images; pin tags or digests for
   anything long-lived.
 - After creating a graph, other Server replicas can lag for a short window before they serve queries for it, so a
@@ -245,9 +262,11 @@ later install under the same release name comes back with the same credentials.
   backoff, or use sticky routing for create-then-query flows; cluster-wide graph readiness is tracked in
   [#3137](https://github.com/apache/hugegraph/issues/3137).
 - Store recovery is operator-triggered on current builds: re-replication after Store loss, leader balancing, and
-  partition rebalancing run only when called through PD's REST API. The chart README's
-  [Disaster Recovery](https://github.com/apache/hugegraph/tree/master/helm/hugegraph#disaster-recovery) section is
-  the runbook.
+  partition rebalancing run only when called through PD's REST API. A Store whose volume is lost can be recovered
+  in place only on images carrying
+  [apache/hugegraph#3234](https://github.com/apache/hugegraph/pull/3234) (merged 2026-09-24, in no release yet);
+  on earlier images, keep a Store's PVC when replacing its Pod. The Disaster Recovery section of the
+  [operations page](/docs/quickstart/hugegraph/hugegraph-helm-operations/) is the runbook.
 - No TLS termination inside the cluster, no backup tooling, no Operator, and no bundled monitoring stack.
 
 ### 10 Troubleshooting
