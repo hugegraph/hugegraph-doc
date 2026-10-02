@@ -90,9 +90,10 @@ pulls.
 
 Two defaults to know before going further:
 
-- **No resources are set.** Every pod is BestEffort and each JVM sizes its heap against total node memory. That is
-  fine on a single node; on a multi-node cluster the heaps oversubscribe the nodes and pods abort. Use
-  `values-cluster.yaml` or set `resources` per component for anything beyond a laptop.
+- **No resources are set.** Every pod is BestEffort, and each JVM sets its maximum heap to half of the memory it
+  sees free on the node at start (up to a per-component ceiling), so the JVMs on one node can together claim more
+  memory than the node has. That holds for `values-single.yaml` on one node as well. Set `resources` per component on every install, the single-node
+  preset included; `values-cluster.yaml` sets them for a multi-node cluster.
 - **Image tags track `latest`** until the next HugeGraph release is published, with `pullPolicy: Always`. Pin tags
   or digests for production.
 
@@ -104,7 +105,7 @@ The chart ships three values files:
 |------|----------|--------------|
 | `values.yaml` | 3 PD + 3 Store + 3 Server | Default; preferred anti-affinity, auth on, Hubble off |
 | `values-single.yaml` | 1 + 1 + 1 | Single-node development and CI; smaller PVCs |
-| `values-cluster.yaml` | 3 + 3 + 3 | Production starting point: JVM heap and resource settings, PD/Store PodDisruptionBudgets, `required` anti-affinity, NetworkPolicy on, Store `OnDelete` updates |
+| `values-cluster.yaml` | 3 + 3 + 3 | Production starting point: JVM heap and resource settings, a Server PodDisruptionBudget, `required` anti-affinity, NetworkPolicy on, Store `OnDelete` updates |
 
 ```bash
 helm install hugegraph ./helm/hugegraph --namespace hugegraph --create-namespace \
@@ -234,7 +235,10 @@ helm upgrade hugegraph ./helm/hugegraph --namespace hugegraph --reuse-values
 ```
 
 `--reuse-values` keeps the release's existing overrides; without it the upgrade rebuilds the release from chart
-defaults. Any upgrade that changes a Pod template rolls that workload once. Points worth planning around:
+defaults. It also keeps the old values as the complete base, so a release created by an earlier chart revision does
+not pick up new defaults such as the hardened `securityContext`; pass your own values with `-f`, or use
+`--reset-then-reuse-values`, to adopt them. Any upgrade that changes a Pod template rolls that workload once.
+Points worth planning around:
 
 - **The first upgrade after a fresh install rolls PD, Server, and Hubble once**, when the Secret-tracking
   annotations first observe the install-created Secrets. Store is untouched. A Server that restarts while PD is
@@ -261,10 +265,11 @@ defaults. Any upgrade that changes a Pod template rolls that workload once. Poin
   upgrade with a new `storage.size` is rejected in full. The chart README documents the resize procedure for
   StorageClasses that support volume expansion.
 
-Scaling Server up and down is a values change (`server.replicas`, or `server.hpa`). Scaling **PD or Store down is
-not**: Raft and shard membership are persisted, deleting pods does not reconfigure them, and a 3-to-1 PD shrink
-permanently loses quorum. The chart rejects an upgrade whose replica count is below the live StatefulSet; the
-manual drain-then-scale procedure is on the
+Scaling Server up and down is a values change (`server.replicas`, or `server.hpa`). Changing the **PD count in
+either direction, or shrinking Store, is not**: Raft and shard membership are persisted and Pods alone do not
+reconfigure them, so a 3-to-1 PD shrink permanently loses quorum and new PD Pods do not join the voting
+configuration. The chart reads the live StatefulSet and rejects an upgrade that changes the PD count or
+lowers the Store count; the manual procedures are on the
 [operations page](/docs/quickstart/hugegraph/hugegraph-helm-operations/#8-scaling).
 
 ### 8 Uninstall
@@ -321,7 +326,7 @@ later install under the same release name comes back with the same credentials.
 |---------|-------------|
 | Store pods stuck in `Init:0/1` | PD is not ready: `kubectl logs <store-pod> -c wait-for-pd`, then the PD pods |
 | PVCs stay `Pending` | No default StorageClass, or the provisioner is down: `kubectl get sc` |
-| Pods OOM killed or restarting on multi-node | No resources set, JVM heaps sized to node memory: use `values-cluster.yaml` |
+| Pods OOM killed or restarting | No resources set, JVM heaps sized to node memory: set `resources` (see Install) |
 | Query fails right after creating a graph | Replica convergence window: see Limitations above |
 | `helm test` prints `Gremlin failed on <Pod IP>` | That Server Pod lost its Gremlin binding: delete it (see Limitations above) |
 | A PD Pod stays not Ready and its `/v1/ready` reports `STATE_UNINITIALIZED` | Its RocksDB store may not have opened: look for `Failed to open RocksDB` in its log (see Limitations above) |

@@ -246,11 +246,12 @@ Know what this does not prove: the shard list is PD's membership record,
 not a statement that the Store caught up on the raft log. No endpoint on
 current images reports restoration-complete. For a closer look,
 port-forward the replaced Store and read its own view of a group:
-`GET :8520/v1/partition/<groupId>` returns the raft role, term, and
-committed index that Store holds, and fails while the Store is down;
-compare term and index with a peer Store rather than reading them alone.
-The plural `GET :8520/v1/partitions` answers 500 on any Store that follows
-a group on images built before
+`GET :8520/v1/partition/<groupId>` returns the raft role, leader, and
+committed index (`logIndex`) that Store holds, and fails while the Store
+is down; compare the index with a peer Store rather than reading it
+alone. This route never fills its `term` field, so `term` always reads 0
+there. The plural `GET :8520/v1/partitions` answers 500 on any Store that
+follows a group on images built before
 [apache/hugegraph#3232](https://github.com/apache/hugegraph/pull/3232)
 (merged 2026-09-24); after it, it answers 200 on every Store, with `conf`
 and `peers` null for followed groups. The per-group path works on both.
@@ -283,17 +284,21 @@ curl -su "hg:${PD_SECRET}" http://127.0.0.1:8620/v1/members
 kubectl port-forward -n hugegraph pod/<leader-pod> 8620:8620
 # Reconcile shard groups and process tombstoned Stores.
 curl -u "hg:${PD_SECRET}" http://127.0.0.1:8620/v1/task/patrolPartitions
+# If the patrol repaired a shard group, wait 180 s first (see below).
 # Spread Raft leaders, then partition data.
 curl -u "hg:${PD_SECRET}" http://127.0.0.1:8620/v1/task/balanceLeaders
 curl -u "hg:${PD_SECRET}" http://127.0.0.1:8620/v1/task/balancePartitions
 ```
 
 Read `/v1/members` again after the tasks: if leadership moved mid-sequence,
-the later tasks ran on a follower and did nothing. Wait at least 180 s
-before rerunning `balanceLeaders` after a `balancePartitions` call:
-`balancePartitions` sets a balance-shard flag for 180 s even when it moves
-nothing, and `balanceLeaders` inside that window is refused. On images
-built before
+the later tasks ran on a follower and did nothing. PD sets a
+balance-shard flag for 180 s in two cases: `patrolPartitions` sets it
+whenever it reallocates a shard group whose shard count is wrong, and
+`balancePartitions` sets it even when it moves nothing. Inside that
+window `balanceLeaders` is refused and `balancePartitions` returns
+without doing anything, so wait at least 180 s after a patrol that
+repaired a group, and after `balancePartitions`, before the next
+balancing call. On images built before
 [apache/hugegraph#3233](https://github.com/apache/hugegraph/pull/3233)
 (merged 2026-09-24) the refusal is a bare HTTP 500 whose reason appears
 only in the PD log; after it, the reason comes back in the body as
@@ -378,10 +383,12 @@ unaffected.
 **PD, either direction.** The rendered peer list reaches raft only as its
 bootstrap configuration, which an initialized group ignores; a 3-to-5
 upgrade leaves the voting configuration at three, and a 3-to-1 shrink
-loses quorum outright. Membership changes go through the PD client API
-(no REST route exposes them), which the chart cannot wrap. Change the
-membership through PD, confirm it in `/v1/members`, scale the live
-StatefulSet, then `helm upgrade` with the matching value; until that
+loses quorum outright. Membership changes go through PD's peer-list
+change, which the PD client API and the PD REST route
+`POST /v1/members/change` both expose; the route needs the same Basic
+authentication as the other PD REST routes, and the chart wraps neither.
+Change the membership through PD, confirm it in `/v1/members`, scale the
+live StatefulSet, then `helm upgrade` with the matching value; until that
 sequence is verified on your own build, install the PD count you intend
 to keep.
 
@@ -402,8 +409,13 @@ replaced one:
 5. Scale the live StatefulSet, then `helm upgrade` with the matching
    value.
 
-Deleting the PVCs of the removed ordinals is separate and permanent; do it
-only after step 4 reports the data moved.
+The chart keeps the PVCs of removed ordinals
+(`store.persistentVolumeClaimRetentionPolicy.whenScaled: Retain`), and a
+retained PVC still holds the retired Store id. PD refuses to register a
+Store id that is Tombstone or deleted, so a Store that later starts on
+that PVC, as when you scale the same ordinal back up, cannot join.
+Delete the PVCs of the removed ordinals after step 4 reports the data
+moved and before reusing those ordinals; the deletion is permanent.
 
 ### 9 Running Hubble outside the cluster
 

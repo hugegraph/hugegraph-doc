@@ -195,8 +195,9 @@ curl -s -u "hg:${PD_SECRET}" http://127.0.0.1:8620/v1/shardGroups | jq '
 
 要清楚这证明不了什么：分片列表是 PD 的成员记录，不代表该 Store 已追上 raft 日志。当前镜像没有任何端点报告"恢复
 完成"。想看得更近，port-forward 被替换的 Store，读它自己对某个分片组的视图：`GET :8520/v1/partition/<groupId>`
-返回该 Store 持有的 raft 角色、term 和已提交 index，Store 停机时会失败；term 和 index 要与对端 Store 上的同一
-组对比着看，不要单独读。复数形式的 `GET :8520/v1/partitions` 在
+返回该 Store 持有的 raft 角色、leader 和已提交 index（`logIndex`），Store 停机时会失败；index 要与对端 Store 上的
+同一组对比着看，不要单独读。这个路由从不填写 `term` 字段，所以这里的 `term` 总是 0。
+复数形式的 `GET :8520/v1/partitions` 在
 [apache/hugegraph#3232](https://github.com/apache/hugegraph/pull/3232)（2026-09-24 合入）之前构建的镜像上，
 对任何跟随分片组的 Store 返回 500；之后的镜像对每个 Store 都返回 200，被跟随分组的 `conf` 和 `peers` 为
 null。逐组路径在两类镜像上都可用。
@@ -221,14 +222,16 @@ curl -su "hg:${PD_SECRET}" http://127.0.0.1:8620/v1/members
 kubectl port-forward -n hugegraph pod/<leader-pod> 8620:8620
 # 校正分片组并处理 Tombstone Store。
 curl -u "hg:${PD_SECRET}" http://127.0.0.1:8620/v1/task/patrolPartitions
+# 如果巡检修复了分片组，先等 180 秒（见下文）。
 # 先摊平 Raft leader，再摊平分区数据。
 curl -u "hg:${PD_SECRET}" http://127.0.0.1:8620/v1/task/balanceLeaders
 curl -u "hg:${PD_SECRET}" http://127.0.0.1:8620/v1/task/balancePartitions
 ```
 
 任务跑完后再读一次 `/v1/members`：如果中途 leader 迁移，后面的任务其实跑在 follower 上、什么也没做。
-`balancePartitions` 之后至少等 180 秒再执行 `balanceLeaders`：`balancePartitions` 即使什么都没搬也会设置
-180 秒的 balance-shard 标志，窗口内的 `balanceLeaders` 会被拒绝。在
+PD 在两种情况下设置 180 秒的 balance-shard 标志：`patrolPartitions` 每次重新分配分片数不对的分片组时都会设置，
+`balancePartitions` 即使什么都没搬也会设置。窗口内 `balanceLeaders` 会被拒绝，`balancePartitions` 什么也不做就返回，
+因此在修复了分片组的巡检之后、以及 `balancePartitions` 之后，至少等 180 秒再执行下一次均衡。在
 [apache/hugegraph#3233](https://github.com/apache/hugegraph/pull/3233)（2026-09-24 合入）之前构建的镜像上，
 拒绝表现为裸的 HTTP 500，原因只在 PD 日志里；之后的镜像把原因放进响应体：
 `{"status":1001,"error":"balance shard is processing, please try later!"}`。
@@ -280,7 +283,8 @@ hugegraph-store --replicas=0` 分阶段，准备好后再扩回来。Server 会�
 重新配置它们。chart 通过读取线上 StatefulSet 拒绝 PD 的双向变更和 Store 的缩容，全新安装不受影响。
 
 **PD，双向。** chart 渲染的对端列表只作为 raft 的引导配置生效，已初始化的组会忽略它：3 扩到 5 只是多起两个
-PD，投票配置仍是三个；3 缩到 1 直接失去多数派。成员变更走 PD 客户端 API（没有 REST 路由），chart 无法代劳。
+PD，投票配置仍是三个；3 缩到 1 直接失去多数派。成员变更走 PD 的对端列表变更，PD 客户端 API 和 PD REST 路由
+`POST /v1/members/change` 都提供它；该路由与其他 PD REST 路由一样需要 Basic 认证，chart 两者都不封装。
 先通过 PD 改成员、在 `/v1/members` 确认新配置、`kubectl scale` 线上 StatefulSet、再用匹配的 values 执行
 `helm upgrade`；在你自己的构建上验证过这套流程之前，请按打算长期保留的 PD 数量安装。
 
@@ -294,7 +298,9 @@ Store。像灾难恢复退役被替换 Store 那样退役要下线的 Store：
 4. 等到 `/v1/shardGroups` 不再列出这些 id，且每个分组都报告完整分片数和一个 leader。
 5. `kubectl scale` 线上 StatefulSet，再用匹配的 values 执行 `helm upgrade`。
 
-删除被移除序号的 PVC 是独立且不可逆的操作；只在第 4 步确认数据已迁走之后再做。
+chart 会保留被移除序号的 PVC（`store.persistentVolumeClaimRetentionPolicy.whenScaled: Retain`），保留下来的 PVC
+里仍是已退役的 Store id。PD 拒绝注册处于 Tombstone 或已删除的 Store id，所以之后在这个 PVC 上启动的 Store（例如把
+同一序号重新扩容回来）无法加入。请在第 4 步确认数据已迁走之后、复用这些序号之前删除它们的 PVC；删除不可逆。
 
 ### 9 在集群外运行 Hubble
 

@@ -83,8 +83,9 @@ helm install hugegraph ./helm/hugegraph --namespace hugegraph --create-namespace
 
 继续之前需要了解两个默认值：
 
-- **默认不设置 resources。** 每个 Pod 都是 BestEffort，JVM 按节点总内存计算堆大小。单节点没有问题；多节点集群上各个堆
-  会超订节点内存导致进程中止。超出笔记本范围的部署请使用 `values-cluster.yaml`，或按组件设置 `resources`。
+- **默认不设置 resources。** 每个 Pod 都是 BestEffort，每个 JVM 在启动时把堆上限设为它看到的节点空闲内存的一半（各组件另有上限），
+  因此同一节点上的几个 JVM 合起来可能占用超过节点总量的内存。单节点上的 `values-single.yaml` 也是如此。每次安装都请
+  按组件设置 `resources`，单节点预设也不例外；`values-cluster.yaml` 为多节点集群设置了这些值。
 - **镜像 tag 跟踪 `latest`**，且 `pullPolicy: Always`，直到下一个 HugeGraph 版本发布。生产环境请固定 tag 或 digest。
 
 #### 3.3 拓扑预设
@@ -95,7 +96,7 @@ chart 附带三个 values 文件：
 |------|------|----------|
 | `values.yaml` | 3 PD + 3 Store + 3 Server | 默认；preferred 反亲和，认证开启，Hubble 关闭 |
 | `values-single.yaml` | 1 + 1 + 1 | 单节点开发与 CI；PVC 更小 |
-| `values-cluster.yaml` | 3 + 3 + 3 | 生产起点：JVM 堆与资源设置、PD/Store PodDisruptionBudget、`required` 反亲和、NetworkPolicy 开启、Store 使用 `OnDelete` 更新 |
+| `values-cluster.yaml` | 3 + 3 + 3 | 生产起点：JVM 堆与资源设置、Server PodDisruptionBudget、`required` 反亲和、NetworkPolicy 开启、Store 使用 `OnDelete` 更新 |
 
 ```bash
 helm install hugegraph ./helm/hugegraph --namespace hugegraph --create-namespace \
@@ -207,7 +208,9 @@ kubectl port-forward -n hugegraph svc/hugegraph-hubble 8088:8088
 helm upgrade hugegraph ./helm/hugegraph --namespace hugegraph --reuse-values
 ```
 
-`--reuse-values` 保留 release 的既有覆盖值；不加它，升级会以 chart 默认值重建 release。任何改变 Pod 模板的升级都会让
+`--reuse-values` 保留 release 的既有覆盖值；不加它，升级会以 chart 默认值重建 release。它还会把旧 values 当作完整的基准，
+因此由早期 chart 版本创建的 release 不会获得新的默认值（例如加固后的 `securityContext`）；要采用它们，请用 `-f` 传入
+自己的 values，或使用 `--reset-then-reuse-values`。任何改变 Pod 模板的升级都会让
 对应工作负载滚动一次。需要提前规划的几点：
 
 - **全新安装后的第一次升级会让 PD、Server、Hubble 各滚动一次**，因为跟踪 Secret 的注解第一次观察到安装时创建的
@@ -228,9 +231,9 @@ helm upgrade hugegraph ./helm/hugegraph --namespace hugegraph --reuse-values
 - **升级不能修改 PVC 大小**：Kubernetes 禁止修改 StatefulSet 的 `volumeClaimTemplates`，带新 `storage.size` 的升级会
   被整体拒绝。chart README 记录了支持卷扩容的 StorageClass 上的扩容步骤。
 
-Server 的扩缩容是普通的 values 变更（`server.replicas` 或 `server.hpa`）。**缩容 PD 或 Store 不是**：Raft 与分片成员
-关系是持久化的，删除 Pod 不会重新配置它们，PD 从 3 缩到 1 会永久失去多数派。chart 会拒绝副本数低于线上 StatefulSet
-的升级；先迁移再缩容的手工步骤见
+Server 的扩缩容是普通的 values 变更（`server.replicas` 或 `server.hpa`）。**双向改变 PD 数量、或缩容 Store 都不是**：
+Raft 与分片成员关系是持久化的，Pod 本身不会重新配置它们，因此 PD 从 3 缩到 1 会永久失去多数派，新增的
+PD Pod 也不会加入投票配置。chart 读取线上 StatefulSet，拒绝改变 PD 数量或降低 Store 数量的升级；手工步骤见
 [运维页](/cn/docs/quickstart/hugegraph/hugegraph-helm-operations/#8-伸缩)。
 
 ### 8 卸载
@@ -279,7 +282,7 @@ helm uninstall hugegraph --namespace hugegraph
 |------|----------|
 | Store Pod 卡在 `Init:0/1` | PD 未就绪：`kubectl logs <store-pod> -c wait-for-pd`，再看 PD Pod |
 | PVC 停在 `Pending` | 没有默认 StorageClass，或供给器故障：`kubectl get sc` |
-| 多节点上 Pod 被 OOM 杀掉或反复重启 | 未设置 resources，JVM 按节点内存取堆：用 `values-cluster.yaml` |
+| Pod 被 OOM 杀掉或反复重启 | 未设置 resources，JVM 按节点内存取堆：设置 `resources`（见"安装"） |
 | 建图后立刻查询失败 | 副本收敛窗口：见上文"限制" |
 | `helm test` 打印 `Gremlin failed on <Pod IP>` | 该 Server Pod 丢失了 Gremlin 绑定：删除它（见上文"限制"） |
 | 某个 PD Pod 一直不 Ready，其 `/v1/ready` 报 `STATE_UNINITIALIZED` | 它的 RocksDB 存储可能没有打开：在日志中查找 `Failed to open RocksDB`（见上文"限制"） |
