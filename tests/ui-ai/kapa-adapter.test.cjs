@@ -21,10 +21,25 @@ function harness() {
     textContent: '',
     classList: { toggle() {} },
   };
+  const consentListeners = new Map();
+  const continueButton = { addEventListener(name, callback) { consentListeners.set(`continue:${name}`, callback); } };
+  const cancelButton = { addEventListener(name, callback) { consentListeners.set(`cancel:${name}`, callback); } };
+  const consent = {
+    open: false,
+    showModal() { this.open = true; },
+    close() { this.open = false; },
+    addEventListener(name, callback) { consentListeners.set(`dialog:${name}`, callback); },
+    querySelector(selector) {
+      if (selector === '[data-hg-ai-continue]') return continueButton;
+      if (selector === '[data-hg-ai-cancel]') return cancelButton;
+      return null;
+    },
+  };
   const documentObject = {
     activeElement: trigger,
     querySelector(selector) {
       if (selector === '[data-hg-ai-status]') return status;
+      if (selector === '[data-hg-ai-consent]') return consent;
       if (selector === 'script[data-hg-kapa-widget]') {
         return scripts.find((script) => !script.removed) || null;
       }
@@ -85,6 +100,10 @@ function harness() {
     documentObject,
     fireRender(index = renderCallbacks.length - 1) { renderCallbacks[index](); },
     fireTimeout() { Array.from(timers.values()).forEach((callback) => callback()); },
+    continueConsent() { consentListeners.get('continue:click')(); },
+    cancelConsent() { consentListeners.get('cancel:click')(); },
+    escapeConsent() { consentListeners.get('dialog:keydown')({ key: 'Escape', preventDefault() {}, stopPropagation() {} }); },
+    nativeCancel() { consentListeners.get('dialog:cancel')({ preventDefault() {} }); },
     installBundle() {
       const queued =
         windowObject.Kapa && Array.isArray(windowObject.Kapa.q)
@@ -138,6 +157,7 @@ test('sends only the trimmed query after explicit activation and render', () => 
   assert.deepEqual(h.calls.map(([name]) => name), ['onModalClose']);
 
   controller.activate('  how to start?  ', true, h.trigger);
+  h.continueConsent();
   assert.equal(controller.getState(), 'loading');
   assert.deepEqual(h.calls.map(([name]) => name), ['onModalClose', 'render']);
 
@@ -163,6 +183,7 @@ test('ignores duplicate activation and never opens after a late render', () => {
     h.config,
   );
   controller.activate('first', true, h.trigger);
+  h.continueConsent();
   controller.activate('second', true, h.trigger);
   assert.equal(
     h.calls.filter(([name]) => name === 'render').length,
@@ -187,12 +208,26 @@ test('launcher opens a blank session without auto-submit', () => {
     h.config,
   );
   controller.activate('', false, h.trigger);
+  h.continueConsent();
   h.scripts[0].fire('load');
   h.fireRender();
   assert.deepEqual(h.calls.at(-1), [
     'open',
     { mode: 'ai', query: '', submit: false },
   ]);
+});
+
+test('cancel, Escape, and native cancel keep Kapa unloaded and restore focus', () => {
+  for (const close of ['cancelConsent', 'escapeConsent', 'nativeCancel']) {
+    const h = harness();
+    const controller = adapter.createController(h.windowObject, h.documentObject, h.config);
+    controller.activate('private question', true, h.trigger);
+    assert.equal(controller.getState(), 'consent');
+    h[close]();
+    assert.equal(controller.getState(), 'idle');
+    assert.equal(h.scripts.length, 0);
+    assert.equal(h.trigger.focused, true);
+  }
 });
 
 test('a pending timeout retries with a fresh script and ignores the late attempt', () => {
@@ -203,6 +238,7 @@ test('a pending timeout retries with a fresh script and ignores the late attempt
     h.config,
   );
   controller.activate('first', true, h.trigger);
+  h.continueConsent();
   assert.equal(h.scripts.length, 1);
   const staleRender = h.renderCallbacks[0];
 
@@ -232,3 +268,141 @@ test('a pending timeout retries with a fresh script and ignores the late attempt
     { mode: 'ai', query: 'second', submit: true },
   ]);
 });
+
+test('init succeeds without search shell and binds standalone triggers', () => {
+  const h = harness();
+  const configNode = {
+    textContent: JSON.stringify({
+      websiteId: 'test-id',
+      sourceGroupId: 'test-group',
+      locale: 'en',
+      themeColor: '#532fc9',
+      historical: false,
+      labels: { ask: 'Ask AI' },
+    }),
+  };
+  const doc = {
+    ...h.documentObject,
+    getElementById(id) {
+      if (id === 'hg-ai-config') return configNode;
+      if (id === 'td-shell-search') return null;
+      return null;
+    },
+  };
+  h.trigger.addEventListener = (name, cb) => {};
+  const controller = adapter.init(h.windowObject, doc);
+  assert.ok(controller);
+  assert.equal(h.trigger.dataset.hgAiBound, '');
+});
+
+test('init wires search shell Enter handler and updates noResults text', () => {
+  global.MutationObserver = class {
+    observe() {}
+    disconnect() {}
+  };
+  const h = harness();
+  h.trigger.addEventListener = (name, cb) => {};
+  const configNode = {
+    textContent: JSON.stringify({
+      websiteId: 'test-id',
+      sourceGroupId: 'test-group',
+      locale: 'en',
+      themeColor: '#532fc9',
+      historical: false,
+      labels: { ask: 'Ask AI', noResults: 'No documentation results found' },
+    }),
+  };
+  const emptyNode = {
+    className: 'td-shell-search__empty',
+    textContent: 'old empty',
+  };
+  const tailBtn = {
+    dataset: { hgAskAi: '' },
+    addEventListener() {},
+  };
+  const tailGroup = {
+    dataset: { hgAiSearchTail: '' },
+    querySelector(sel) {
+      if (sel === '[data-hg-ask-ai]') return tailBtn;
+      return null;
+    },
+    remove() {},
+  };
+  const list = {
+    className: 'td-shell-search__list',
+    querySelector(sel) {
+      if (sel === '.td-shell-search__empty') return emptyNode;
+      if (sel === '.td-shell-search__item:not(.hg-ai-search-tail__button)') return null;
+      if (sel === '[data-hg-ai-search-tail] [data-hg-ask-ai]') return tailBtn;
+      if (sel === '[data-hg-ai-search-tail]') return tailGroup;
+      return null;
+    },
+    querySelectorAll(sel) {
+      if (sel === '.td-shell-search__empty') return [emptyNode];
+      if (sel === '.td-shell-search__group-label') return [];
+      return [];
+    },
+    appendChild() {},
+  };
+  const inputListeners = new Map();
+  const input = {
+    value: 'graph query',
+    addEventListener(event, handler) {
+      inputListeners.set(event, handler);
+    },
+  };
+  const root = {
+    dataset: {},
+    hidden: false,
+    querySelector(sel) {
+      if (sel === '.td-shell-search__input') return input;
+      if (sel === '.td-shell-search__list') return list;
+      return null;
+    },
+  };
+  const doc = {
+    ...h.documentObject,
+    getElementById(id) {
+      if (id === 'hg-ai-config') return configNode;
+      if (id === 'td-shell-search') return root;
+      return null;
+    },
+    createElement(name) {
+      if (name === 'script') return h.documentObject.createElement('script');
+      return {
+        className: '',
+        dataset: {},
+        setAttribute() {},
+        appendChild() {},
+        addEventListener() {},
+      };
+    },
+  };
+
+  const controller = adapter.init(h.windowObject, doc);
+  assert.ok(controller);
+
+  // Assert empty node text was updated
+  assert.equal(emptyNode.textContent, 'No documentation results found');
+
+  // Trigger Enter on input
+  const keydown = inputListeners.get('keydown');
+  assert.ok(keydown);
+  let prevented = false;
+  keydown({
+    key: 'Enter',
+    preventDefault() { prevented = true; },
+    stopImmediatePropagation() {},
+  });
+  assert.equal(prevented, true);
+  h.continueConsent();
+  h.installBundle();
+  h.scripts[0].fire('load');
+  h.fireRender();
+  assert.deepEqual(h.calls.at(-1), [
+    'open',
+    { mode: 'ai', query: 'graph query', submit: true },
+  ]);
+});
+
+

@@ -1,0 +1,17 @@
+{{- /* Presentation only: all version targets remain in the document. Native
+     details provides pointer, touch and keyboard access without a JS dependency. */ -}}
+{{- $p := .page -}}
+{{- $links := where .versions "url" "ne" "" -}}
+{{- range $index, $version := $links -}}
+  {{- if eq $index 3 }}
+  <details class="hg-version-overflow">
+    <summary aria-label="{{ T "ui_more_versions" }}" title="{{ T "ui_more_versions" }}">…</summary>
+  {{- end }}
+  {{- $active := eq $version.version $p.Site.Params.version -}}
+  {{- partial "version-link.html" (dict
+    "page" $p "version" $version "active" $active "icon" $.icon
+    "class" (printf "%s%s" $.class (cond $active " td-is-active" ""))
+    "iconKey" (printf "%s-version-%s" $.key $version.version)
+  ) -}}
+{{- end -}}
+{{- if gt (len $links) 3 }}</details>{{ end -}}

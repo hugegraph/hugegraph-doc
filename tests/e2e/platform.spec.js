@@ -4,7 +4,7 @@ for (const locale of ["en", "cn"]) {
   const prefix = locale === "cn" ? "/cn" : "";
   test(`latest ${locale} sidebar persists and isolates collapse`, async ({ page }) => {
     await page.goto(`${prefix}/docs/introduction/`);
-    const key = `oink.sidebar.v1.latest.${locale}`;
+    const key = `oink.sidebar.v2.latest.${locale}`;
     await expect.poll(() => page.evaluate((name) => localStorage.getItem(name), key))
       .not.toBeNull();
     const toggle = page
@@ -25,6 +25,22 @@ for (const locale of ["en", "cn"]) {
     await expect(page.locator("#td-shell-sidebar")).toHaveJSProperty("inert", true);
     const restore = page.locator(".hg-sidebar-restore");
     await expect(restore).toBeVisible();
+    const edge = page.locator(".hg-sidebar-edge");
+    const panel = page.locator(".td-shell-sidebar__panel");
+    await page.waitForTimeout(200);
+    await edge.dispatchEvent("pointerenter", { pointerType: "mouse" });
+    await expect(page.locator("#td-shell-sidebar")).toHaveClass(
+      /td-shell-sidebar--overlay/
+    );
+    const previewBox = await page.locator(".td-shell-sidebar__panel").boundingBox();
+    expect(previewBox.x).toBeLessThanOrEqual(1);
+    expect(previewBox.y).toBeLessThanOrEqual(1);
+    await panel.dispatchEvent("pointerenter", { pointerType: "mouse" });
+    await panel.dispatchEvent("pointerleave", { pointerType: "mouse" });
+    await expect.poll(
+      () => page.locator("#td-shell-sidebar").getAttribute("class"),
+      { timeout: 1500 }
+    ).not.toContain("td-shell-sidebar--overlay");
     await restore.click();
     await expect(page.locator("#td-shell-sidebar")).not.toHaveAttribute(
       "aria-hidden", "true"
@@ -41,6 +57,32 @@ for (const locale of ["en", "cn"]) {
     await expect(page.locator("#td-shell-sidebar")).toHaveJSProperty("inert", true);
     await expect(opener).toBeFocused();
     await expect(page.locator("html")).not.toHaveAttribute("data-td-shell-lock", "");
+  });
+}
+
+for (const locale of ["en", "cn"]) {
+  const prefix = locale === "cn" ? "/cn" : "";
+  test(`latest ${locale} docs home opens start and components by default`, async ({ page }) => {
+    const key = `oink.sidebar.v2.latest.${locale}`;
+    await page.goto(`${prefix}/docs/`);
+    await page.evaluate((name) => localStorage.removeItem(name), key);
+    await page.reload();
+    const start = page.locator(
+      '#td-shell-sidebar [data-td-shell-tree-toggle][aria-controls$="_navstart-children"]',
+    );
+    const components = page.locator(
+      '#td-shell-sidebar [data-td-shell-tree-toggle][aria-controls$="_navcomponents-children"]',
+    );
+    const develop = page.locator(
+      '#td-shell-sidebar [data-td-shell-tree-toggle][aria-controls$="_navdevelop-children"]',
+    );
+    await expect(start).toHaveAttribute("aria-expanded", "true");
+    await expect(components).toHaveAttribute("aria-expanded", "true");
+    await expect(develop).toHaveAttribute("aria-expanded", "false");
+    await start.click();
+    await page.reload();
+    await expect(page.locator(`[aria-controls="${await start.getAttribute("aria-controls")}"]`))
+      .toHaveAttribute("aria-expanded", "false");
   });
 }
 
@@ -104,7 +146,7 @@ test("Community grid and HTML/Print/Markdown profiles stay in parity", async ({
     (await page.locator(".hg-community-members__grid").count()) === 0,
     "PR-B Community section is not integrated in this artifact"
   );
-  for (const [width, columns] of [[1440, 5], [900, 3], [390, 2], [320, 2]]) {
+  for (const [width, columns] of [[1440, 4], [900, 3], [390, 2], [320, 2]]) {
     await page.setViewportSize({ width, height: 900 });
     await page.goto("/community/");
     const grid = page.locator(".hg-community-members__grid").first();
@@ -117,6 +159,18 @@ test("Community grid and HTML/Print/Markdown profiles stay in parity", async ({
   await page.reload();
   await expect(page.locator(".hg-community-member__link").first()).toBeVisible();
   await expect(page.locator(".hg-community-member__initials").first()).toBeAttached();
+  await expect(page.locator(".hg-community-member__role-label")).toHaveCount(0);
+  expect(await page.locator(".hg-community-member__surface:not(.hg-community-member__link)").count()).toBeGreaterThan(0);
+  expect(await page.locator(".hg-community-member__surface:not(.hg-community-member__link) a").count()).toBe(0);
+  const publicNames = await page
+    .locator("#project-members .hg-community-member__identity")
+    .allTextContents();
+  expect(publicNames).toContain("coderzc");
+  expect(publicNames).toContain("Jacky Yang");
+  expect(publicNames).toContain("Jermy Li");
+  await expect(page.getByRole("link", { name: "coderzc on GitHub", exact: true })).toBeVisible();
+  await page.goto("/cn/community/");
+  await expect(page.getByRole("link", { name: "coderzc 的 GitHub 主页", exact: true })).toBeVisible();
 
   const htmlProfiles = await page
     .locator("#project-members .hg-community-member__link")

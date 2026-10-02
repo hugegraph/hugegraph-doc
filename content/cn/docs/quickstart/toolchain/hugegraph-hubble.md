@@ -1,7 +1,10 @@
 ---
 title: "HugeGraph-Hubble Quick Start"
+description: "部署 HugeGraph-Hubble，进行图可视化、元数据管理、数据导入，以及 Gremlin 或 Cypher 查询。"
 linkTitle: "使用 Hubble 实现图可视化"
 weight: 1
+search_keywords: [HugeGraph Hubble, 图可视化, Web 管理界面]
+search_boost: 1.6
 ---
 
 ### 1 HugeGraph-Hubble 概述

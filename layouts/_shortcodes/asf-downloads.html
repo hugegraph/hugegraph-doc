@@ -1,0 +1,8 @@
+{{- /* {{< asf-downloads latest >}} or {{< asf-downloads archived >}}:
+     ASF release download tables driven by data/downloads/asf.json. The
+     positional mode is required; a missing mode fails the build instead of
+     rendering duplicate sections. */ -}}
+{{- if or .IsNamedParams (ne (len .Params) 1) -}}
+  {{- errorf "asf-downloads requires exactly one positional mode (latest or archived) at %s" .Position -}}
+{{- end -}}
+{{- partial "asf-downloads.html" (dict "page" .Page "mode" (.Get 0) "position" .Position) -}}

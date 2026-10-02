@@ -52,7 +52,7 @@
     if (!buttons.length) return;
     var storage = safeStorage(windowObject);
     var key =
-      'oink.sidebar.v1.' +
+      'oink.sidebar.v2.' +
       String(config.version || 'latest') +
       '.' +
       String(config.locale || 'en');
@@ -62,10 +62,13 @@
       }),
     );
     var saved = [];
+    var hasSavedState = false;
     if (storage) {
       try {
-        var parsed = JSON.parse(storage.getItem(key) || '[]');
+        var stored = storage.getItem(key);
+        var parsed = JSON.parse(stored || '[]');
         if (Array.isArray(parsed)) {
+          hasSavedState = stored !== null;
           saved = parsed.filter(function (id) {
             return typeof id === 'string' && valid.has(id);
           });
@@ -75,13 +78,19 @@
       }
     }
     var remembered = new Set(saved);
+    var docsRoot = /(?:^|\/)(?:cn\/)?docs\/?$/.test(windowObject.location.pathname);
 
     buttons.forEach(function (button) {
       var item = button.closest('li');
       var activePath = item && item.classList.contains('td-active-path');
+      var control = button.getAttribute('aria-controls') || '';
+      var defaultOpen =
+        !hasSavedState &&
+        docsRoot &&
+        /_nav(?:start|components)-children$/.test(control);
       setTreeExpanded(
         button,
-        Boolean(activePath || remembered.has(button.getAttribute('aria-controls'))),
+        Boolean(activePath || remembered.has(control) || defaultOpen),
         documentObject,
       );
       button.addEventListener('click', function () {
@@ -108,11 +117,22 @@
       });
     });
 
-    // Rewriting the filtered set removes stale node IDs after navigation
-    // changes without retaining a second schema/version marker.
-    if (storage) {
+    // Seed the new persistence schema once so the docs-home defaults survive
+    // reloads; later clicks replace this set with the user's choices.
+    if (storage && !hasSavedState) {
       try {
-        storage.setItem(key, JSON.stringify(saved));
+        var initial = buttons
+          .filter(function (button) {
+            var item = button.closest('li');
+            return (
+              button.getAttribute('aria-expanded') === 'true' &&
+              !(item && item.classList.contains('td-active-path'))
+            );
+          })
+          .map(function (button) {
+            return button.getAttribute('aria-controls');
+          });
+        storage.setItem(key, JSON.stringify(initial));
       } catch (_) {
         /* Ignore storage becoming unavailable after the probe. */
       }
@@ -126,12 +146,83 @@
     var restore = documentObject.querySelector('.hg-sidebar-restore');
     var desktop = windowObject.matchMedia('(min-width: 768px)');
 
+    var panel = sidebar.querySelector('.td-shell-sidebar__panel');
+    // The native 16px panel edge cannot receive pointers while the sidebar is
+    // inert. Keep an equivalent pointer-only strip outside the inert subtree;
+    // the labelled navbar button remains the keyboard/touch equivalent.
+    var edge = documentObject.createElement('div');
+    edge.className = 'hg-sidebar-edge d-print-none';
+    edge.setAttribute('aria-hidden', 'true');
+    documentObject.body.appendChild(edge);
+    var closeTimer;
+    var pointerLockUntil = 0;
+    function dynamic() {
+      return desktop.matches &&
+        html.getAttribute('data-td-shell-sidebar') === 'collapsed';
+    }
+    function preview() {
+      if (!dynamic()) return;
+      windowObject.clearTimeout(closeTimer);
+      sidebar.classList.add('td-shell-sidebar--overlay');
+      sync();
+    }
+    function closePreview() {
+      windowObject.clearTimeout(closeTimer);
+      closeTimer = windowObject.setTimeout(function () {
+        if (!sidebar.contains(documentObject.activeElement)) {
+          sidebar.classList.remove('td-shell-sidebar--overlay');
+          sync();
+        }
+      }, 350);
+    }
+    edge.addEventListener('pointerenter', function (event) {
+      if (event.pointerType !== 'touch' && Date.now() >= pointerLockUntil) preview();
+    });
+    edge.addEventListener('pointerleave', closePreview);
+    if (restore) {
+      restore.addEventListener('pointerenter', function (event) {
+        if (event.pointerType !== 'touch' && Date.now() >= pointerLockUntil) preview();
+      });
+      restore.addEventListener('pointerleave', closePreview);
+      restore.addEventListener('keydown', function (event) {
+        if (event.key !== 'ArrowRight' || !dynamic()) return;
+        event.preventDefault();
+        preview();
+        var first = sidebar.querySelector('a[href], button');
+        if (first) first.focus();
+      });
+    }
+    if (panel) {
+      panel.addEventListener('pointerenter', function () {
+        windowObject.clearTimeout(closeTimer);
+      });
+      panel.addEventListener('pointerleave', closePreview);
+      panel.addEventListener('focusout', closePreview);
+      panel.addEventListener('keydown', function (event) {
+        if (event.key !== 'Escape' || !dynamic()) return;
+        event.preventDefault();
+        if (restore) restore.focus();
+        sidebar.classList.remove('td-shell-sidebar--overlay');
+        sync();
+      });
+    }
+
     function sync() {
       var collapsed =
         html.getAttribute('data-td-shell-sidebar') === 'collapsed';
       var drawerOpen =
         html.getAttribute('data-td-shell-drawer') === 'open';
-      var isolated = desktop.matches ? collapsed : !drawerOpen;
+      // OINK owns the persistent collapsed mode and pointer overlay. Keep
+      // focus inside an open preview safe when its native pointerleave fires.
+      if (desktop.matches && collapsed &&
+          !sidebar.classList.contains('td-shell-sidebar--overlay') &&
+          sidebar.contains(documentObject.activeElement)) {
+        sidebar.classList.add('td-shell-sidebar--overlay');
+      }
+      var overlay = sidebar.classList.contains('td-shell-sidebar--overlay');
+      var isolated = desktop.matches ? collapsed && !overlay : !drawerOpen;
+      edge.hidden = !desktop.matches || !collapsed;
+      if (restore) restore.setAttribute('aria-expanded', String(!isolated));
       if (restore) restore.hidden = !desktop.matches || !collapsed;
       sidebar.inert = isolated;
       if (isolated) sidebar.setAttribute('aria-hidden', 'true');
@@ -150,15 +241,56 @@
       attributes: true,
       attributeFilter: ['data-td-shell-sidebar', 'data-td-shell-drawer'],
     });
+    new MutationObserver(sync).observe(sidebar, { attributes: true, attributeFilter: ['class'] });
     desktop.addEventListener('change', sync);
     documentObject
       .querySelectorAll('[data-td-shell-sidebar-toggle], [data-td-shell-drawer-close]')
       .forEach(function (button) {
         button.addEventListener('click', function () {
-          global.queueMicrotask(sync);
-        });
+          var hadFocus = documentObject.activeElement === button;
+          // Match OINK's cooldown so a newly visible trigger under the pointer
+          // does not immediately undo an explicit keyboard collapse.
+          pointerLockUntil = Date.now() + 150;
+          // Run after OINK's native click listener regardless of chunk order.
+          global.setTimeout(function () {
+            if (dynamic() && sidebar.contains(button) && restore) {
+              restore.hidden = false;
+              restore.focus();
+              sidebar.classList.remove('td-shell-sidebar--overlay');
+            }
+            sync();
+            // Both external restore controls disappear when pinned. Transfer
+            // their focus after making the sidebar operable; hover and clicks
+            // that did not focus a trigger must not steal unrelated focus.
+            if (hadFocus && desktop.matches && !dynamic() &&
+                !sidebar.contains(button) && button.offsetParent === null) {
+              var collapse = sidebar.querySelector('.td-shell-sidebar__collapse');
+              if (collapse) collapse.focus();
+            }
+          }, 0);
+        }, true);
       });
     sync();
+  }
+
+  function initScrollableTables(documentObject) {
+    documentObject.querySelectorAll('[data-td-asset-table-scroll]').forEach(function (region) {
+      if (region.dataset.hgTableScrollBound !== undefined) return;
+      region.dataset.hgTableScrollBound = '';
+      region.addEventListener('keydown', function (event) {
+        // Keep native keyboard behavior for links and other descendants in the table.
+        if (event.target !== region) return;
+        if (region.scrollWidth <= region.clientWidth) return;
+        var delta = 0;
+        if (event.key === 'ArrowRight') delta = 80;
+        else if (event.key === 'ArrowLeft') delta = -80;
+        else if (event.key === 'Home') delta = -region.scrollLeft;
+        else if (event.key === 'End') delta = region.scrollWidth - region.clientWidth - region.scrollLeft;
+        else return;
+        event.preventDefault();
+        region.scrollBy({ left: delta, behavior: 'smooth' });
+      });
+    });
   }
 
   function initSearchRetry(windowObject, documentObject) {
@@ -324,6 +456,7 @@
     initVersionSwitching(windowObject, documentObject);
     initTreePersistence(windowObject, documentObject, config);
     initSidebarIsolation(windowObject, documentObject);
+    initScrollableTables(documentObject);
     initSearchRetry(windowObject, documentObject);
   }
 

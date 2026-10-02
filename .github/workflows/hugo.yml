@@ -51,6 +51,7 @@ jobs:
       artifact_prefix: ${{ steps.plan.outputs.artifact_prefix }}
       publish_branch: ${{ steps.plan.outputs.publish_branch }}
       latest_sha: ${{ steps.plan.outputs.latest_sha }}
+      source_sha: ${{ steps.plan.outputs.source_sha }}
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7
         with:
@@ -103,7 +104,6 @@ jobs:
           latest_sha="$EVENT_SHA"
 
           if [[ "$EVENT_NAME" == workflow_dispatch ]]; then
-            test "$GITHUB_REF" = refs/heads/master
             candidate="$CANDIDATE_BRANCH"
             test -n "$candidate"
             [[ "$candidate" =~ ^[A-Za-z0-9][A-Za-z0-9._/-]*$ ]]
@@ -119,6 +119,9 @@ jobs:
 
             case "$OPERATION" in
               staging-next)
+                # Dispatches must load this privileged workflow from master;
+                # the candidate is data resolved to an immutable commit below.
+                test "$GITHUB_REF" = "refs/heads/master"
                 test "$CONFIRMATION" = "publish asf-staging-oink"
                 site_origin="$STAGING_ORIGIN"
                 artifact_prefix="staging"
@@ -131,6 +134,7 @@ jobs:
                 fi
                 ;;
               production-history-refresh)
+                test "$GITHUB_REF" = refs/heads/master
                 test "$CONFIRMATION" = "publish asf-site"
                 test "$candidate" = "$latest_ref"
                 test "$SCOPE" = full
@@ -152,11 +156,13 @@ jobs:
             echo "artifact_prefix=$artifact_prefix"
             echo "publish_branch=$publish_branch"
             echo "latest_sha=$latest_sha"
+            echo "source_sha=$latest_sha"
           } >> "$GITHUB_OUTPUT"
 
       - name: Validate source and version tooling
         run: |
           bash dist/validate-links.sh
+          go mod download
           PYTHONDONTWRITEBYTECODE=1 \
             python3 -m unittest discover -s scripts -p 'test_*.py' -v
       - name: Resolve immutable version matrix
@@ -172,10 +178,12 @@ jobs:
       - name: Upload resolved version manifest
         uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7
         with:
-          name: resolved-versions-${{ github.run_id }}-${{ github.run_attempt }}
+          # Keep dependency artifact names stable across selective job reruns.
+          name: resolved-versions-${{ github.run_id }}
           path: resolved-versions.json
           retention-days: 7
           if-no-files-found: error
+          overwrite: true
 
   build:
     needs: prepare
@@ -193,7 +201,7 @@ jobs:
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7
         with:
-          ref: ${{ github.event.pull_request.head.sha || github.sha }}
+          ref: ${{ needs.prepare.outputs.source_sha }}
           fetch-depth: 0
           persist-credentials: false
       - uses: actions/setup-python@ece7cb06caefa5fff74198d8649806c4678c61a1 # v6
@@ -223,11 +231,7 @@ jobs:
           restore-keys: ${{ runner.os }}-hugo-${{ env.HUGO_VERSION }}-${{ matrix.version.id }}-
       - name: Verify pinned OINK module
         run: |
-          go mod verify
-          test "$(go list -m -f '{{ .Path }}')" = "github.com/apache/hugegraph-doc"
-          test "$(go list -m all | wc -l)" -eq 2
-          test "$(go list -m -f '{{ .Path }}@{{ .Version }}' github.com/pgsty/oink)" = "github.com/pgsty/oink@v1.0.0"
-          test -z "$(go list -m -f '{{ with .Replace }}{{ .Path }}@{{ .Version }}{{ end }}' github.com/pgsty/oink)"
+          python3 scripts/oink_module.py
       - name: Build isolated version artifact
         env:
           OINK_PYTHON: python3
@@ -245,11 +249,12 @@ jobs:
       - name: Upload isolated version artifact
         uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7
         with:
-          name: ${{ needs.prepare.outputs.artifact_prefix }}-${{ matrix.version.id }}-${{ github.run_id }}-${{ github.run_attempt }}
+          name: ${{ needs.prepare.outputs.artifact_prefix }}-${{ matrix.version.id }}-${{ github.run_id }}
           path: ${{ runner.temp }}/version-public
           include-hidden-files: true
           retention-days: 1
           if-no-files-found: error
+          overwrite: true
 
   aggregate:
     needs: [prepare, build]
@@ -259,18 +264,18 @@ jobs:
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7
         with:
-          ref: ${{ github.event.pull_request.head.sha || github.sha }}
+          ref: ${{ needs.prepare.outputs.source_sha }}
           persist-credentials: false
       - uses: actions/setup-python@ece7cb06caefa5fff74198d8649806c4678c61a1 # v6
         with:
           python-version: "3.13"
       - uses: actions/download-artifact@3e5f45b2cfb9172054b4087a40e8e0b5a5461e7c # v8
         with:
-          name: resolved-versions-${{ github.run_id }}-${{ github.run_attempt }}
+          name: resolved-versions-${{ github.run_id }}
           path: resolved
       - uses: actions/download-artifact@3e5f45b2cfb9172054b4087a40e8e0b5a5461e7c # v8
         with:
-          pattern: ${{ needs.prepare.outputs.artifact_prefix }}-*-${{ github.run_id }}-${{ github.run_attempt }}
+          pattern: ${{ needs.prepare.outputs.artifact_prefix }}-*-${{ github.run_id }}
           path: version-artifacts
       - name: Assemble publishable site
         env:
@@ -285,19 +290,24 @@ jobs:
           fi
           python3 scripts/versioning.py aggregate \
             --artifacts version-artifacts --artifact-prefix "$PREFIX-" \
-            --artifact-suffix="-${GITHUB_RUN_ID}-${GITHUB_RUN_ATTEMPT}" \
+            --artifact-suffix="-${GITHUB_RUN_ID}" \
             --resolved-manifest resolved/resolved-versions.json \
             --site-origin "$SITE_ORIGIN" --historical-origin "$HISTORICAL_ORIGIN" \
             --select "$SELECTION" \
             --output "${RUNNER_TEMP}/public-site" "${extra[@]}"
+      - name: Verify rendered download contracts
+        env:
+          DOWNLOAD_PUBLIC_DIR: ${{ runner.temp }}/public-site
+        run: python3 -m unittest scripts.test_download_data.DownloadDataTest.test_rendered_download_pages_have_verified_rows -v
       - name: Upload publishable aggregate
         uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7
         with:
-          name: hugegraph-site-${{ needs.prepare.outputs.artifact_prefix }}-${{ github.run_id }}-${{ github.run_attempt }}
+          name: hugegraph-site-${{ needs.prepare.outputs.artifact_prefix }}-${{ github.run_id }}
           path: ${{ runner.temp }}/public-site
           include-hidden-files: true
           retention-days: ${{ github.event_name == 'pull_request' && 1 || 7 }}
           if-no-files-found: error
+          overwrite: true
 
   e2e:
     needs: [prepare, aggregate]
@@ -309,7 +319,7 @@ jobs:
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7
         with:
-          ref: ${{ github.event.pull_request.head.sha || github.sha }}
+          ref: ${{ needs.prepare.outputs.source_sha }}
           persist-credentials: false
       - uses: actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020 # v4
         with:
@@ -327,7 +337,7 @@ jobs:
           extended: true
       - uses: actions/download-artifact@3e5f45b2cfb9172054b4087a40e8e0b5a5461e7c # v8
         with:
-          name: hugegraph-site-${{ needs.prepare.outputs.artifact_prefix }}-${{ github.run_id }}-${{ github.run_attempt }}
+          name: hugegraph-site-${{ needs.prepare.outputs.artifact_prefix }}-${{ github.run_id }}
           path: public-site
       - name: Install Chromium test workspace
         working-directory: tests/e2e
@@ -372,7 +382,7 @@ jobs:
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7
         with:
-          ref: ${{ github.event.pull_request.head.sha || github.sha }}
+          ref: ${{ needs.prepare.outputs.source_sha }}
           persist-credentials: false
       - uses: actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020 # v4
         with:
@@ -381,7 +391,7 @@ jobs:
           cache-dependency-path: tests/e2e/package-lock.json
       - uses: actions/download-artifact@3e5f45b2cfb9172054b4087a40e8e0b5a5461e7c # v8
         with:
-          name: hugegraph-site-${{ needs.prepare.outputs.artifact_prefix }}-${{ github.run_id }}-${{ github.run_attempt }}
+          name: hugegraph-site-${{ needs.prepare.outputs.artifact_prefix }}-${{ github.run_id }}
           path: public-site
       - name: Capture advisory visual states
         working-directory: tests/e2e
@@ -429,7 +439,7 @@ jobs:
     steps:
       - uses: actions/download-artifact@3e5f45b2cfb9172054b4087a40e8e0b5a5461e7c # v8
         with:
-          name: hugegraph-site-${{ needs.prepare.outputs.artifact_prefix }}-${{ github.run_id }}-${{ github.run_attempt }}
+          name: hugegraph-site-${{ needs.prepare.outputs.artifact_prefix }}-${{ github.run_id }}
           path: public-site
       - name: Verify fixed publication target
         env:

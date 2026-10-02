@@ -2,6 +2,8 @@
 title: "Apache HugeGraph Introduction"
 linkTitle: "System Introduction"
 weight: 1
+search_keywords: [HugeGraph overview, graph database introduction, architecture]
+search_boost: 3
 aliases:
   # Hugo 0.165 prefixes aliases with the current language path.
   - /docs/introduction/readme/
@@ -111,7 +113,7 @@ Graph computing is an OLAP workload. Its capacity and resource requirements depe
 | Run graph algorithms | [Vermeer and Computer](/docs/quickstart/computing/) |
 | Build GraphRAG or graph machine learning applications | [HugeGraph-AI](/docs/quickstart/hugegraph-ai/) |
 
-## Community
+## Community {#community}
 
 - [GitHub Issues](https://github.com/apache/hugegraph/issues)
 - Developer mailing list: [dev@hugegraph.apache.org](mailto:dev@hugegraph.apache.org)

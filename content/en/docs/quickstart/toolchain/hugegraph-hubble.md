@@ -1,7 +1,10 @@
 ---
 title: "HugeGraph-Hubble Quick Start"
+description: "Deploy HugeGraph-Hubble for graph visualization, schema management, data import, and Gremlin or Cypher queries."
 linkTitle: "Visual with HugeGraph-Hubble"
 weight: 1
+search_keywords: [HugeGraph Hubble, graph visualization, web console]
+search_boost: 1.6
 ---
 
 ### 1 HugeGraph-Hubble Overview

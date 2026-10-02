@@ -74,7 +74,7 @@ ERROR_DOCUMENT_PATHS = {
 }
 DOCS_NAV_GROUP_TITLES = {
     "en": ("Get Started", "Components", "Develop", "Operate", "Reference"),
-    "cn": ("开始", "组件", "开发", "运维", "参考"),
+    "cn": ("开始", "组件", "开发", "配置", "参考"),
 }
 EXTERNAL_ACTIVE_RESOURCE_ATTRIBUTES = {
     ("script", "src"),

@@ -2,6 +2,8 @@
 title: "Apache HugeGraph 介绍"
 linkTitle: "系统介绍"
 weight: 1
+search_keywords: [HugeGraph 介绍, 图数据库简介, 系统架构]
+search_boost: 3
 aliases:
   # Hugo 0.165 prefixes aliases with the current language path.
   - /docs/introduction/readme/
@@ -111,7 +113,7 @@ HugeGraph-AI 连接图技术与大语言模型、图机器学习框架。仓库�
 | 运行图算法 | [Vermeer 与 Computer](/cn/docs/quickstart/computing/) |
 | 构建 GraphRAG 或图机器学习应用 | [HugeGraph-AI](/cn/docs/quickstart/hugegraph-ai/) |
 
-## 社区
+## 社区 {#community}
 
 - [GitHub Issues](https://github.com/apache/hugegraph/issues)
 - 开发者邮件列表：[dev@hugegraph.apache.org](mailto:dev@hugegraph.apache.org)
