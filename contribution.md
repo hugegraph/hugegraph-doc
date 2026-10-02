@@ -72,11 +72,37 @@ Cancelled runs skip report uploads and the final gate instead of holding the
 queue with `always()`. A queued job with no runner has not started testing;
 repeated reruns do not resolve runner capacity shortages.
 
-Version builds remain parallel. Site assembly and blocking browser tests share
-one runner and the same local artifact. The required `deploy` check still
-requires all blocking jobs to succeed; visual captures remain advisory and
-publication alone receives write permission. For a test failure, rerun failed
+A complete historical cache hit uses one build job. Cold runs use at most three
+build groups, with at most two versions building concurrently within each runner.
+Historical artifacts are reused only when both the complete build-input fingerprint
+and artifact digest match. Missing or invalid cache entries rebuild automatically;
+manual dispatches start without the artifact cache and use the original build and
+validate commands so older candidate branches do not need the new CI helpers. Cache hits still run the full
+version validator, and aggregation validates every selected version again.
+
+Assembly validates at most two versions concurrently, then writes the complete
+site and runs the cross-version checks. The final security scan also uses at most
+two processes; it starts after version validation finishes, so these pools do not
+nest. All checks remain enabled. Stage timings are printed as
+`timing <stage>: <seconds>s`; nested security timings are included in their parent
+validation duration and must not be added twice. Site assembly and blocking browser
+tests share one runner and the same local artifact. The assembly job carries the
+required `deploy` check name, avoiding a separate gate runner and its queue time.
+Its first step requires successful preparation and builds, and all assembly and
+browser checks remain blocking. Visual captures remain advisory and publication
+alone receives write permission. For a test failure, rerun failed
 jobs after inspecting the cause; artifact names remain stable within the run.
+
+## SeaTunnel documentation versions
+
+The `latest` SeaTunnel guides use the 3.0+ minimum-version label and link to
+upstream latest/Next documentation. Concrete versions in installation commands are
+examples, with the engine and plugins kept at the same version. When preparing the
+HugeGraph 1.8.0 documentation snapshot, pin its SeaTunnel references and installation
+version to 3.0.0 in the release branch; keep the `latest` guides tracking upstream.
+
+latest 文档使用 SeaTunnel 3.0+ 等最低版本说明，并引用上游 latest/Next 文档；安装命令中的具体版本仅作为示例，引擎和插件保持同版。
+准备 HugeGraph 1.8.0 文档快照时，在发布分支中将 SeaTunnel 文档引用和安装版本固定为 3.0.0，latest 文档继续跟随上游。
 
 ## Repository structure
 
