@@ -104,7 +104,7 @@ The chart ships three values files:
 |------|----------|--------------|
 | `values.yaml` | 3 PD + 3 Store + 3 Server | Default; preferred anti-affinity, auth on, Hubble off |
 | `values-single.yaml` | 1 + 1 + 1 | Single-node development and CI; smaller PVCs |
-| `values-cluster.yaml` | 3 + 3 + 3 | Production starting point: JVM heap and resource settings, PD/Store PodDisruptionBudgets, `required` anti-affinity, NetworkPolicy on |
+| `values-cluster.yaml` | 3 + 3 + 3 | Production starting point: JVM heap and resource settings, PD/Store PodDisruptionBudgets, `required` anti-affinity, NetworkPolicy on, Store `OnDelete` updates |
 
 ```bash
 helm install hugegraph ./helm/hugegraph --namespace hugegraph --create-namespace \
@@ -123,6 +123,15 @@ scheduling, and Secret knob) is kept in the
 ```bash
 helm test hugegraph --namespace hugegraph
 ```
+
+The test first calls `/versions` and `/graphs` through the Server Service. It then resolves the headless Service
+`hugegraph-server-headless` and sends an authenticated Gremlin query bound to the `DEFAULT-hugegraph` graph to
+each Server Pod it lists, and it requires at least `server.replicas` Pods (`server.hpa.minReplicas` with HPA on).
+The headless Service lists only Ready Pods, the same Pods the Server Service routes to, so a Pod that is not Ready
+is not queried. A failing Pod is retried every 5 seconds for up to 150 seconds, so a short PD election is not
+reported as a broken Pod; after that the test fails and prints each failing Pod IP with its HTTP status. This is
+the check that catches a Server that passes readiness and serves REST while every Gremlin call on it fails (see
+Limitations). Large HPA fleets may need `helm test --timeout` above the 5-minute default.
 
 Read the generated admin password and call the API:
 
@@ -149,8 +158,9 @@ an `existingSecret` you created wins, then an inline value, then a random value 
 
 To manage a credential yourself, create the Secret before installing and point the matching `existingSecret` value
 at it; the chart never modifies a Secret it did not create. Value constraints: the admin password must not contain
-newlines, carriage returns, or backslashes; the JWT key must be at least 32 bytes; the PD secret must be printable
-ASCII. Invalid values are rejected at render time or by the startup wrapper, not silently truncated.
+newlines, carriage returns, or backslashes, or start or end with whitespace; the JWT key must be at least 32 bytes;
+the PD secret must be printable ASCII with no backslashes and no leading or trailing space. Invalid values are
+rejected at render time or by the startup wrapper, not silently truncated.
 
 Chart-managed Secrets are kept on uninstall and reused by a later install under the same release name.
 
@@ -183,10 +193,15 @@ healthy Raft member, and restarting it would make the outage worse. A single PD 
 full disk ([apache/hugegraph#3222](https://github.com/apache/hugegraph/issues/3222)), would answer `/v1/health`
 forever while serving no writes; the kubelet restarts it instead.
 
-Server startup gets a matching budget: the image would normally kill a Server still starting after 120 seconds, so
-the chart derives `HG_SERVER_STARTUP_TIMEOUT_S` from the startup probe (450 seconds by default) and raises a lower
-configured probe budget to that floor. Raise `server.probes.startup` if your storage takes longer to come up, and
-the image budget follows.
+Server startup gets a budget of at least 450 seconds, enough for the 300-second storage wait the image entrypoint
+runs before the start command, plus process startup. The chart counts the guaranteed probe time as
+`(failureThreshold - 1) * periodSeconds`, because the kubelet may run the first probe as soon as the container
+starts, and raises a lower configured `failureThreshold` to that floor (91 at the default 5-second period, the
+value `values.yaml` ships). The image would kill a Server still starting after 120 seconds, so the chart also sets
+`HG_SERVER_STARTUP_TIMEOUT_S` to the guaranteed probe time minus the 300-second storage wait: 150 seconds by
+default, never less than the image's 120. The start command and the probe then give up together. Raise
+`server.probes.startup` if your storage takes longer to come up, and the timeout follows; the variable is
+chart-managed, so change the probe rather than setting it in `server.extraEnv`.
 
 ### 6 Enable the Hubble UI
 
@@ -217,15 +232,25 @@ helm upgrade hugegraph ./helm/hugegraph --namespace hugegraph --reuse-values
 defaults. Any upgrade that changes a Pod template rolls that workload once. Points worth planning around:
 
 - **The first upgrade after a fresh install rolls PD, Server, and Hubble once**, when the Secret-tracking
-  annotations first observe the install-created Secrets. Store is untouched.
+  annotations first observe the install-created Secrets. Store is untouched. A Server that restarts while PD is
+  rolling can lose its Gremlin binding (see Limitations), so run `helm test` after any upgrade that rolled PD and
+  Server together.
 - **Store rolling updates advance on a listener check, not on shard recovery**, so the controller can replace the
-  next Store while the previous one is still rejoining its shard groups. For a production image roll, set
-  `store.updateStrategy.type=OnDelete` and replace Store pods one at a time. `Up` in PD is not the between-pods
-  check: PD marks a Store `Up` at registration, before it restores partitions, and a stopped Store stays `Up`
-  until a 300 s keep-alive expires. Wait for the replaced Pod to be `Ready`, then confirm every shard group
-  reports its full shard count with one leader; the full procedure is on the
-  [operations page](/docs/quickstart/hugegraph/hugegraph-helm-operations/). PD restarts are one pod at a time
-  either way, and `pd.updateStrategy.type=OnDelete` gives the same manual control for maintenance windows.
+  next Store while the previous one is still rejoining its shard groups. `values-cluster.yaml` therefore sets
+  `store.updateStrategy.type=OnDelete`; `values.yaml` and `values-single.yaml` keep `RollingUpdate`, so set it
+  yourself on any other production values. Under `OnDelete` an upgrade updates the StatefulSet but replaces no
+  Store Pod, and you delete Store Pods one at a time. `OnDelete` only stops automatic advancement: deleting Pods
+  without checking between them carries the same risk. `Up` in PD is not that check: PD marks a Store `Up` at
+  registration, before it restores partitions, and a stopped Store stays `Up` until a 300 s keep-alive expires
+  ([apache/hugegraph#3229](https://github.com/apache/hugegraph/issues/3229) tracks a real restoration signal).
+  Wait for the replaced Pod to be `Ready`, then confirm every shard group reports its full shard count with one
+  leader; the full procedure is on the
+  [operations page](/docs/quickstart/hugegraph/hugegraph-helm-operations/#6-rolling-store-images-safely).
+- **The controller never rolls more than one PD or Store Pod at a time.** The chart leaves
+  `updateStrategy.rollingUpdate.maxUnavailable` unset and accepts only the integer `1` there: a larger number or
+  a percentage fails the render, because it would let the controller take down two members of a three-member
+  Raft group or shard at once, and a PodDisruptionBudget does not limit controller rollouts. For PD maintenance
+  windows, `pd.updateStrategy.type=OnDelete` gives the same manual control as for Store.
 - **PVC sizes cannot be changed by upgrade**: Kubernetes forbids changing StatefulSet `volumeClaimTemplates`, so an
   upgrade with a new `storage.size` is rejected in full. The chart README documents the resize procedure for
   StorageClasses that support volume expansion.
@@ -233,8 +258,8 @@ defaults. Any upgrade that changes a Pod template rolls that workload once. Poin
 Scaling Server up and down is a values change (`server.replicas`, or `server.hpa`). Scaling **PD or Store down is
 not**: Raft and shard membership are persisted, deleting pods does not reconfigure them, and a 3-to-1 PD shrink
 permanently loses quorum. The chart rejects an upgrade whose replica count is below the live StatefulSet; the
-manual drain-then-scale procedure is in the chart README under
-[Scaling](https://github.com/apache/hugegraph/tree/master/helm/hugegraph#scaling).
+manual drain-then-scale procedure is on the
+[operations page](/docs/quickstart/hugegraph/hugegraph-helm-operations/#8-scaling).
 
 ### 8 Uninstall
 
@@ -261,6 +286,19 @@ later install under the same release name comes back with the same credentials.
   query routed to a not-yet-converged replica can fail with an error such as `Could not rebind [g]`. Retry with
   backoff, or use sticky routing for create-then-query flows; cluster-wide graph readiness is tracked in
   [#3137](https://github.com/apache/hugegraph/issues/3137).
+- A Server that starts while PD is unreachable, as during a PD roll, can come up without its Gremlin binding for
+  the life of the Pod: it passes readiness and serves REST while every Gremlin request on it fails with
+  `Could not rebind [graph]` ([apache/hugegraph#3228](https://github.com/apache/hugegraph/issues/3228)). The
+  readiness probe calls `/versions` and cannot see this. `helm test` queries Gremlin on every Ready Server Pod and
+  names a Pod in this state; delete that Pod, and its replacement binds once PD is stable. See
+  [When Gremlin fails with "Could not rebind"](/docs/quickstart/hugegraph/hugegraph-helm-operations/#10-when-gremlin-fails-with-could-not-rebind).
+- A PD that fails to open its RocksDB store at startup, as when the previous process still holds the store's
+  `LOCK` file, logs `Failed to open RocksDB` once and keeps running without retrying or exiting
+  ([apache/hugegraph#3226](https://github.com/apache/hugegraph/issues/3226)). `/v1/ready` answers 503 with
+  `STATE_UNINITIALIZED`, so the Pod is not Ready and leaves the Service endpoints. With more than one PD, though,
+  startup and liveness probe `/v1/health`, which still answers 200, so the kubelet never restarts it and it stays
+  stuck until an operator deletes the Pod. Do not delete the `LOCK` files instead: they guard against a second
+  process that may still be running. A single PD probes `/v1/ready` for liveness, so the kubelet restarts it.
 - Store recovery is operator-triggered on current builds: re-replication after Store loss, leader balancing, and
   partition rebalancing run only when called through PD's REST API. A Store whose volume is lost can be recovered
   in place only on images carrying
@@ -277,6 +315,8 @@ later install under the same release name comes back with the same credentials.
 | PVCs stay `Pending` | No default StorageClass, or the provisioner is down: `kubectl get sc` |
 | Pods OOM killed or restarting on multi-node | No resources set, JVM heaps sized to node memory: use `values-cluster.yaml` |
 | Query fails right after creating a graph | Replica convergence window: see Limitations above |
+| `helm test` prints `Gremlin failed on <Pod IP>` | That Server Pod lost its Gremlin binding: delete it (see Limitations above) |
+| A PD Pod stays not Ready and its `/v1/ready` reports `STATE_UNINITIALIZED` | Its RocksDB store did not open: look for `Failed to open RocksDB` in its log, then delete the Pod (see Limitations above) |
 
-Longer walkthroughs for each case are in the
+Longer walkthroughs for most of these cases are in the
 [chart README](https://github.com/apache/hugegraph/tree/master/helm/hugegraph#troubleshooting).

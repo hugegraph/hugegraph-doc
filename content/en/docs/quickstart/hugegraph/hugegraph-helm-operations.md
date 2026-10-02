@@ -134,7 +134,11 @@ including the Ingress controller and the clients of a NodePort or
 LoadBalancer Service. Exposing PD, Server or Hubble that way, or setting
 `server.advertiseUrl`, with an empty `extraIngress` fails the render instead
 of opening the port. The check sees only exposure the chart creates; a
-Service, Gateway route or proxy you add yourself needs its own entry.
+Service, Gateway route or proxy you add yourself needs its own entry. An
+in-cluster Hubble in `pd` mode combined with `server.advertiseUrl` also
+fails the render until `networkPolicy.hubble.extraEgress` admits the
+advertised destination: PD hands Hubble that URL for discovery, and
+Hubble's egress policy otherwise reaches only the release's own Pods.
 
 Two egress facts to plan around. PD, Store and Server reach nothing outside
 the release except DNS, so features that call out do not work with the
@@ -200,9 +204,12 @@ networkPolicy:
 
 Store rolling updates advance on a listener check, not on shard recovery,
 so the controller can replace the next Store while the previous one is
-still rejoining its shard groups. For a production image roll, set
-`store.updateStrategy.type=OnDelete` and delete Store Pods one at a time,
-checking between deletions.
+still rejoining its shard groups. `values-cluster.yaml` therefore sets
+`store.updateStrategy.type=OnDelete` (set it yourself on any other
+production values): an upgrade then updates the StatefulSet without
+replacing any Store Pod, and you delete Store Pods one at a time, checking
+between deletions. `OnDelete` only stops automatic advancement; deleting
+Pods without the checks below carries the same risk.
 
 `Up` in PD is not that check. PD marks a Store `Up` at registration, before
 the Store has restored any partition, and a stopped Store stays `Up` in
@@ -432,8 +439,10 @@ pd.server=<reachable-pd-host>:<rest-port>
 
 Trade-off: when `server.advertiseUrl` is set, every Server replica
 registers that same logical URL and PD returns it to every discovery
-client, including an in-cluster Hubble. Leave it empty for the default
-in-cluster path, where each Server Pod registers its own IP.
+client, including an in-cluster Hubble (which, with the chart's
+NetworkPolicy on, then needs `networkPolicy.hubble.extraEgress`; see
+NetworkPolicy above). Leave it empty for the default in-cluster path,
+where each Server Pod registers its own IP.
 
 Local quick test (cluster and Hubble on one machine): port-forward Server
 `8080` and PD client `8620`/`8686`, set
@@ -460,15 +469,21 @@ opening query traffic. Cluster-wide readiness is tracked in
 instantiates the graph once at startup; if the PD client cannot connect
 at that moment, the Pod passes readiness and serves REST while every
 Gremlin request on it fails with `Could not rebind [graph]`, for the life
-of the Pod. Its `hugegraph-server.log` names it:
+of the Pod
+([apache/hugegraph#3228](https://github.com/apache/hugegraph/issues/3228)).
+Its `hugegraph-server.log` names it:
 
 ```
 Graph [DEFAULT-hugegraph] configured at [...] could not be instantiated and
 will not be available in Gremlin Server
 ```
 
-After any upgrade that rolled PD and Server together, check Gremlin on
-each Server Pod (the image ships no curl, so port-forward each Pod):
+After any upgrade that rolled PD and Server together, run `helm test`:
+it sends the graph-bound Gremlin query below to every Ready Server Pod
+through the headless Service `hugegraph-server-headless`, retries for up
+to 150 seconds, and fails with `Gremlin failed on <Pod IP>` for a Pod in
+this state. To check one Pod by hand, port-forward it (the image ships no
+curl):
 
 ```bash
 kubectl port-forward -n hugegraph pod/<server-pod> 8080:8080

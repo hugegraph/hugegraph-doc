@@ -107,7 +107,9 @@ pod 反亲和预设；Hubble 设计为单副本，没有这个配置项。设置
 每个组件还可以走 53 端口解析 DNS。release 之外的任何来源都必须列入
 `networkPolicy.<component>.extraIngress` 才被放行，包括 Ingress 控制器和 NodePort / LoadBalancer Service
 的客户端。在 `extraIngress` 为空时暴露 PD、Server 或 Hubble，或设置 `server.advertiseUrl`，渲染会直接失败
-而不是打开端口。该检查只看 chart 自己创建的暴露；你自行添加的 Service、Gateway 路由或代理需要自己的条目。
+而不是打开端口。该检查只看 chart 自己创建的暴露；你自行添加的 Service、Gateway 路由或代理需要自己的条目。集群内
+`pd` 模式的 Hubble 与 `server.advertiseUrl` 同时使用时，在 `networkPolicy.hubble.extraEgress` 放行该对外地址之前，
+渲染同样会失败：PD 会把这个 URL 交给 Hubble 用于发现，而 Hubble 的出向策略默认只能访问本 release 的 Pod。
 
 两个出向事实需要规划。PD、Store、Server 除 DNS 外不访问 release 以外的任何地址，因此需要外呼的功能在策略开启时
 不可用；默认唯一的外呼方是 Store 镜像，它每次启动都从 github.com 下载 `libjemalloc.so`。策略开启时该连接约两分
@@ -161,7 +163,9 @@ networkPolicy:
 ### 6 安全地滚动 Store 镜像
 
 Store 的滚动更新以监听检查推进，而不是以分片恢复推进，控制器可能在上一个 Store 尚未重新加入分片组时就替换下一
-个。生产环境滚动镜像时，设置 `store.updateStrategy.type=OnDelete`，逐个删除 Store Pod，并在两次删除之间做检查。
+个。`values-cluster.yaml` 因此设置了 `store.updateStrategy.type=OnDelete`（其他生产 values 请自行设置）：升级只更新
+StatefulSet，不替换任何 Store Pod，由你逐个删除 Store Pod，并在两次删除之间做检查。`OnDelete` 只是停止自动推进；
+删除 Pod 时不做下面的检查，风险相同。
 
 PD 里的 `Up` 不是这个检查。PD 在注册时就把 Store 标为 `Up`，此时它还没恢复任何分区；已停止的 Store 也会在
 keep-alive 记录过期前（当前镜像为 300 秒）一直保持 `Up` 并留在所有分片组里：窗口内删除又回来的 Pod 根本不会离开
@@ -317,7 +321,8 @@ pd.server=<reachable-pd-host>:<rest-port>
 ```
 
 取舍：设置 `server.advertiseUrl` 后，每个 Server 副本注册的都是同一个逻辑 URL，PD 会把它返回给所有发现客户
-端，包括集群内的 Hubble。留空则走默认的集群内路径，每个 Server Pod 注册自己的 IP。
+端，包括集群内的 Hubble（开启 chart 的 NetworkPolicy 时，它还需要 `networkPolicy.hubble.extraEgress`，见上文
+NetworkPolicy 一节）。留空则走默认的集群内路径，每个 Server Pod 注册自己的 IP。
 
 本机快速验证（集群和 Hubble 在同一台机器）：port-forward Server `8080` 和 PD 客户端 `8620`/`8686`，设置
 `server.advertiseUrl=http://127.0.0.1:8080`，用 `--network host` 和上面的 PD 配置运行独立 Hubble，再打开
@@ -335,15 +340,17 @@ port-forward，或先在每个副本上轮询 `/graphs` 再放开查询流量。
 [#3137](https://github.com/apache/hugegraph/issues/3137) 跟踪。
 
 **在 PD 滚动期间启动的 Server Pod。** Gremlin Server 只在启动时实例化一次图；那一刻 PD 客户端连不上的话，
-这个 Pod 会终身通过就绪探测、正常提供 REST，而每个发到它的 Gremlin 请求都报 `Could not rebind [graph]`。
-它的 `hugegraph-server.log` 会写明：
+这个 Pod 会终身通过就绪探测、正常提供 REST，而每个发到它的 Gremlin 请求都报 `Could not rebind [graph]`
+（[apache/hugegraph#3228](https://github.com/apache/hugegraph/issues/3228)）。它的 `hugegraph-server.log` 会写明：
 
 ```
 Graph [DEFAULT-hugegraph] configured at [...] could not be instantiated and
 will not be available in Gremlin Server
 ```
 
-任何同时滚动了 PD 和 Server 的升级之后，逐个检查 Server Pod 的 Gremlin（镜像不带 curl，逐个 port-forward）：
+任何同时滚动了 PD 和 Server 的升级之后，运行 `helm test`：它通过 headless Service `hugegraph-server-headless` 向每个
+Ready 的 Server Pod 发送下面这条绑定图的 Gremlin 查询，最多重试 150 秒，遇到处于这种状态的 Pod 会以
+`Gremlin failed on <Pod IP>` 失败。手工检查单个 Pod 时，对它做 port-forward（镜像不带 curl）：
 
 ```bash
 kubectl port-forward -n hugegraph pod/<server-pod> 8080:8080

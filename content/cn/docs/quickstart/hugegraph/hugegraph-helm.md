@@ -95,7 +95,7 @@ chart 附带三个 values 文件：
 |------|------|----------|
 | `values.yaml` | 3 PD + 3 Store + 3 Server | 默认；preferred 反亲和，认证开启，Hubble 关闭 |
 | `values-single.yaml` | 1 + 1 + 1 | 单节点开发与 CI；PVC 更小 |
-| `values-cluster.yaml` | 3 + 3 + 3 | 生产起点：JVM 堆与资源设置、PD/Store PodDisruptionBudget、`required` 反亲和、NetworkPolicy 开启 |
+| `values-cluster.yaml` | 3 + 3 + 3 | 生产起点：JVM 堆与资源设置、PD/Store PodDisruptionBudget、`required` 反亲和、NetworkPolicy 开启、Store 使用 `OnDelete` 更新 |
 
 ```bash
 helm install hugegraph ./helm/hugegraph --namespace hugegraph --create-namespace \
@@ -112,6 +112,13 @@ Store OOM 杀掉了）。两个数字要随数据量一起放大。完整参数�
 ```bash
 helm test hugegraph --namespace hugegraph
 ```
+
+测试先经 Server Service 调用 `/versions` 和 `/graphs`，再解析 headless Service `hugegraph-server-headless`，向它列出的
+每个 Server Pod 发送一条带认证、绑定 `DEFAULT-hugegraph` 图的 Gremlin 查询，并要求至少有 `server.replicas` 个 Pod
+（开启 HPA 时为 `server.hpa.minReplicas`）。headless Service 只列出 Ready 的 Pod，也就是 Server Service 实际转发流量的
+那些 Pod，未 Ready 的 Pod 不会被查询。失败的 Pod 每 5 秒重试一次，最多 150 秒，短暂的 PD 选举因此不会被误判为 Pod
+损坏；超时后测试失败，并打印每个失败 Pod 的 IP 和 HTTP 状态码。能通过就绪探测、能提供 REST、但每个 Gremlin 调用都
+失败的 Server，正是靠这一步发现的（见"限制"）。HPA 规模较大时，`helm test --timeout` 可能需要高于默认的 5 分钟。
 
 读取自动生成的 admin 密码并调用 API：
 
@@ -136,7 +143,8 @@ curl --user "admin:${PASSWORD}" http://127.0.0.1:8080/versions
 | `<release>-pd-auth` | `secret-key` | PD REST 认证，由 PD、Server、Hubble 读取 | `pd.auth.existingSecret` |
 
 要自行管理凭据，请在安装前创建 Secret 并把对应的 `existingSecret` 指向它；chart 不会改动任何不是它创建的 Secret。取值
-约束：admin 密码不能包含换行、回车或反斜杠；JWT 密钥至少 32 字节；PD 密钥必须是可打印 ASCII。非法值会在渲染时或启动
+约束：admin 密码不能包含换行、回车或反斜杠，也不能以空白开头或结尾；JWT 密钥至少 32 字节；PD 密钥必须是不含反斜杠、
+首尾没有空格的可打印 ASCII。非法值会在渲染时或启动
 包装脚本中被拒绝，不会被悄悄截断。
 
 chart 管理的 Secret 在卸载时保留，同名 release 再次安装会复用它们。
@@ -164,9 +172,12 @@ chart 把 PD 的**就绪探测**和 Store init 容器的等待放在 `/v1/ready`
 [apache/hugegraph#3222](https://github.com/apache/hugegraph/issues/3222)）会一直用 `/v1/health` 返回 200 却不再
 服务写入；改用 `/v1/ready` 让 kubelet 把它重启。
 
-Server 的启动获得相同的预算：镜像默认会在 120 秒后杀掉仍在启动的 Server，chart 因此从启动探针推导
-`HG_SERVER_STARTUP_TIMEOUT_S`（默认 450 秒），配置的探针预算低于该下限时会被抬高。如果存储层启动更慢，调大
-`server.probes.startup`，镜像的预算会跟着变。
+Server 启动获得至少 450 秒的预算，足够覆盖镜像入口脚本在启动命令之前执行的 300 秒存储等待和进程启动。chart 按
+`(failureThreshold - 1) * periodSeconds` 计算有保证的探测时间，因为 kubelet 可能在容器启动后立刻执行第一次探测；
+配置的 `failureThreshold` 低于该下限时会被抬高（默认 5 秒周期下为 91，也就是默认值）。镜像默认会在 120 秒后杀掉
+仍在启动的 Server，chart 因此把 `HG_SERVER_STARTUP_TIMEOUT_S` 设为有保证的探测时间减去 300 秒存储等待：默认 150 秒，
+不低于镜像的 120 秒。这样启动命令与探针同时放弃。如果存储层启动更慢，调大 `server.probes.startup`，超时会跟着变；
+该变量由 chart 管理，请修改探针，不要在 `server.extraEnv` 里设置它。
 
 ### 6 启用 Hubble UI
 
@@ -195,20 +206,27 @@ helm upgrade hugegraph ./helm/hugegraph --namespace hugegraph --reuse-values
 对应工作负载滚动一次。需要提前规划的几点：
 
 - **全新安装后的第一次升级会让 PD、Server、Hubble 各滚动一次**，因为跟踪 Secret 的注解第一次观察到安装时创建的
-  Secret。Store 不受影响。
+  Secret。Store 不受影响。在 PD 滚动期间重启的 Server 可能丢失 Gremlin 绑定（见"限制"），因此任何同时滚动了 PD 和
+  Server 的升级之后，请运行 `helm test`。
 - **Store 的滚动更新以监听检查推进，而不是以分片恢复推进**，因此控制器可能在上一个 Store 尚未重新加入分片组时就替换
-  下一个。生产环境滚动镜像时，设置 `store.updateStrategy.type=OnDelete`，逐个替换 Store Pod。PD 里的 `Up` 不是两次
-  替换之间的检查：PD 在注册时就把 Store 标为 `Up`，此时分区尚未恢复，已停止的 Store 也要等 300 秒 keep-alive 过期
-  才离开 `Up`。应等被替换的 Pod 变为 `Ready`，再确认每个分片组都报告完整分片数和一个 leader；完整流程见
-  [运维页](/cn/docs/quickstart/hugegraph/hugegraph-helm-operations/)。PD 本来就逐个重启，
-  `pd.updateStrategy.type=OnDelete` 为维护窗口提供同样的手工控制。
+  下一个。`values-cluster.yaml` 因此设置了 `store.updateStrategy.type=OnDelete`；`values.yaml` 和 `values-single.yaml`
+  仍为 `RollingUpdate`，其他生产 values 请自行设置。`OnDelete` 下升级只更新 StatefulSet，不替换任何 Store Pod，由你逐个
+  删除 Store Pod。`OnDelete` 只是停止自动推进：删除 Pod 时不在两次删除之间做检查，风险相同。PD 里的 `Up` 不是这个检查：
+  PD 在注册时就把 Store 标为 `Up`，此时分区尚未恢复，已停止的 Store 也要等 300 秒 keep-alive 过期才离开 `Up`
+  （真正的恢复完成信号在 [apache/hugegraph#3229](https://github.com/apache/hugegraph/issues/3229) 跟踪）。应等被替换的
+  Pod 变为 `Ready`，再确认每个分片组都报告完整分片数和一个 leader；完整流程见
+  [运维页](/cn/docs/quickstart/hugegraph/hugegraph-helm-operations/#6-安全地滚动-store-镜像)。
+- **控制器每次最多滚动一个 PD 或 Store Pod。** chart 不设置 `updateStrategy.rollingUpdate.maxUnavailable`，且该字段只接受
+  整数 `1`：更大的数字或百分比会导致渲染失败，因为它会让控制器同时停掉三成员 Raft 组或分片中的两个成员，而
+  PodDisruptionBudget 不约束控制器发起的滚动。PD 的维护窗口可用 `pd.updateStrategy.type=OnDelete` 获得与 Store 相同的
+  手工控制。
 - **升级不能修改 PVC 大小**：Kubernetes 禁止修改 StatefulSet 的 `volumeClaimTemplates`，带新 `storage.size` 的升级会
   被整体拒绝。chart README 记录了支持卷扩容的 StorageClass 上的扩容步骤。
 
 Server 的扩缩容是普通的 values 变更（`server.replicas` 或 `server.hpa`）。**缩容 PD 或 Store 不是**：Raft 与分片成员
 关系是持久化的，删除 Pod 不会重新配置它们，PD 从 3 缩到 1 会永久失去多数派。chart 会拒绝副本数低于线上 StatefulSet
-的升级；先迁移再缩容的手工步骤见 chart README 的
-[Scaling](https://github.com/apache/hugegraph/tree/master/helm/hugegraph#scaling)。
+的升级；先迁移再缩容的手工步骤见
+[运维页](/cn/docs/quickstart/hugegraph/hugegraph-helm-operations/#8-伸缩)。
 
 ### 8 卸载
 
@@ -231,6 +249,17 @@ helm uninstall hugegraph --namespace hugegraph
 - 创建图之后，其他 Server 副本在短暂窗口内可能尚未收敛，路由到这类副本的查询可能报 `Could not rebind [g]` 之类的
   错误。请带退避重试，或对"创建后立即查询"的流程使用会话粘滞路由；集群级图就绪在
   [#3137](https://github.com/apache/hugegraph/issues/3137) 跟踪。
+- 在 PD 不可达时（例如 PD 滚动期间）启动的 Server，可能在整个 Pod 生命周期内都没有 Gremlin 绑定：它通过就绪探测、
+  正常提供 REST，而每个发到它的 Gremlin 请求都报 `Could not rebind [graph]`
+  （[apache/hugegraph#3228](https://github.com/apache/hugegraph/issues/3228)）。就绪探测调用的是 `/versions`，看不到
+  这种状态。`helm test` 会在每个 Ready 的 Server Pod 上查询 Gremlin 并指出处于这种状态的 Pod；删除该 Pod，PD 稳定后
+  替换者会正常绑定。见
+  [Gremlin 报 "Could not rebind" 时](/cn/docs/quickstart/hugegraph/hugegraph-helm-operations/#10-gremlin-报-could-not-rebind-时)。
+- 启动时打不开自己 RocksDB 存储的 PD（例如上一个进程仍持有存储的 `LOCK` 文件），只记录一次 `Failed to open RocksDB`，
+  之后继续运行，既不重试也不退出（[apache/hugegraph#3226](https://github.com/apache/hugegraph/issues/3226)）。
+  `/v1/ready` 返回 503 和 `STATE_UNINITIALIZED`，因此 Pod 不会 Ready，并退出 Service 端点。但多副本 PD 的启动和存活
+  探测使用仍返回 200 的 `/v1/health`，kubelet 永远不会重启它，它会一直卡住，直到运维人员删除该 Pod。不要改为删除
+  `LOCK` 文件：它们防的是可能仍在运行的另一个进程。单副本 PD 的存活探测使用 `/v1/ready`，kubelet 会重启它。
 - 当前版本的 Store 恢复由运维人员触发：Store 丢失后的副本重建、leader 均衡、分区再均衡都只在调用 PD 的 REST API 时
   执行。丢失了卷的 Store 只有在携带
   [apache/hugegraph#3234](https://github.com/apache/hugegraph/pull/3234)（2026-09-24 合入，尚未进入任何发布版本）
@@ -246,6 +275,8 @@ helm uninstall hugegraph --namespace hugegraph
 | PVC 停在 `Pending` | 没有默认 StorageClass，或供给器故障：`kubectl get sc` |
 | 多节点上 Pod 被 OOM 杀掉或反复重启 | 未设置 resources，JVM 按节点内存取堆：用 `values-cluster.yaml` |
 | 建图后立刻查询失败 | 副本收敛窗口：见上文"限制" |
+| `helm test` 打印 `Gremlin failed on <Pod IP>` | 该 Server Pod 丢失了 Gremlin 绑定：删除它（见上文"限制"） |
+| 某个 PD Pod 一直不 Ready，其 `/v1/ready` 报 `STATE_UNINITIALIZED` | 它的 RocksDB 存储没有打开：在日志中查找 `Failed to open RocksDB`，然后删除该 Pod（见上文"限制"） |
 
-每种情况的完整排查步骤见
+其中多数情况的完整排查步骤见
 [chart README](https://github.com/apache/hugegraph/tree/master/helm/hugegraph#troubleshooting)。
