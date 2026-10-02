@@ -212,9 +212,9 @@ helm upgrade hugegraph ./helm/hugegraph --namespace hugegraph --reuse-values
   下一个。`values-cluster.yaml` 因此设置了 `store.updateStrategy.type=OnDelete`；`values.yaml` 和 `values-single.yaml`
   仍为 `RollingUpdate`，其他生产 values 请自行设置。`OnDelete` 下升级只更新 StatefulSet，不替换任何 Store Pod，由你逐个
   删除 Store Pod。`OnDelete` 只是停止自动推进：删除 Pod 时不在两次删除之间做检查，风险相同。PD 里的 `Up` 不是这个检查：
-  PD 在注册时就把 Store 标为 `Up`，此时分区尚未恢复，已停止的 Store 也要等 300 秒 keep-alive 过期才离开 `Up`
-  （真正的恢复完成信号在 [apache/hugegraph#3229](https://github.com/apache/hugegraph/issues/3229) 跟踪）。应等被替换的
-  Pod 变为 `Ready`，再确认每个分片组都报告完整分片数和一个 leader；完整流程见
+  PD 在注册时就把 Store 标为 `Up`，此时分区尚未恢复，已停止的 Store 也要等 300 秒 keep-alive 过期才离开 `Up`。当前
+  镜像上没有任何端点报告 Store 已完成分区恢复（[apache/hugegraph#3229](https://github.com/apache/hugegraph/issues/3229)），
+  因此只能间接检查。应等被替换的 Pod 变为 `Ready`，再确认每个分片组都报告完整分片数和一个 leader；完整流程见
   [运维页](/cn/docs/quickstart/hugegraph/hugegraph-helm-operations/#6-安全地滚动-store-镜像)。
 - **控制器每次最多滚动一个 PD 或 Store Pod。** chart 不设置 `updateStrategy.rollingUpdate.maxUnavailable`，且该字段只接受
   整数 `1`：更大的数字或百分比会导致渲染失败，因为它会让控制器同时停掉三成员 Raft 组或分片中的两个成员，而
@@ -252,14 +252,15 @@ helm uninstall hugegraph --namespace hugegraph
 - 在 PD 不可达时（例如 PD 滚动期间）启动的 Server，可能在整个 Pod 生命周期内都没有 Gremlin 绑定：它通过就绪探测、
   正常提供 REST，而每个发到它的 Gremlin 请求都报 `Could not rebind [graph]`
   （[apache/hugegraph#3228](https://github.com/apache/hugegraph/issues/3228)）。就绪探测调用的是 `/versions`，看不到
-  这种状态。`helm test` 会在每个 Ready 的 Server Pod 上查询 Gremlin 并指出处于这种状态的 Pod；删除该 Pod，PD 稳定后
+  这种状态。`helm test` 会在每个 Ready 的 Server Pod 上查询 Gremlin，并打印处于这种状态的 Pod 的 IP；删除该 Pod，PD 稳定后
   替换者会正常绑定。见
   [Gremlin 报 "Could not rebind" 时](/cn/docs/quickstart/hugegraph/hugegraph-helm-operations/#10-gremlin-报-could-not-rebind-时)。
-- 启动时打不开自己 RocksDB 存储的 PD（例如上一个进程仍持有存储的 `LOCK` 文件），只记录一次 `Failed to open RocksDB`，
-  之后继续运行，既不重试也不退出（[apache/hugegraph#3226](https://github.com/apache/hugegraph/issues/3226)）。
-  `/v1/ready` 返回 503 和 `STATE_UNINITIALIZED`，因此 Pod 不会 Ready，并退出 Service 端点。但多副本 PD 的启动和存活
-  探测使用仍返回 200 的 `/v1/health`，kubelet 永远不会重启它，它会一直卡住，直到运维人员删除该 Pod。不要改为删除
-  `LOCK` 文件：它们防的是可能仍在运行的另一个进程。单副本 PD 的存活探测使用 `/v1/ready`，kubelet 会重启它。
+- 启动时打不开自己 RocksDB 存储的 PD（例如另一个进程仍持有存储的 `LOCK` 文件）既不重试也不退出：它只记录一次
+  `Failed to open RocksDB`，之后继续运行，`/v1/ready` 返回 503 和 `STATE_UNINITIALIZED`，而 `/v1/health` 返回 200。
+  这是在 Kubernetes 之外的 PD 进程上观察到的（[apache/hugegraph#3226](https://github.com/apache/hugegraph/issues/3226)）。
+  在 chart 的探针下，这样的 Pod 不会 Ready，并退出 Service 端点。多副本 PD 的启动和存活探测使用 `/v1/health`，kubelet
+  不会重启它；单副本 PD 使用 `/v1/ready`，kubelet 会重启容器。这种状态在 Kubernetes 上如何出现，以及重启或删除 Pod
+  能否消除它，都尚未测试。删除 `LOCK` 文件不是解决办法：它们保护存储不被可能仍在运行的另一个进程同时打开。
 - 当前版本的 Store 恢复由运维人员触发：Store 丢失后的副本重建、leader 均衡、分区再均衡都只在调用 PD 的 REST API 时
   执行。丢失了卷的 Store 只有在携带
   [apache/hugegraph#3234](https://github.com/apache/hugegraph/pull/3234)（2026-09-24 合入，尚未进入任何发布版本）
@@ -276,7 +277,7 @@ helm uninstall hugegraph --namespace hugegraph
 | 多节点上 Pod 被 OOM 杀掉或反复重启 | 未设置 resources，JVM 按节点内存取堆：用 `values-cluster.yaml` |
 | 建图后立刻查询失败 | 副本收敛窗口：见上文"限制" |
 | `helm test` 打印 `Gremlin failed on <Pod IP>` | 该 Server Pod 丢失了 Gremlin 绑定：删除它（见上文"限制"） |
-| 某个 PD Pod 一直不 Ready，其 `/v1/ready` 报 `STATE_UNINITIALIZED` | 它的 RocksDB 存储没有打开：在日志中查找 `Failed to open RocksDB`，然后删除该 Pod（见上文"限制"） |
+| 某个 PD Pod 一直不 Ready，其 `/v1/ready` 报 `STATE_UNINITIALIZED` | 它的 RocksDB 存储可能没有打开：在日志中查找 `Failed to open RocksDB`（见上文"限制"） |
 
 其中多数情况的完整排查步骤见
 [chart README](https://github.com/apache/hugegraph/tree/master/helm/hugegraph#troubleshooting)。

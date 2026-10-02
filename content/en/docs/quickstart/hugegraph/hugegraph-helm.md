@@ -241,9 +241,10 @@ defaults. Any upgrade that changes a Pod template rolls that workload once. Poin
   yourself on any other production values. Under `OnDelete` an upgrade updates the StatefulSet but replaces no
   Store Pod, and you delete Store Pods one at a time. `OnDelete` only stops automatic advancement: deleting Pods
   without checking between them carries the same risk. `Up` in PD is not that check: PD marks a Store `Up` at
-  registration, before it restores partitions, and a stopped Store stays `Up` until a 300 s keep-alive expires
-  ([apache/hugegraph#3229](https://github.com/apache/hugegraph/issues/3229) tracks a real restoration signal).
-  Wait for the replaced Pod to be `Ready`, then confirm every shard group reports its full shard count with one
+  registration, before it restores partitions, and a stopped Store stays `Up` until a 300 s keep-alive expires.
+  No endpoint on current images reports that a Store has finished restoring its partitions
+  ([apache/hugegraph#3229](https://github.com/apache/hugegraph/issues/3229)), so the check is indirect. Wait for
+  the replaced Pod to be `Ready`, then confirm every shard group reports its full shard count with one
   leader; the full procedure is on the
   [operations page](/docs/quickstart/hugegraph/hugegraph-helm-operations/#6-rolling-store-images-safely).
 - **The controller never rolls more than one PD or Store Pod at a time.** The chart leaves
@@ -290,15 +291,17 @@ later install under the same release name comes back with the same credentials.
   the life of the Pod: it passes readiness and serves REST while every Gremlin request on it fails with
   `Could not rebind [graph]` ([apache/hugegraph#3228](https://github.com/apache/hugegraph/issues/3228)). The
   readiness probe calls `/versions` and cannot see this. `helm test` queries Gremlin on every Ready Server Pod and
-  names a Pod in this state; delete that Pod, and its replacement binds once PD is stable. See
+  prints the IP of a Pod in this state; delete that Pod, and its replacement binds once PD is stable. See
   [When Gremlin fails with "Could not rebind"](/docs/quickstart/hugegraph/hugegraph-helm-operations/#10-when-gremlin-fails-with-could-not-rebind).
-- A PD that fails to open its RocksDB store at startup, as when the previous process still holds the store's
-  `LOCK` file, logs `Failed to open RocksDB` once and keeps running without retrying or exiting
-  ([apache/hugegraph#3226](https://github.com/apache/hugegraph/issues/3226)). `/v1/ready` answers 503 with
-  `STATE_UNINITIALIZED`, so the Pod is not Ready and leaves the Service endpoints. With more than one PD, though,
-  startup and liveness probe `/v1/health`, which still answers 200, so the kubelet never restarts it and it stays
-  stuck until an operator deletes the Pod. Do not delete the `LOCK` files instead: they guard against a second
-  process that may still be running. A single PD probes `/v1/ready` for liveness, so the kubelet restarts it.
+- A PD that cannot open its RocksDB store at startup, for example because another process still holds the
+  store's `LOCK` file, neither retries nor exits: it logs `Failed to open RocksDB` once and keeps running, with
+  `/v1/ready` answering 503 and `STATE_UNINITIALIZED` while `/v1/health` answers 200. This was observed on PD
+  processes outside Kubernetes ([apache/hugegraph#3226](https://github.com/apache/hugegraph/issues/3226)). Under
+  the chart's probes such a Pod is not Ready and leaves the Service endpoints. With more than one PD, startup and
+  liveness use `/v1/health`, so the kubelet does not restart it; with a single PD they use `/v1/ready`, so the
+  kubelet restarts the container. How this state arises on Kubernetes, and whether restarting or deleting the Pod
+  clears it, has not been tested. Deleting the `LOCK` files is not a fix: they protect the store from a second
+  process that may still be running.
 - Store recovery is operator-triggered on current builds: re-replication after Store loss, leader balancing, and
   partition rebalancing run only when called through PD's REST API. A Store whose volume is lost can be recovered
   in place only on images carrying
@@ -316,7 +319,7 @@ later install under the same release name comes back with the same credentials.
 | Pods OOM killed or restarting on multi-node | No resources set, JVM heaps sized to node memory: use `values-cluster.yaml` |
 | Query fails right after creating a graph | Replica convergence window: see Limitations above |
 | `helm test` prints `Gremlin failed on <Pod IP>` | That Server Pod lost its Gremlin binding: delete it (see Limitations above) |
-| A PD Pod stays not Ready and its `/v1/ready` reports `STATE_UNINITIALIZED` | Its RocksDB store did not open: look for `Failed to open RocksDB` in its log, then delete the Pod (see Limitations above) |
+| A PD Pod stays not Ready and its `/v1/ready` reports `STATE_UNINITIALIZED` | Its RocksDB store may not have opened: look for `Failed to open RocksDB` in its log (see Limitations above) |
 
 Longer walkthroughs for most of these cases are in the
 [chart README](https://github.com/apache/hugegraph/tree/master/helm/hugegraph#troubleshooting).
