@@ -14,23 +14,23 @@ For the short workflow, start with [README.md](./README.md). This file records t
 
 The site uses the Hugo Module recorded in `go.mod` and `go.sum`:
 
-```text
-Go:             1.27.0 or newer
-Hugo Extended:  0.165.0
-OINK:           v1.0.0
-```
+Toolchain versions are maintained in `go.mod` and `.github/workflows/hugo.yml`;
+`go.mod` / `go.sum` pin the theme. Node.js is needed only for the browser tests,
+with its version declared by `tests/e2e/package.json` and CI.
 
-Node.js, npm, PostCSS, and a vendored Docsy checkout are not part of the build.
-
-Verify the resolved theme before editing:
+Verify the installed toolchain and locked module:
 
 ```bash
 hugo version
 go version
-hugo mod graph
+python3 scripts/oink_module.py
 ```
 
-The module graph must contain exactly the pinned `github.com/pgsty/oink@v1.0.0` dependency for this site.
+For theme updates and breaking-change recovery, follow
+[scripts/oink-upgrade.md](scripts/oink-upgrade.md).
+
+For Kapa staging, consent/CSP checks and production activation, follow
+[scripts/kapa-rollout.md](scripts/kapa-rollout.md).
 
 ## Local preview
 
@@ -65,13 +65,26 @@ the generated local origin.
 
 A successful command proves that Hugo rendered the configured outputs. It does not replace browser checks for navigation, search, language switching, accessibility, mobile layout, print, or Content Security Policy behavior.
 
+## CI queue and reruns
+
+Each PR has its own concurrency group; a new commit cancels its previous run.
+Cancelled runs skip report uploads and the final gate instead of holding the
+queue with `always()`. A queued job with no runner has not started testing;
+repeated reruns do not resolve runner capacity shortages.
+
+Version builds remain parallel. Site assembly and blocking browser tests share
+one runner and the same local artifact. The required `deploy` check still
+requires all blocking jobs to succeed; visual captures remain advisory and
+publication alone receives write permission. For a test failure, rerun failed
+jobs after inspecting the cause; artifact names remain stable within the run.
+
 ## Repository structure
 
 - `content/en/` and `content/cn/` contain the bilingual source pages.
 - `hugo.yaml` owns routing, languages, outputs, search, navigation, and OINK parameters.
 - `data/home/<language>.yaml` owns the bilingual homepage.
 - `data/footer/<language>.yaml` owns the bilingual footer.
-- `i18n/zh-CN.yaml` carries the Simplified Chinese OINK interface catalogue for the preserved `cn` URL language key; the file is named after the `zh-CN` locale because Hugo resolves translations by locale, not by the URL key.
+- `i18n/zh-CN.yaml` carries only HugeGraph-specific Simplified Chinese labels; generic interface translations come from OINK for the preserved `cn` URL language key; the file is named after the `zh-CN` locale because Hugo resolves translations by locale, not by the URL key.
 - `assets/` and `static/` contain site-owned brand and compatibility assets.
 
 OINK is a module dependency. Do not copy or edit generated module-cache files. Site-specific overrides belong in the corresponding root `layouts/`, `assets/`, or data path and require focused regression evidence.

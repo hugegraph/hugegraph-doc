@@ -130,10 +130,10 @@ DOCS_NAV_GROUP_TITLES = {
 DOCS_NAV_EXPECTED_STATS = {
     "latest": {
         "groups": 5,
-        "pages": 91,
+        "pages": 92,
         "removed": 4,
         "scopedLinks": 0,
-        "treeSha256": "3314337a4c679484d29ebb8e613d5e85dc8bb9020a7465c13b95441b0856f485",
+        "treeSha256": "15de4de385857f877b46083de8e65d2887769d811687c4fe7ade3069401fc929",
     },
     "1.7": {
         "groups": 5,
@@ -4070,10 +4070,15 @@ def build(args: argparse.Namespace) -> None:
             json.dumps(override, ensure_ascii=False), encoding="utf-8"
         )
         hugo = os.environ.get("HUGO_BIN", "hugo")
-        go_executable = shutil.which(os.environ.get("GO_BIN", "go"))
+        go = os.environ.get("GO_BIN", "go")
+        go_executable = shutil.which(go)
         if go_executable is None:
-            fail("Go executable is unavailable")
-        module = download_locked(assembly)
+            fail(f"Go executable is unavailable: {go}")
+        go_executable = str(pathlib.Path(go_executable).resolve())
+        try:
+            module = download_locked(assembly, go_executable)
+        except (ValueError, OSError, subprocess.CalledProcessError) as error:
+            fail(f"OINK module verification failed: {error}")
         migration_script = pathlib.Path(module["Dir"]) / "bin/migrations/oink06.py"
         if not migration_script.is_file():
             fail(f"pinned OINK migration tool is absent: {migration_script}")
@@ -4254,8 +4259,10 @@ def copy_without_collision(
 def write_error_documents(output: pathlib.Path, seen: set[str]) -> int:
     """Install localized Apache error documents beside every generated 404 page."""
     template = (ROOT / ".htaccess").read_text(encoding="utf-8")
-    if template != (
+    directives = "\n".join(line for line in template.splitlines() if not line.startswith("#")) + "\n"
+    if directives != (
         'RedirectMatch 404 "(?i)(?:^|/)\\.git(?:/|$)"\nErrorDocument 404 /404.html\n'
+        'SetEnv CSP_PROJECT_DOMAINS "https://widget.kapa.ai https://proxy.kapa.ai https://kapa-widget-proxy-la7dkmplpq-uc.a.run.app https://hcaptcha.com https://*.hcaptcha.com"\n'
     ):
         fail("unexpected root .htaccess contract")
     root_page = output / "404.html"
@@ -4361,6 +4368,10 @@ def aggregate(args: argparse.Namespace) -> None:
             f"{args.artifact_prefix}{entry['id']}"
             f"{getattr(args, 'artifact_suffix', '')}"
         )
+        # download-artifact flattens a single match into its destination.
+        # Never use that layout to satisfy a multi-version selection.
+        if not source.exists() and len(selected) == 1:
+            source = args.artifacts
         metadata_path = source / ".version.json"
         if not metadata_path.is_file():
             fail(f"missing version metadata: {metadata_path}")
