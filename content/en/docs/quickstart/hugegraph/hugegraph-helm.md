@@ -133,11 +133,16 @@ reported as a broken Pod; after that the test fails and prints each failing Pod 
 the check that catches a Server that passes readiness and serves REST while every Gremlin call on it fails (see
 Limitations). Large HPA fleets may need `helm test --timeout` above the 5-minute default.
 
-Read the generated admin password and call the API:
+To call the API, start a port-forward in one terminal; it runs in the foreground until you stop it:
+
+```bash
+kubectl port-forward -n hugegraph svc/hugegraph-server 8080:8080
+```
+
+Then, in a second terminal, read the generated admin password and call the API:
 
 ```bash
 PASSWORD="$(kubectl get secret -n hugegraph hugegraph-admin -o jsonpath='{.data.password}' | base64 --decode)"
-kubectl port-forward -n hugegraph svc/hugegraph-server 8080:8080
 curl --user "admin:${PASSWORD}" http://127.0.0.1:8080/versions
 ```
 

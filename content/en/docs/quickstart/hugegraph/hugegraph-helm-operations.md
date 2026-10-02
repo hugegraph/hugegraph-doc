@@ -47,10 +47,16 @@ alive but frozen) is ended by its liveness probe: the default 20 s period and
 3-failure threshold bound the blast radius of a stalled Store at roughly one
 minute, and raft moves its partition leaders within seconds of the restart.
 
-Reach the API through a port-forward:
+Reach the API through a port-forward. It runs in the foreground, so keep
+it in one terminal:
 
 ```bash
 kubectl port-forward -n hugegraph svc/hugegraph-server 8080:8080
+```
+
+and call the API from a second terminal, with `PASSWORD` set as above:
+
+```bash
 curl --user "admin:${PASSWORD}" http://127.0.0.1:8080/versions
 curl --user "admin:${PASSWORD}" http://127.0.0.1:8080/graphs
 ```
@@ -482,11 +488,16 @@ After any upgrade that rolled PD and Server together, run `helm test`:
 it sends the graph-bound Gremlin query below to every Ready Server Pod
 through the headless Service `hugegraph-server-headless`, retries for up
 to 150 seconds, and fails with `Gremlin failed on <Pod IP>` for a Pod in
-this state. To check one Pod by hand, port-forward it (the image ships no
-curl):
+this state. To check one Pod by hand, port-forward it in one terminal
+(the image ships no curl, and the forward runs in the foreground):
 
 ```bash
 kubectl port-forward -n hugegraph pod/<server-pod> 8080:8080
+```
+
+and send the query from a second:
+
+```bash
 curl -s --compressed -u "admin:${PASSWORD}" -H 'Content-Type: application/json' \
   -X POST http://127.0.0.1:8080/gremlin \
   -d '{"gremlin":"graph.traversal().V().limit(1).count()","aliases":{"graph":"DEFAULT-hugegraph"}}'

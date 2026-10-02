@@ -42,10 +42,15 @@ PD_SECRET="$(kubectl get secret -n hugegraph hugegraph-pd-auth \
 存活探测终结：默认 20 秒周期、3 次失败阈值把一个卡死 Store 的影响时间限制在约一分钟内，重启后 raft 几秒内就会转移
 它持有的分区 leader。
 
-通过 port-forward 访问 API：
+通过 port-forward 访问 API。forward 在前台运行，请让它留在一个终端里：
 
 ```bash
 kubectl port-forward -n hugegraph svc/hugegraph-server 8080:8080
+```
+
+再在第二个终端里调用 API（`PASSWORD` 按上文设置）：
+
+```bash
 curl --user "admin:${PASSWORD}" http://127.0.0.1:8080/versions
 curl --user "admin:${PASSWORD}" http://127.0.0.1:8080/graphs
 ```
@@ -350,10 +355,16 @@ will not be available in Gremlin Server
 
 任何同时滚动了 PD 和 Server 的升级之后，运行 `helm test`：它通过 headless Service `hugegraph-server-headless` 向每个
 Ready 的 Server Pod 发送下面这条绑定图的 Gremlin 查询，最多重试 150 秒，遇到处于这种状态的 Pod 会以
-`Gremlin failed on <Pod IP>` 失败。手工检查单个 Pod 时，对它做 port-forward（镜像不带 curl）：
+`Gremlin failed on <Pod IP>` 失败。手工检查单个 Pod 时，在一个终端里对它做 port-forward（镜像不带 curl，forward
+在前台运行）：
 
 ```bash
 kubectl port-forward -n hugegraph pod/<server-pod> 8080:8080
+```
+
+再在第二个终端里发送查询：
+
+```bash
 curl -s --compressed -u "admin:${PASSWORD}" -H 'Content-Type: application/json' \
   -X POST http://127.0.0.1:8080/gremlin \
   -d '{"gremlin":"graph.traversal().V().limit(1).count()","aliases":{"graph":"DEFAULT-hugegraph"}}'

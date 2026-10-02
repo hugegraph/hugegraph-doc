@@ -120,11 +120,16 @@ helm test hugegraph --namespace hugegraph
 损坏；超时后测试失败，并打印每个失败 Pod 的 IP 和 HTTP 状态码。能通过就绪探测、能提供 REST、但每个 Gremlin 调用都
 失败的 Server，正是靠这一步发现的（见"限制"）。HPA 规模较大时，`helm test --timeout` 可能需要高于默认的 5 分钟。
 
-读取自动生成的 admin 密码并调用 API：
+调用 API 前，先在一个终端里启动 port-forward；它会一直在前台运行，直到你停止它：
+
+```bash
+kubectl port-forward -n hugegraph svc/hugegraph-server 8080:8080
+```
+
+然后在第二个终端里读取自动生成的 admin 密码并调用 API：
 
 ```bash
 PASSWORD="$(kubectl get secret -n hugegraph hugegraph-admin -o jsonpath='{.data.password}' | base64 --decode)"
-kubectl port-forward -n hugegraph svc/hugegraph-server 8080:8080
 curl --user "admin:${PASSWORD}" http://127.0.0.1:8080/versions
 ```
 
