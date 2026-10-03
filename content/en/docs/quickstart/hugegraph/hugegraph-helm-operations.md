@@ -424,9 +424,11 @@ recommended path and is covered on the deployment page. Two paths exist
 for a Hubble that must run outside the cluster.
 
 **Direct Server URL** (graph, schema, data, and Gremlin; no PD
-discovery): leave in-chart Hubble off, expose Server
-(`server.service.type` NodePort/LoadBalancer, or Ingress), and run a
-standalone Hubble image with:
+discovery): leave in-chart Hubble off, expose Server through an
+HTTPS-terminating Ingress or a NodePort/LoadBalancer `server.service.type`,
+and run a standalone Hubble image. The Service carries the plain-HTTP API,
+so the chart requires `server.service.allowInsecureExposure=true` for it;
+restrict who can reach it first. The Hubble properties are:
 
 ```properties
 pd.enabled=false

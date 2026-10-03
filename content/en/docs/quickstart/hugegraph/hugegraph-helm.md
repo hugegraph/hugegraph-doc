@@ -163,10 +163,12 @@ an `existingSecret` you created wins, then an inline value, then a random value 
 | `<release>-pd-auth` | `secret-key` | PD REST authentication, read by PD, Server, and Hubble | `pd.auth.existingSecret` |
 
 To manage a credential yourself, create the Secret before installing and point the matching `existingSecret` value
-at it; the chart never modifies a Secret it did not create. Value constraints: the admin password must not contain
-newlines, carriage returns, or backslashes, or start or end with whitespace; the JWT key must be at least 32 bytes;
-the PD secret must be printable ASCII with no backslashes and no leading or trailing space. Invalid values are
-rejected at render time or by the startup wrapper, not silently truncated.
+at it; the chart never modifies a Secret it did not create. Value constraints: the admin password must be printable
+ASCII with no spaces, colons, or backslashes (the image stores a space with a backslash before it, and the Server splits
+Basic-auth credentials on every colon, so either would leave the account unable to log in with the Secret value); the
+JWT key must be at least 32 bytes; the PD secret must be printable ASCII with no backslashes and no leading or trailing
+space. Invalid inline values are rejected at render time, and an `existingSecret` by the startup wrapper when the Pod
+starts, not silently truncated.
 
 Chart-managed Secrets are kept on uninstall and reused by a later install under the same release name.
 
@@ -175,9 +177,14 @@ Chart-managed Secrets are kept on uninstall and reused by a later install under 
 
 - The admin password is applied only when the auth metadata is first created, so changing the Secret later does not
   rotate an existing cluster's password. Rotate it through the Server's auth API instead.
-- Rotating the PD REST Secret rolls PD, Server, and Hubble together on the next `helm upgrade`, which keeps their
-  copies in step. Template-only pipelines (`helm template`, GitOps renderers) cannot see live Secrets, so there the
-  rotation-detecting annotation is inert.
+- Rotating a credential rolls the Pods that read it once, on the next `helm upgrade`: PD, Server, and Hubble together
+  for the PD REST Secret, which keeps their copies in step, and Server for the admin password or JWT key.
+- Template-only pipelines (`helm template`, Argo CD, Flux in template mode) cannot see live Secrets, so a
+  chart-generated credential gets a new value on every render: each sync changes the Secret, rolls the Pods that read
+  it, and leaves the admin account created at first start out of step with the Secret. For such a pipeline, create the
+  three Secrets first and set the `existingSecret` values; see
+  [Template-only pipelines](https://github.com/apache/hugegraph/tree/master/helm/hugegraph#template-only-pipelines-gitops)
+  in the chart README.
 - All three Secrets exist even if you only ever read one: the post-install notes print the exact `kubectl get
   secret` commands for the admin password and the PD secret.
 </details>
@@ -223,7 +230,8 @@ kubectl port-forward -n hugegraph svc/hugegraph-hubble 8088:8088
 
 Open `http://127.0.0.1:8088` and log in as `admin` with the admin password from Section 3.4. Hubble discovers the
 Servers through PD, so the cluster operations view works without extra wiring. Hubble serves plain HTTP: reach it
-through a port-forward or an HTTPS-terminating Ingress, never directly from an untrusted network. Running Hubble
+through a port-forward or an HTTPS-terminating Ingress, never directly from an untrusted network; a NodePort or
+LoadBalancer Hubble Service is refused unless `hubble.service.allowInsecureExposure=true` acknowledges it. Running Hubble
 outside the cluster is possible but takes more wiring; see
 [Reaching Hubble](https://github.com/apache/hugegraph/tree/master/helm/hugegraph#reaching-hubble-pick-one-path) in
 the chart README.
@@ -240,10 +248,11 @@ not pick up new defaults such as the hardened `securityContext`; pass your own v
 `--reset-then-reuse-values`, to adopt them. Any upgrade that changes a Pod template rolls that workload once.
 Points worth planning around:
 
-- **The first upgrade after a fresh install rolls PD, Server, and Hubble once**, when the Secret-tracking
-  annotations first observe the install-created Secrets. Store is untouched. A Server that restarts while PD is
-  rolling can lose its Gremlin binding (see Limitations), so run `helm test` after any upgrade that rolled PD and
-  Server together.
+- **A no-change upgrade rolls nothing.** The Secret-tracking annotations hash each credential's value, or the live
+  `resourceVersion` of an `existingSecret`, so a Pod rolls only when a credential it reads changes. An upgrade that
+  does roll PD and Server together, such as a PD REST Secret rotation or an image change on both, can leave a Server
+  without its Gremlin binding (see Limitations), so run `helm test` after any upgrade that rolled PD and Server
+  together.
 - **Store rolling updates advance on a listener check, not on shard recovery**, so the controller can replace the
   next Store while the previous one is still rejoining its shard groups. `values-cluster.yaml` therefore sets
   `store.updateStrategy.type=OnDelete`; `values.yaml` and `values-single.yaml` keep `RollingUpdate`, so set it
@@ -264,6 +273,19 @@ Points worth planning around:
 - **PVC sizes cannot be changed by upgrade**: Kubernetes forbids changing StatefulSet `volumeClaimTemplates`, so an
   upgrade with a new `storage.size` is rejected in full. The chart README documents the resize procedure for
   StorageClasses that support volume expansion.
+- **Some values are fixed once the release is initialized.** `nameOverride`, `fullnameOverride`, the PD and Store
+  raft ports, and the storage settings are install-time identity: the chart refuses an override or raft port change
+  against the live StatefulSets, and Kubernetes refuses the storage change. `server.auth.admin.*` and the partition
+  shard counts apply at bootstrap only, so an initialized cluster ignores a new value. The chart README sorts the
+  values by
+  [lifecycle](https://github.com/apache/hugegraph/tree/master/helm/hugegraph#settings-by-lifecycle).
+- **`helm rollback` runs none of the chart's guards.** A rollback, including the automatic one after a failed
+  `--atomic` upgrade, reapplies an earlier stored manifest without rendering the chart, so a rollback across a PD or
+  Store replica change scales the StatefulSet straight to the old count and can drop PD below quorum. Rollback across
+  a membership or identity change is unsupported: return to an earlier chart or image with a forward upgrade that
+  keeps the current topology values, and keep `--atomic` off for upgrades that change replicas. The chart README
+  covers the checks to run after any
+  [rollback](https://github.com/apache/hugegraph/tree/master/helm/hugegraph#rollback).
 
 Scaling Server up and down is a values change (`server.replicas`, or `server.hpa`). Changing the **PD count in
 either direction, or shrinking Store, is not**: Raft and shard membership are persisted and Pods alone do not
@@ -318,6 +340,11 @@ later install under the same release name comes back with the same credentials.
   [apache/hugegraph#3234](https://github.com/apache/hugegraph/pull/3234) (merged 2026-09-24, in no release yet);
   on earlier images, keep a Store's PVC when replacing its Pod. The Disaster Recovery section of the
   [operations page](/docs/quickstart/hugegraph/hugegraph-helm-operations/) is the runbook.
+- The Server and Hubble serve plain HTTP, and PD gRPC has no authentication. A NodePort or LoadBalancer Service for
+  any of them is refused unless the matching `pd.service.allowInsecureExposure`, `server.service.allowInsecureExposure`,
+  or `hubble.service.allowInsecureExposure` is set, and a Server or Hubble Ingress without `tls` is refused unless its
+  `allowPlainHttp` is set. Prefer a port-forward or an HTTPS-terminating Ingress, and restrict who can reach an
+  exposed Service first.
 - No TLS termination inside the cluster, no backup tooling, no Operator, and no bundled monitoring stack.
 
 ### 10 Troubleshooting

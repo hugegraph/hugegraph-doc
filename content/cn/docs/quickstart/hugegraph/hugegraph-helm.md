@@ -149,9 +149,10 @@ curl --user "admin:${PASSWORD}" http://127.0.0.1:8080/versions
 | `<release>-pd-auth` | `secret-key` | PD REST 认证，由 PD、Server、Hubble 读取 | `pd.auth.existingSecret` |
 
 要自行管理凭据，请在安装前创建 Secret 并把对应的 `existingSecret` 指向它；chart 不会改动任何不是它创建的 Secret。取值
-约束：admin 密码不能包含换行、回车或反斜杠，也不能以空白开头或结尾；JWT 密钥至少 32 字节；PD 密钥必须是不含反斜杠、
-首尾没有空格的可打印 ASCII。非法值会在渲染时或启动
-包装脚本中被拒绝，不会被悄悄截断。
+约束：admin 密码必须是不含空格、冒号和反斜杠的可打印 ASCII（镜像会在空格前写入反斜杠，Server 又按每个冒号拆分
+Basic 认证凭据，两者都会让账号无法用 Secret 中的值登录）；JWT 密钥至少 32 字节；PD 密钥必须是不含反斜杠、
+首尾没有空格的可打印 ASCII。非法的内联值在渲染时被拒绝，`existingSecret` 的值在 Pod 启动时被启动包装脚本拒绝，
+不会被悄悄截断。
 
 chart 管理的 Secret 在卸载时保留，同名 release 再次安装会复用它们。
 
@@ -159,8 +160,12 @@ chart 管理的 Secret 在卸载时保留，同名 release 再次安装会复用
 <summary>轮换与注意事项</summary>
 
 - admin 密码只在认证元数据首次创建时生效，之后修改 Secret 不会轮换已有集群的密码。请改用 Server 的 auth API 轮换。
-- 轮换 PD REST Secret 会在下一次 `helm upgrade` 时同时滚动 PD、Server 和 Hubble，保证三者持有的副本一致。纯模板流水线
-  （`helm template`、GitOps 渲染器）看不到集群里的 Secret，因此在那里检测轮换的注解不起作用。
+- 轮换凭据会在下一次 `helm upgrade` 时让读取它的 Pod 滚动一次：PD REST Secret 同时滚动 PD、Server 和 Hubble，保证三者
+  持有的副本一致；admin 密码或 JWT 密钥只滚动 Server。
+- 纯模板流水线（`helm template`、Argo CD、模板模式的 Flux）看不到集群里的 Secret，因此 chart 生成的凭据每次渲染都会得到
+  新值：每次同步都会改动 Secret、滚动读取它的 Pod，并让首次启动时创建的 admin 账号与 Secret 不再一致。这类流水线请先
+  创建三个 Secret 并设置对应的 `existingSecret`；见 chart README 的
+  [Template-only pipelines](https://github.com/apache/hugegraph/tree/master/helm/hugegraph#template-only-pipelines-gitops)。
 - 三个 Secret 即使从不读取也都存在：安装结束打印的说明里有读取 admin 密码和 PD 密钥的 `kubectl get secret` 命令。
 </details>
 
@@ -199,7 +204,8 @@ kubectl port-forward -n hugegraph svc/hugegraph-hubble 8088:8088
 
 打开 `http://127.0.0.1:8088`，用 3.4 节的 admin 密码以 `admin` 身份登录。Hubble 通过 PD 发现 Server，集群运维视图无需
 额外配置即可工作。Hubble 只提供明文 HTTP：请通过 port-forward 或做 HTTPS 终结的 Ingress 访问，绝不要直接暴露在不可信
-网络上。在集群外运行 Hubble 也可行，但配置更多；见 chart README 的
+网络上；NodePort 或 LoadBalancer 类型的 Hubble Service 需要设置 `hubble.service.allowInsecureExposure=true` 确认后才会
+渲染。在集群外运行 Hubble 也可行，但配置更多；见 chart README 的
 [Reaching Hubble](https://github.com/apache/hugegraph/tree/master/helm/hugegraph#reaching-hubble-pick-one-path)。
 
 ### 7 升级
@@ -213,9 +219,10 @@ helm upgrade hugegraph ./helm/hugegraph --namespace hugegraph --reuse-values
 自己的 values，或使用 `--reset-then-reuse-values`。任何改变 Pod 模板的升级都会让
 对应工作负载滚动一次。需要提前规划的几点：
 
-- **全新安装后的第一次升级会让 PD、Server、Hubble 各滚动一次**，因为跟踪 Secret 的注解第一次观察到安装时创建的
-  Secret。Store 不受影响。在 PD 滚动期间重启的 Server 可能丢失 Gremlin 绑定（见"限制"），因此任何同时滚动了 PD 和
-  Server 的升级之后，请运行 `helm test`。
+- **没有变更的升级不会滚动任何工作负载。** 跟踪 Secret 的注解对每个凭据的值做哈希（`existingSecret` 则取其线上
+  `resourceVersion`），只有 Pod 读取的凭据变化时它才会滚动。确实同时滚动 PD 和 Server 的升级（例如轮换 PD REST Secret，
+  或同时更换两者的镜像）可能让 Server 丢失 Gremlin 绑定（见"限制"），因此任何同时滚动了 PD 和 Server 的升级之后，
+  请运行 `helm test`。
 - **Store 的滚动更新以监听检查推进，而不是以分片恢复推进**，因此控制器可能在上一个 Store 尚未重新加入分片组时就替换
   下一个。`values-cluster.yaml` 因此设置了 `store.updateStrategy.type=OnDelete`；`values.yaml` 和 `values-single.yaml`
   仍为 `RollingUpdate`，其他生产 values 请自行设置。`OnDelete` 下升级只更新 StatefulSet，不替换任何 Store Pod，由你逐个
@@ -230,6 +237,15 @@ helm upgrade hugegraph ./helm/hugegraph --namespace hugegraph --reuse-values
   手工控制。
 - **升级不能修改 PVC 大小**：Kubernetes 禁止修改 StatefulSet 的 `volumeClaimTemplates`，带新 `storage.size` 的升级会
   被整体拒绝。chart README 记录了支持卷扩容的 StorageClass 上的扩容步骤。
+- **部分值在 release 初始化后就固定。** `nameOverride`、`fullnameOverride`、PD 与 Store 的 raft 端口以及存储设置属于
+  安装时身份：chart 会对照线上 StatefulSet 拒绝修改 override 或 raft 端口，Kubernetes 拒绝修改存储设置。
+  `server.auth.admin.*` 和分区分片数只在初始化时生效，已初始化的集群会忽略新值。chart README 按
+  [生命周期](https://github.com/apache/hugegraph/tree/master/helm/hugegraph#settings-by-lifecycle)对各个值分了类。
+- **`helm rollback` 不运行 chart 的任何检查。** 回滚（包括 `--atomic` 升级失败后的自动回滚）直接重新应用之前保存的
+  清单，不渲染 chart，因此跨越 PD 或 Store 副本数变更的回滚会把 StatefulSet 直接缩放到旧数量，可能让 PD 失去多数派。
+  不支持跨越成员关系或身份变更的回滚：要回到更早的 chart 或镜像，请用保留当前拓扑 values 的正向升级，且改变副本数的
+  升级不要加 `--atomic`。任何回滚之后要做的检查见 chart README 的
+  [Rollback](https://github.com/apache/hugegraph/tree/master/helm/hugegraph#rollback)。
 
 Server 的扩缩容是普通的 values 变更（`server.replicas` 或 `server.hpa`）。**双向改变 PD 数量、或缩容 Store 都不是**：
 Raft 与分片成员关系是持久化的，Pod 本身不会重新配置它们，因此 PD 从 3 缩到 1 会永久失去多数派，新增的
@@ -274,6 +290,10 @@ helm uninstall hugegraph --namespace hugegraph
   [apache/hugegraph#3234](https://github.com/apache/hugegraph/pull/3234)（2026-09-24 合入，尚未进入任何发布版本）
   的镜像上才能原地恢复；更早的镜像上，替换 Store Pod 时请保留它的 PVC。操作手册见
   [运维页](/cn/docs/quickstart/hugegraph/hugegraph-helm-operations/)的灾难恢复一节。
+- Server 和 Hubble 只提供明文 HTTP，PD gRPC 没有认证。它们中任何一个的 NodePort 或 LoadBalancer Service，都要设置对应的
+  `pd.service.allowInsecureExposure`、`server.service.allowInsecureExposure` 或 `hubble.service.allowInsecureExposure`
+  才会渲染；不带 `tls` 的 Server 或 Hubble Ingress 也要设置各自的 `allowPlainHttp`。优先使用 port-forward 或做 HTTPS
+  终结的 Ingress，暴露 Service 前先限制谁能访问它。
 - 集群内无 TLS 终结，无备份工具，无 Operator，无内置监控栈。
 
 ### 10 排障

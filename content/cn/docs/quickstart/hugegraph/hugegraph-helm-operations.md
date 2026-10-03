@@ -307,8 +307,9 @@ chart 会保留被移除序号的 PVC（`store.persistentVolumeClaimRetentionPol
 集群内 Hubble（`hubble.enabled=true` 加 port-forward）是推荐路径，部署页已覆盖。Hubble 必须在集群外运行时有
 两条路径。
 
-**直连 Server URL**（图、schema、数据、Gremlin；不需要 PD 发现）：关闭 chart 内的 Hubble，暴露 Server
-（`server.service.type` NodePort/LoadBalancer，或 Ingress），用如下配置运行独立的 Hubble 镜像：
+**直连 Server URL**（图、schema、数据、Gremlin；不需要 PD 发现）：关闭 chart 内的 Hubble，通过做 HTTPS 终结的
+Ingress 或 NodePort/LoadBalancer 类型的 `server.service.type` 暴露 Server，并运行独立的 Hubble 镜像。这类 Service
+承载明文 HTTP API，chart 因此要求设置 `server.service.allowInsecureExposure=true`；请先限制谁能访问它。Hubble 配置如下：
 
 ```properties
 pd.enabled=false
