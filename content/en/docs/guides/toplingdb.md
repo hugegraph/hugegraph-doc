@@ -5,79 +5,59 @@ weight: 11
 description: "Build the optional ToplingDB runtime from development source, isolate its data, and understand startup and recovery boundaries."
 ---
 
-> **Unreleased development interface.** This guide describes the proposed replacement for the 2025 ToplingDB integration.
-> It requires a complete source checkout containing the integration and its lifecycle and snapshot-recovery prerequisites.
-> These changes are under review; existing HugeGraph releases and registry tags do not establish support for this interface.
-> Follow the [integration proposal](https://github.com/hugegraph/hugegraph/pull/264) for its delivery status.
+> **Unreleased development interface.** This guide follows the [three-component runtime integration](https://github.com/hugegraph/hugegraph/pull/266).
+> Use source containing that change. Existing releases and image tags do not establish support, and runtime acceptance remains a deployment prerequisite.
 
-## Choose the process that owns the database
+## Choose the database owner
 
-| Deployment | Process that loads Topling JNI | Provider setting |
-|---|---|---|
-| Standalone RocksDB Server | Server | `rocksdb.provider=topling` in `conf/graphs/hugegraph.properties` |
-| HStore PD | Each PD | `provider: topling` under `rocksdb` in `conf/application.yml` |
-| HStore Store | Each Store | `provider: topling` under `rocksdb` in `conf/application-pd.yml` |
-| HStore-backed Server | None | No local Topling setting |
+HugeGraph defaults to standard RocksDB. Enable Topling separately for each process that owns local storage:
 
-PD and Store select their providers independently. The HStore-backed Server is a remote client and does not need a Topling JAR or native library.
-Provider selection happens at process startup. All local RocksDB graphs within one Server process must agree on the provider.
+| Component | Business provider setting | Start command |
+| --- | --- | --- |
+| Standalone RocksDB Server | `rocksdb.provider=topling` in each selected graph properties file | `bin/start-hugegraph.sh` |
+| PD | `provider: topling` under `rocksdb` in `conf/application.yml` | `bin/start-hugegraph-pd.sh` |
+| Store | `provider: topling` under `rocksdb` in `conf/application-pd.yml` | `bin/start-hugegraph-store.sh` |
 
-The historical `rocksdb.option_path` and `rocksdb.open_http` examples describe a different integration.
-Do not copy that configuration into this development interface. The component's launch scripts select the Easy Migrate YAML file.
+A standalone Server keeps `backend=rocksdb`; an HStore-backed Server uses `backend=hstore` and needs no local Topling runtime.
+All local RocksDB graphs in one Server process must use the same provider. The business setting must match the runtime selected by its launcher.
 
-## Build an optional distribution
+## Build and prepare a standard distribution
 
-Build on Linux x86_64 with Java 11+, Maven 3.5+, `rsync`, `unzip`, and `tar`.
-The Server mount preflight additionally requires util-linux 2.37+ `mountpoint` on `PATH`.
-Native macOS execution is outside this integration's support matrix; use a Linux x86_64 container when working on macOS.
-
-Obtain a compatible Topling Easy Migrate JNI JAR from its producer, together with its source revision, dependency licenses, notices, and trusted SHA-256.
-The HugeGraph source tree does not include this binary. A checksum identifies an artifact; it does not establish its origin, license, or runtime compatibility.
-Verify redistribution rights and retain the required license and notice files before distributing a derived package or image.
-
-From the complete source checkout containing this feature:
+Build the normal distributions from the source repository root using its supported JDK and Maven:
 
 ```bash
-VERSION=$(mvn help:evaluate -Dexpression=project.version -q -DforceStdout)
-mvn clean package \
-  -pl hugegraph-server/hugegraph-dist,hugegraph-pd/hg-pd-dist,hugegraph-store/hg-store-dist \
-  -am -Dmaven.test.skip=true -Dmaven.javadoc.skip=true -ntp
-
-export TOPLING_JNI_JAR=/absolute/path/to/rocksdbjni-topling.jar
-export TOPLING_JNI_SHA256='<trusted 64-character SHA-256>'
-install-dist/scripts/build-topling-distribution.sh server "$VERSION"
-# Generate these only when running HStore:
-install-dist/scripts/build-topling-distribution.sh pd "$VERSION"
-install-dist/scripts/build-topling-distribution.sh store "$VERSION"
+mvn clean package -Dmaven.test.skip=true -Dmaven.javadoc.skip=true
 ```
 
-The Maven build creates standard packages. The generator creates separate `-topling` directories and archives beside them.
-It copies the external JAR into private staging, verifies that copy, and prepares the native library.
-Missing inputs, a checksum mismatch, or incompatible JAR structure stop generation; the generator does not search a Maven cache or download a substitute.
-Build success is not a native runtime acceptance test.
+Obtain a trusted Topling Easy Migrate JNI JAR and its SHA-256 through your artifact channel. Preparation requires Linux x86_64,
+`sha256sum`, `unzip`, `od`, `ldd`, and GNU `mv`. The selected JAR's native dependencies, including its glibc and libaio requirements, must be installed.
 
-Each Topling package contains `lib/topling/rocksdbjni-topling.jar`, `lib/topling/runtime.properties`,
-`library/librocksdbjni-linux64.so`, and the component's preparation and preload scripts.
-To change the JNI JAR, regenerate the component distribution with the new trusted JAR and SHA-256, then run preparation.
-`prepare-topling.sh` alone does not refresh the JAR checksum in `runtime.properties`.
+Stop the component, unpack a fresh standard distribution, and run from that component directory:
 
-For container builds, use the matching checkout's `docker/README.md` and `docker/bake.hcl` with the same external JNI inputs.
-Build locally before using the example `topling` tags and select `pull_policy: never` for that local deployment.
-For registry images, verify the source revision, JNI identity, and digest first. A tag or a healthy container alone does not prove which JNI is running.
+```bash
+export TOPLING_JNI_JAR=/absolute/path/to/rocksdbjni-topling.jar
+export TOPLING_JNI_SHA256='<trusted-64-character-sha256>'
+bash bin/prepare-topling.sh
+```
 
-## Configure isolated data
+The script verifies the copied JAR's hash, Topling Java marker, one Linux x86_64 JNI entry, ELF architecture and native dependencies.
+It installs `topling/rocksdbjni.jar`, its native library and optional web resources outside `lib`. Preparation refuses an existing `topling` directory;
+replace a runtime by preparing another stopped, fresh distribution. Repeat preparation separately for Server, PD and Store as applicable.
 
-Changing the provider does not migrate or convert data. Give Topling a separate data directory and keep the standard RocksDB directory unchanged.
-Use these component-specific settings:
+## Keep data outside the distribution
 
-| Component | Data setting | Example Topling root |
-|---|---|---|
-| Server | `rocksdb.data_path` | `/srv/hugegraph/topling/server/data` |
-| Server WAL | `rocksdb.wal_path` | `/srv/hugegraph/topling/server/wal` |
-| PD | `pd.data-path` | `/srv/hugegraph/topling/pd` |
-| Store | `app.data-path` | `/srv/hugegraph/topling/store` |
+Changing providers does not convert an existing database. Use separate, initially empty Topling directories and retain the standard-provider data.
+Create persistent directories writable by the service account, outside source checkouts, build outputs and unpacked distribution directories:
 
-For a standalone Server, edit the generated distribution's `conf/graphs/hugegraph.properties`:
+| Component | Configuration file and key | Example persistent path |
+| --- | --- | --- |
+| Server data | Graph properties: `rocksdb.data_path` | `/srv/hugegraph/topling/server/data` |
+| Server WAL | Graph properties: `rocksdb.wal_path` | `/srv/hugegraph/topling/server/wal` |
+| PD | `conf/application.yml`: `pd.data-path` | `/srv/hugegraph/topling/pd` |
+| Store data | `conf/application.yml`: `app.data-path` | `/srv/hugegraph/topling/store/data` |
+| Store Raft | `conf/application.yml`: `app.raft-path` | `/srv/hugegraph/topling/store/raft` |
+
+For a standalone Server, edit every selected graph configuration, for example `conf/graphs/hugegraph.properties`:
 
 ```properties
 backend=rocksdb
@@ -86,78 +66,46 @@ rocksdb.data_path=/srv/hugegraph/topling/server/data
 rocksdb.wal_path=/srv/hugegraph/topling/server/wal
 ```
 
-Both Server data and WAL paths must sit under the mounted `/srv/hugegraph/topling/server` root, outside the generated distribution. Do not leave WAL at its
-default path inside the distribution; regenerating the package replaces that directory.
-Mount or create the configured Topling root as a real directory before startup. Do not use symlinked path components.
-Mount the parent data root, not an individual store directory such as `data/g`; sibling recovery files must remain visible to all cooperating processes.
-The standalone Server launcher rejects individual store mounts before starting Java, including same-filesystem bind mounts on Linux.
-Keep the mount layout unchanged throughout startup and recovery.
+Set **both** Server data and WAL paths. Leaving WAL at its package-local default risks losing it when a build or package replacement removes that directory.
+Keep the external data, WAL and Raft roots across runtime/package changes.
 
-The `.hugegraph-rocksdb-provider` marker guards against accidental directory reuse; it is not a converter.
-Server launchers and packaged Linux PD/Store startup reject conflicting markers; Topling also rejects unmarked, non-empty storage roots.
-PD checks `pd.data-path`; Store checks `app.data-path` and `app.raft-path` before database beans initialize.
-Topling requires the component-local marker helper. These checks guard directory ownership; they do not convert existing data.
-Standard RocksDB retains compatibility with existing unmarked data, but that is not permission to open a directory modified by Topling.
+For PD and Store, edit the existing `rocksdb` mapping in the provider configuration file listed above, retaining its other options:
 
-## Start, verify, and stop
-
-Run from the standalone Topling distribution:
-
-```bash
-bin/init-store.sh
-bin/start-hugegraph.sh
-curl --fail http://127.0.0.1:8080/versions
-# Stop cleanly when finished:
-bin/stop-hugegraph.sh
+```yaml
+rocksdb:
+  provider: topling
 ```
 
-For HStore, configure the normal network addresses and start PD, then Store, then the HStore-backed Server.
-Use `bin/start-hugegraph-pd.sh`, `bin/start-hugegraph-store.sh`, and `bin/start-hugegraph.sh` in their respective distributions.
-Stop them in reverse order: Server with `bin/stop-hugegraph.sh`, Store with `bin/stop-hugegraph-store.sh`,
-and PD with `bin/stop-hugegraph-pd.sh`. Wait for each component to exit before stopping its dependency.
+Set their persistent paths separately in `conf/application.yml`; keep the normal network addresses and cluster configuration.
 
-The launcher reports `TOPLINGDB_EASY_MIGRATE_CONF`. Check that it names the intended component file:
+## Select, start and verify
 
-| Component | Easy Migrate YAML | Monitor binding |
-|---|---|---|
-| Server | `conf/toplingdb.yaml` | `127.0.0.1:2011` |
-| PD | `conf/rocksdb_pd.yaml` | `127.0.0.1:2012` |
-| Store | `conf/rocksdb_store.yaml` | `127.0.0.1:2013` |
+In the startup shell of each component that owns a Topling database, explicitly select the runtime:
 
-The sample files set `http.auto_start_http: false`. The monitor has no authentication; keep its loopback binding if you enable it.
-Do not use the old `rocksdb.open_http` switch.
+```bash
+export TOPLINGDB_ROCKSDB_PROVIDER=topling
+# Run this component's start command from the first table.
+```
 
-Before accepting a deployment, verify the loaded RocksDB Java class's JAR origin, the unique JNI selected for that process,
-and the mapped native library and their SHA-256 values against the prepared artifact.
-Then verify schema and data operations, persistence after restart, clean shutdown, and rejection of invalid provider or conflicting data directories.
-Startup logs, a provider variable, and `/versions` are useful checks but do not by themselves prove a real Topling runtime.
+The launcher uses that component's `conf/toplingdb.yaml`. Set `TOPLINGDB_EASY_MIGRATE_CONF=/absolute/path/config.yaml` for an explicit override.
+The shipped native profile disables its HTTP server and keeps `memtable_as_log_index=false`, which the Java write path requires.
+Tune that profile for the host; it is separate from the business provider and data-path configuration.
 
-Finish application transactions explicitly. Request cleanup releases thread-local transactions but does not commit unfinished work.
-During planned shutdown, stop new writes and check in-flight outcomes; cancellation can fail requests.
-Store waits for callbacks and workers before closing its databases. If its stop script times out, it returns a failure and retains the PID file.
-Inspect logs and thread dumps; do not force a second database close underneath active workers.
+For a standalone Server, `bin/init-store.sh` and `bin/dump-store.sh` use the same explicit selection as `bin/start-hugegraph.sh`.
+For HStore, start PD, then Store, then the HStore-backed Server with its default runtime environment; do not enable local Topling on that Server.
+A configured provider/runtime mismatch fails before the component opens its database.
 
-## Recover an interrupted standalone snapshot restore
+Before adoption, verify the actual RocksDB Java classes and mapped JNI library belong to the prepared runtime. Use dedicated data directories to test real
+writes, reads, normal stop and restart; for HStore, include a Server graph operation through PD and Store. A successful build, startup or standard-JNI unit test
+alone does not establish Topling runtime acceptance.
 
-This protocol applies to local RocksDB adapter snapshot restore. It does not provide atomic whole-graph restore or an HStore multi-partition protocol.
-Before replacing data, restore records its checkpoint and WAL location in a sibling `<data-path>.resume-pending` file.
-A subsequent open retries the interrupted installation before native recovery.
-Missing checkpoints, incomplete metadata, or a changed WAL configuration stop opening.
+## Stop or switch back
 
-Keep the checkpoint, pending marker, and configured paths. Restore access or free space, then retry normal startup with the same runtime and configuration.
-Do not delete the pending marker or `<data-path>.resume-lock` to force startup.
-The operating-system lock remains held until the database closes; the retained lock file alone does not indicate an active owner.
-Older binaries and unrelated writers do not honor this protocol and must not access the same directories concurrently.
+Stop incoming work, then use the normal stop scripts. For HStore, stop Server with `bin/stop-hugegraph.sh`, Store with `bin/stop-hugegraph-store.sh`,
+and PD with `bin/stop-hugegraph-pd.sh`, waiting for each process to exit before stopping its dependency. A forced kill is not proof of normal native cleanup.
 
-Independent WAL, WAL inside data, and data inside a WAL root use in-place log replacement. Preserve WAL symlink configuration across retries.
-Successful native reopening clears the pending marker and then attempts checkpoint cleanup.
-Interrupted-operation tests do not establish power-cut durability.
+To use standard RocksDB again, stop the component, unset `TOPLINGDB_ROCKSDB_PROVIDER`, and restore its business provider to `rocksdb`.
+Select the corresponding standard-provider data and WAL paths; do not point it at a database modified by Topling.
 
-## Upgrade or return to standard RocksDB
-
-Validate old data created with the previous runtime before a standard RocksDB dependency upgrade.
-Creating a new database and restarting it does not test old-data compatibility.
-
-To return from Topling to standard RocksDB, stop writers and stop the component cleanly, preserve the Topling data,
-and restore a full pre-Topling backup into a new, empty directory using its compatible standard runtime.
-Validate schema, reads, writes, and restart before serving traffic. Do not point standard RocksDB at a directory Topling has modified.
+Dedicated Topling distributions, Docker/Compose packaging, general lifecycle changes and retryable snapshot recovery are separate follow-ups.
+This guide covers the normal distribution launch scripts; custom IDE and embedded launchers require their own runtime setup and validation.
