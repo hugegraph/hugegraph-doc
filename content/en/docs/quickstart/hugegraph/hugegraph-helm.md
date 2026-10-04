@@ -83,10 +83,9 @@ Then install:
 helm install hugegraph ./helm/hugegraph --namespace hugegraph --create-namespace --wait --timeout 15m
 ```
 
-`--wait` makes Helm block until every workload is ready, which for a distributed cluster is the signal that PD
-elected a leader, Stores registered, and Servers came up; without it `helm install` returns as soon as the objects
-are created. A fresh cluster normally converges in a few minutes; the 15 minute timeout leaves room for slow image
-pulls.
+`--wait` waits for Kubernetes readiness probes, not application workflows. A fresh cluster normally converges in
+a few minutes; the 15-minute timeout leaves room for slow image pulls. Verify graph queries after installation.
+Without `--wait`, Helm returns as soon as the objects are created.
 
 Two defaults to know before going further:
 
@@ -122,7 +121,7 @@ scheduling, and Secret knob) is kept in the
 #### 3.4 Verify the install
 
 ```bash
-helm test hugegraph --namespace hugegraph
+helm test hugegraph --namespace hugegraph --logs --timeout 5m
 ```
 
 The test first calls `/versions` and `/graphs` through the Server Service. It then resolves the headless Service
@@ -133,6 +132,9 @@ is not queried. A failing Pod is retried every 5 seconds for up to 150 seconds, 
 reported as a broken Pod; after that the test fails and prints each failing Pod IP with its HTTP status. This is
 the check that catches a Server that passes readiness and serves REST while every Gremlin call on it fails (see
 Limitations). Large HPA fleets may need `helm test --timeout` above the 5-minute default.
+
+The hook verifies Server Gremlin, not Hubble login. With Hubble enabled, also verify a fresh login and graph query
+after installation or recovery; `/actuator/health` alone does not establish backend connectivity.
 
 To call the API, start a port-forward in one terminal; it runs in the foreground until you stop it:
 
@@ -221,7 +223,8 @@ chart-managed, so change the probe rather than setting it in `server.extraEnv`.
 Hubble is off by default so API-only clusters stay lean. Enable it on a running release:
 
 ```bash
-helm upgrade hugegraph ./helm/hugegraph --namespace hugegraph --reuse-values --set hubble.enabled=true
+helm upgrade hugegraph ./helm/hugegraph --namespace hugegraph --reuse-values \
+    --set hubble.enabled=true --wait --timeout 15m
 ```
 
 ```bash
@@ -251,8 +254,10 @@ Points worth planning around:
 - **A no-change upgrade rolls nothing.** The Secret-tracking annotations hash each credential's value, or the live
   `resourceVersion` of an `existingSecret`, so a Pod rolls only when a credential it reads changes. An upgrade that
   does roll PD and Server together, such as a PD REST Secret rotation or an image change on both, can leave a Server
-  without its Gremlin binding (see Limitations), so run `helm test` after any upgrade that rolled PD and Server
-  together.
+  without its Gremlin binding (see Limitations). Treat `pd.auth` rotation as coordinated maintenance, not an
+  unattended routine change: run `helm test --logs` afterwards and recover affected replicas as documented on the
+  [operations page](/docs/quickstart/hugegraph/hugegraph-helm-operations/#10-when-gremlin-fails-with-could-not-rebind).
+  A rollback that rolls both components needs the same verification.
 - **Store rolling updates advance on a listener check, not on shard recovery**, so the controller can replace the
   next Store while the previous one is still rejoining its shard groups. `values-cluster.yaml` therefore sets
   `store.updateStrategy.type=OnDelete`; `values.yaml` and `values-single.yaml` keep `RollingUpdate`, so set it

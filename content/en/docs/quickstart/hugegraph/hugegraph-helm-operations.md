@@ -498,12 +498,13 @@ Graph [DEFAULT-hugegraph] configured at [...] could not be instantiated and
 will not be available in Gremlin Server
 ```
 
-After any upgrade that rolled PD and Server together, run `helm test`:
+After an upgrade or rollback that rolled PD and Server together, run
+`helm test hugegraph --namespace hugegraph --logs --timeout 5m`:
 it sends the graph-bound Gremlin query below to every Ready Server Pod
 through the headless Service `hugegraph-server-headless`, retries for up
 to 150 seconds, and fails with `Gremlin failed on <Pod IP>` for a Pod in
 this state. To check one Pod by hand, port-forward it in one terminal
-(the image ships no curl, and the forward runs in the foreground):
+(the forward runs in the foreground):
 
 ```bash
 kubectl port-forward -n hugegraph pod/<server-pod> 8080:8080
@@ -517,7 +518,6 @@ curl -s --compressed -u "admin:${PASSWORD}" -H 'Content-Type: application/json' 
   -d '{"gremlin":"graph.traversal().V().limit(1).count()","aliases":{"graph":"DEFAULT-hugegraph"}}'
 ```
 
-A healthy Pod answers with `result.data`; delete a Pod that answers
-`Could not rebind`. Its replacement binds normally once PD is stable
-(measured: 4 of 12 Server starts that overlapped a PD roll hit this, and
-every deletion recovered).
+A healthy Pod answers with `result.data`. Once PD is stable, delete the affected
+Pod and rerun the hook to verify its replacement. If Hubble is enabled, also
+verify a fresh login and graph query.

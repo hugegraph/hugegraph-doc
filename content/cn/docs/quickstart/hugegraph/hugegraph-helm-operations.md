@@ -360,10 +360,10 @@ Graph [DEFAULT-hugegraph] configured at [...] could not be instantiated and
 will not be available in Gremlin Server
 ```
 
-任何同时滚动了 PD 和 Server 的升级之后，运行 `helm test`：它通过 headless Service `hugegraph-server-headless` 向每个
+任何同时滚动了 PD 和 Server 的升级或回滚之后，运行
+`helm test hugegraph --namespace hugegraph --logs --timeout 5m`：它通过 headless Service `hugegraph-server-headless` 向每个
 Ready 的 Server Pod 发送下面这条绑定图的 Gremlin 查询，最多重试 150 秒，遇到处于这种状态的 Pod 会以
-`Gremlin failed on <Pod IP>` 失败。手工检查单个 Pod 时，在一个终端里对它做 port-forward（镜像不带 curl，forward
-在前台运行）：
+`Gremlin failed on <Pod IP>` 失败。手工检查单个 Pod 时，在一个终端里对它做 port-forward（forward 在前台运行）：
 
 ```bash
 kubectl port-forward -n hugegraph pod/<server-pod> 8080:8080
@@ -377,5 +377,5 @@ curl -s --compressed -u "admin:${PASSWORD}" -H 'Content-Type: application/json' 
   -d '{"gremlin":"graph.traversal().V().limit(1).count()","aliases":{"graph":"DEFAULT-hugegraph"}}'
 ```
 
-健康的 Pod 返回 `result.data`；返回 `Could not rebind` 的 Pod 直接删除。只要 PD 稳定，替换者会正常完成绑定
-（实测：与 PD 滚动重叠的 12 次 Server 启动中 4 次命中，每次删除后都恢复）。
+健康的 Pod 返回 `result.data`。PD 稳定后，删除受影响的 Pod，并重新运行测试 hook 验证替换副本。
+若启用了 Hubble，还需验证新会话登录和图查询。

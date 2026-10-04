@@ -78,8 +78,8 @@ kubectl get storageclass
 helm install hugegraph ./helm/hugegraph --namespace hugegraph --create-namespace --wait --timeout 15m
 ```
 
-`--wait` 让 Helm 阻塞到所有工作负载就绪。对分布式集群来说，这个信号意味着 PD 已选出 leader、Store 已注册、Server 已
-启动；不加它，`helm install` 在对象创建完成后就返回。全新集群一般几分钟内收敛，15 分钟超时是给缓慢的镜像拉取留的余量。
+`--wait` 等待 Kubernetes 就绪探测通过，不代表业务流程可用。全新集群一般几分钟内收敛，15 分钟超时为缓慢的镜像拉取留出余量。
+安装后仍需验证图查询；不加 `--wait`，Helm 在对象创建完成后就返回。
 
 继续之前需要了解两个默认值：
 
@@ -111,7 +111,7 @@ Store OOM 杀掉了）。两个数字要随数据量一起放大。完整参数�
 #### 3.4 验证安装
 
 ```bash
-helm test hugegraph --namespace hugegraph
+helm test hugegraph --namespace hugegraph --logs --timeout 5m
 ```
 
 测试先经 Server Service 调用 `/versions` 和 `/graphs`，再解析 headless Service `hugegraph-server-headless`，向它列出的
@@ -120,6 +120,9 @@ helm test hugegraph --namespace hugegraph
 那些 Pod，未 Ready 的 Pod 不会被查询。失败的 Pod 每 5 秒重试一次，最多 150 秒，短暂的 PD 选举因此不会被误判为 Pod
 损坏；超时后测试失败，并打印每个失败 Pod 的 IP 和 HTTP 状态码。能通过就绪探测、能提供 REST、但每个 Gremlin 调用都
 失败的 Server，正是靠这一步发现的（见"限制"）。HPA 规模较大时，`helm test --timeout` 可能需要高于默认的 5 分钟。
+
+测试 hook 验证 Server Gremlin，不验证 Hubble 登录。启用 Hubble 时，安装或恢复后还需验证新会话登录和图查询；
+仅 `/actuator/health` 通过不能证明后端连接可用。
 
 调用 API 前，先在一个终端里启动 port-forward；它会一直在前台运行，直到你停止它：
 
@@ -195,7 +198,8 @@ Server 启动获得至少 450 秒的预算，足够覆盖镜像入口脚本在�
 Hubble 默认关闭，纯 API 集群因此更精简。在运行中的 release 上启用：
 
 ```bash
-helm upgrade hugegraph ./helm/hugegraph --namespace hugegraph --reuse-values --set hubble.enabled=true
+helm upgrade hugegraph ./helm/hugegraph --namespace hugegraph --reuse-values \
+    --set hubble.enabled=true --wait --timeout 15m
 ```
 
 ```bash
@@ -221,8 +225,9 @@ helm upgrade hugegraph ./helm/hugegraph --namespace hugegraph --reuse-values
 
 - **没有变更的升级不会滚动任何工作负载。** 跟踪 Secret 的注解对每个凭据的值做哈希（`existingSecret` 则取其线上
   `resourceVersion`），只有 Pod 读取的凭据变化时它才会滚动。确实同时滚动 PD 和 Server 的升级（例如轮换 PD REST Secret，
-  或同时更换两者的镜像）可能让 Server 丢失 Gremlin 绑定（见"限制"），因此任何同时滚动了 PD 和 Server 的升级之后，
-  请运行 `helm test`。
+  或同时更换两者的镜像）可能让 Server 丢失 Gremlin 绑定（见"限制"）。应将 `pd.auth` 轮换视为联合维护，而非无人干预的常规变更：
+  完成后运行 `helm test --logs`，并按[运维流程](/cn/docs/quickstart/hugegraph/hugegraph-helm-operations/#10-gremlin-报-could-not-rebind-时)
+  恢复受影响副本。回滚若同时滚动两者，也需要相同验证。
 - **Store 的滚动更新以监听检查推进，而不是以分片恢复推进**，因此控制器可能在上一个 Store 尚未重新加入分片组时就替换
   下一个。`values-cluster.yaml` 因此设置了 `store.updateStrategy.type=OnDelete`；`values.yaml` 和 `values-single.yaml`
   仍为 `RollingUpdate`，其他生产 values 请自行设置。`OnDelete` 下升级只更新 StatefulSet，不替换任何 Store Pod，由你逐个
