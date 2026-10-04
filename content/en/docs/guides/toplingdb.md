@@ -58,7 +58,8 @@ Build success is not a native runtime acceptance test.
 
 Each Topling package contains `lib/topling/rocksdbjni-topling.jar`, `lib/topling/runtime.properties`,
 `library/librocksdbjni-linux64.so`, and the component's preparation and preload scripts.
-Run `bin/prepare-topling.sh` again after replacing the installed Topling JAR.
+To change the JNI JAR, regenerate the component distribution with the new trusted JAR and SHA-256, then run preparation.
+`prepare-topling.sh` alone does not refresh the JAR checksum in `runtime.properties`.
 
 For container builds, use the matching checkout's `docker/README.md` and `docker/bake.hcl` with the same external JNI inputs.
 Build locally before using the example `topling` tags and select `pull_policy: never` for that local deployment.
@@ -71,7 +72,8 @@ Use these component-specific settings:
 
 | Component | Data setting | Example Topling root |
 |---|---|---|
-| Server | `rocksdb.data_path` | `/srv/hugegraph/topling/server` |
+| Server | `rocksdb.data_path` | `/srv/hugegraph/topling/server/data` |
+| Server WAL | `rocksdb.wal_path` | `/srv/hugegraph/topling/server/wal` |
 | PD | `pd.data-path` | `/srv/hugegraph/topling/pd` |
 | Store | `app.data-path` | `/srv/hugegraph/topling/store` |
 
@@ -80,16 +82,21 @@ For a standalone Server, edit the generated distribution's `conf/graphs/hugegrap
 ```properties
 backend=rocksdb
 rocksdb.provider=topling
-rocksdb.data_path=/srv/hugegraph/topling/server
+rocksdb.data_path=/srv/hugegraph/topling/server/data
+rocksdb.wal_path=/srv/hugegraph/topling/server/wal
 ```
 
+Both Server data and WAL paths must sit under the mounted `/srv/hugegraph/topling/server` root, outside the generated distribution. Do not leave WAL at its
+default path inside the distribution; regenerating the package replaces that directory.
 Mount or create the configured Topling root as a real directory before startup. Do not use symlinked path components.
 Mount the parent data root, not an individual store directory such as `data/g`; sibling recovery files must remain visible to all cooperating processes.
 The standalone Server launcher rejects individual store mounts before starting Java, including same-filesystem bind mounts on Linux.
 Keep the mount layout unchanged throughout startup and recovery.
 
 The `.hugegraph-rocksdb-provider` marker guards against accidental directory reuse; it is not a converter.
-A conflicting marker stops startup. Topling also rejects an unmarked, non-empty data directory.
+Server launchers and packaged Linux PD/Store startup reject conflicting markers; Topling also rejects unmarked, non-empty storage roots.
+PD checks `pd.data-path`; Store checks `app.data-path` and `app.raft-path` before database beans initialize.
+Topling requires the component-local marker helper. These checks guard directory ownership; they do not convert existing data.
 Standard RocksDB retains compatibility with existing unmarked data, but that is not permission to open a directory modified by Topling.
 
 ## Start, verify, and stop
@@ -106,6 +113,8 @@ bin/stop-hugegraph.sh
 
 For HStore, configure the normal network addresses and start PD, then Store, then the HStore-backed Server.
 Use `bin/start-hugegraph-pd.sh`, `bin/start-hugegraph-store.sh`, and `bin/start-hugegraph.sh` in their respective distributions.
+Stop them in reverse order: Server with `bin/stop-hugegraph.sh`, Store with `bin/stop-hugegraph-store.sh`,
+and PD with `bin/stop-hugegraph-pd.sh`. Wait for each component to exit before stopping its dependency.
 
 The launcher reports `TOPLINGDB_EASY_MIGRATE_CONF`. Check that it names the intended component file:
 

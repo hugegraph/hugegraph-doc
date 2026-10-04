@@ -58,7 +58,8 @@ install-dist/scripts/build-topling-distribution.sh store "$VERSION"
 
 每个 Topling 包包含 `lib/topling/rocksdbjni-topling.jar`、`lib/topling/runtime.properties`、
 `library/librocksdbjni-linux64.so` 以及组件的准备和预加载脚本。
-更换已安装的 Topling JAR 后，重新运行 `bin/prepare-topling.sh`。
+更换 JNI JAR 时，用新的可信 JAR 和 SHA-256 重新生成对应组件的发行包，然后执行准备。
+仅运行 `prepare-topling.sh` 不会更新 `runtime.properties` 中记录的 JAR 校验和。
 
 构建容器时，使用同一源码中的 `docker/README.md` 和 `docker/bake.hcl`，并传入相同的外部 JNI 参数。
 先在本地完成构建，再使用示例中的 `topling` 标签，本地部署选择 `pull_policy: never`。
@@ -71,7 +72,8 @@ install-dist/scripts/build-topling-distribution.sh store "$VERSION"
 
 | 组件 | 数据配置 | Topling 根目录示例 |
 |---|---|---|
-| Server | `rocksdb.data_path` | `/srv/hugegraph/topling/server` |
+| Server | `rocksdb.data_path` | `/srv/hugegraph/topling/server/data` |
+| Server WAL | `rocksdb.wal_path` | `/srv/hugegraph/topling/server/wal` |
 | PD | `pd.data-path` | `/srv/hugegraph/topling/pd` |
 | Store | `app.data-path` | `/srv/hugegraph/topling/store` |
 
@@ -80,16 +82,20 @@ install-dist/scripts/build-topling-distribution.sh store "$VERSION"
 ```properties
 backend=rocksdb
 rocksdb.provider=topling
-rocksdb.data_path=/srv/hugegraph/topling/server
+rocksdb.data_path=/srv/hugegraph/topling/server/data
+rocksdb.wal_path=/srv/hugegraph/topling/server/wal
 ```
 
+Server 的 data 和 WAL 两个路径都必须位于挂载的 `/srv/hugegraph/topling/server` 根目录下，并保持在生成的发行目录之外。不要让 WAL 留在发行包内的默认路径；重新生成发行包会替换该目录。
 启动前，挂载或创建实际的 Topling 根目录，不要使用包含符号链接的路径。
 挂载父数据根目录，不要单独挂载 `data/g` 等数据库目录，确保所有遵循恢复协议的进程都能看到同级恢复文件。
 单机 Server 启动脚本在 Java 启动前拒绝单独挂载的数据库目录，包括 Linux 上同一文件系统的绑定挂载。
 启动和恢复期间保持挂载布局不变。
 
 `.hugegraph-rocksdb-provider` 标记用于防止误用目录，不负责数据转换。
-标记冲突时停止启动。Topling 也会拒绝没有标记的非空数据目录。
+Server 启动脚本及打包后的 Linux PD/Store 启动路径会拒绝冲突标记，Topling 还会拒绝没有标记的非空存储根目录。
+PD 检查 `pd.data-path`，Store 在数据库 bean 初始化前检查 `app.data-path` 和 `app.raft-path`。
+Topling 校验需要组件自身的标记 helper；这些检查保护目录归属，不负责转换已有数据。
 标准 RocksDB 为兼容历史数据而接受已有的无标记目录，但这不意味着可以打开经 Topling 修改的目录。
 
 ## 启动、核验和关闭
@@ -106,6 +112,8 @@ bin/stop-hugegraph.sh
 
 HStore 部署先配置正常的网络地址，再依次启动 PD、Store 和使用 HStore 的 Server。
 在各自的发行包目录中使用 `bin/start-hugegraph-pd.sh`、`bin/start-hugegraph-store.sh` 和 `bin/start-hugegraph.sh`。
+按相反顺序停机：先用 `bin/stop-hugegraph.sh` 停止 Server，再用 `bin/stop-hugegraph-store.sh` 停止 Store，
+最后用 `bin/stop-hugegraph-pd.sh` 停止 PD。确认每个组件已退出后，再停止其依赖。
 
 启动脚本输出 `TOPLINGDB_EASY_MIGRATE_CONF`。核对它指向相应组件的配置文件：
 
