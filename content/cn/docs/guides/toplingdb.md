@@ -92,7 +92,8 @@ export TOPLINGDB_ROCKSDB_PROVIDER=topling
 请按机器条件调整该文件；它与业务 provider、数据目录配置分别生效。
 
 独立 Server 的 `bin/init-store.sh`、`bin/dump-store.sh` 与 `bin/start-hugegraph.sh` 使用同一显式运行时选择。
-HStore 按 PD、Store、Server 的顺序启动；HStore Server 使用默认运行时环境，不启用本地 Topling。
+HStore 按 PD、Store、Server 的顺序启动。在同一 shell 中启动 HStore Server 前，执行 `unset TOPLINGDB_ROCKSDB_PROVIDER`
+（或 `export TOPLINGDB_ROCKSDB_PROVIDER=rocksdb`）；不要在该 Server 上启用本地 Topling。
 业务 provider 与实际运行时不一致时，组件会在开库前拒绝启动。
 
 采用前须确认实际 RocksDB Java 类和进程加载的 JNI 库来自准备好的运行时。在专用数据目录中验证真实写入、读取、正常停止和重启；

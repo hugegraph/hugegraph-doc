@@ -92,7 +92,8 @@ The shipped native profile disables its HTTP server and keeps `memtable_as_log_i
 Tune that profile for the host; it is separate from the business provider and data-path configuration.
 
 For a standalone Server, `bin/init-store.sh` and `bin/dump-store.sh` use the same explicit selection as `bin/start-hugegraph.sh`.
-For HStore, start PD, then Store, then the HStore-backed Server with its default runtime environment; do not enable local Topling on that Server.
+For HStore, start PD, then Store. Before starting the HStore-backed Server from the same shell, run `unset TOPLINGDB_ROCKSDB_PROVIDER`
+(or `export TOPLINGDB_ROCKSDB_PROVIDER=rocksdb`); do not enable local Topling on that Server.
 A configured provider/runtime mismatch fails before the component opens its database.
 
 Before adoption, verify the actual RocksDB Java classes and mapped JNI library belong to the prepared runtime. Use dedicated data directories to test real
