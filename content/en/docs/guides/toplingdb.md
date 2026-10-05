@@ -23,7 +23,7 @@ All local RocksDB graphs in one Server process must use the same provider. The b
 
 ## Build and prepare a standard distribution
 
-Build the normal distributions from the source repository root using its supported JDK and Maven:
+Build the normal distributions from the source repository root using Java 17 and Maven 3.6.3 or later:
 
 ```bash
 mvn clean package -Dmaven.test.skip=true -Dmaven.javadoc.skip=true

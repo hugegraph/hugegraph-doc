@@ -23,7 +23,7 @@ HugeGraph 默认使用标准 RocksDB。对持有本地存储的每个进程分�
 
 ## 构建并准备标准发行包
 
-在源码仓库根目录，使用项目支持的 JDK 和 Maven 构建普通发行包：
+在源码仓库根目录，使用 Java 17 和 Maven 3.6.3 或更新版本构建普通发行包：
 
 ```bash
 mvn clean package -Dmaven.test.skip=true -Dmaven.javadoc.skip=true
