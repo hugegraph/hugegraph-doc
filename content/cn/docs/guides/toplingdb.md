@@ -29,7 +29,7 @@ HugeGraph 默认使用标准 RocksDB。对持有本地存储的每个进程分�
 mvn clean package -Dmaven.test.skip=true -Dmaven.javadoc.skip=true
 ```
 
-从可信制品渠道取得 Topling Easy Migrate JNI JAR 及其 SHA-256。准备环境需要 Linux x86_64、`sha256sum`、`unzip`、`od`、`ldd` 和 GNU `mv`。
+从可信制品渠道取得 Topling Easy Migrate JNI JAR 及其 SHA-256。准备环境需要 Java 17 JDK、Linux x86_64、`sha256sum`、`unzip`、`od`、`ldd` 和 GNU `mv`。
 还须满足所选 JAR 的 native 依赖，包括其要求的 glibc 和 libaio。
 
 先停止组件，解压一份新的标准发行包，再从该组件目录执行：
@@ -41,6 +41,9 @@ bash bin/prepare-topling.sh
 ```
 
 脚本校验复制后的 JAR 哈希、Topling Java 标识、唯一的 Linux x86_64 JNI 条目、ELF 架构及 native 依赖。
+安装前还会用所选 JNI 打开临时数据库，确认 EasyMigrate 配置实际改变了持久化的写缓冲区大小；类标识和哈希匹配但不支持该配置入口的构建会被拒绝。
+此探针不代表已有数据兼容性或所有生产配置均已验证。校验记录绑定已测试的 JAR 和 native 库，启动时拒绝缺失或失效的记录；从旧准备脚本升级时请重新准备一份新发行包。
+启动时也会拒绝 `LD_PRELOAD` 中另一份可识别的 RocksDB JNI，保留其他预载库。
 它将 `topling/rocksdbjni.jar`、对应 native 库和可选网页资源放在 `lib` 之外。已有 `topling` 目录时会拒绝准备；更换运行时请使用另一份已停止的新发行包。
 按实际部署需要，为 Server、PD 和 Store 分别执行准备步骤。
 

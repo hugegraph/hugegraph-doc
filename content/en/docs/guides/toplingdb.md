@@ -29,7 +29,7 @@ Build the normal distributions from the source repository root using Java 17 and
 mvn clean package -Dmaven.test.skip=true -Dmaven.javadoc.skip=true
 ```
 
-Obtain a trusted Topling Easy Migrate JNI JAR and its SHA-256 through your artifact channel. Preparation requires Linux x86_64,
+Obtain a trusted Topling Easy Migrate JNI JAR and its SHA-256 through your artifact channel. Preparation requires a Java 17 JDK, Linux x86_64,
 `sha256sum`, `unzip`, `od`, `ldd`, and GNU `mv`. The selected JAR's native dependencies, including its glibc and libaio requirements, must be installed.
 
 Stop the component, unpack a fresh standard distribution, and run from that component directory:
@@ -41,6 +41,10 @@ bash bin/prepare-topling.sh
 ```
 
 The script verifies the copied JAR's hash, Topling Java marker, one Linux x86_64 JNI entry, ELF architecture and native dependencies.
+Before installation, a disposable database verifies that the selected JNI actually applies EasyMigrate configuration to its persisted write-buffer size.
+Unsupported builds are rejected even when their marker and hash match. The probe does not certify existing-data compatibility or every production setting.
+A checksum receipt binds this verification to the installed JAR and native library; launchers reject missing or changed receipts. Use a fresh distribution
+when upgrading from an older preparation script. Launch also rejects a competing RocksDB JNI in `LD_PRELOAD`, while preserving unrelated preloads.
 It installs `topling/rocksdbjni.jar`, its native library and optional web resources outside `lib`. Preparation refuses an existing `topling` directory;
 replace a runtime by preparing another stopped, fresh distribution. Repeat preparation separately for Server, PD and Store as applicable.
 
