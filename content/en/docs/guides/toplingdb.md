@@ -82,6 +82,8 @@ rocksdb:
 
 Set their persistent paths separately in `conf/application.yml`; keep the normal network addresses and cluster configuration.
 
+The published runtime directories use 0755 and regular files use 0644, so a service account different from the preparer can read the JNI. The service account also needs traversal permission on the component's parent directories; preparation does not change those parents.
+
 ## Select, start and verify
 
 In the startup shell of each component that owns a Topling database, explicitly select the runtime:
