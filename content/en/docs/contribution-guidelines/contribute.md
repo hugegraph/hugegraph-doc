@@ -86,9 +86,11 @@ When adding a third-party dependency, also update the license information includ
 3. From the repository root, prepare the current revision's Server, PD and Store distribution libraries before regenerating the inventory:
 
    ```bash
-   mvn install -DskipTests -Dmaven.javadoc.skip=true
+   mvn clean install -DskipTests -Dmaven.javadoc.skip=true
    bash install-dist/scripts/dependency/regenerate_known_dependencies.sh
    ```
+
+   The clean phase removes the previous versioned distribution directories, preventing removed dependencies from remaining as stale jars.
 
    This build skips tests. Collection combines Maven runtime dependencies with actual flat and nested distribution jars,
    including Spring Boot `BOOT-INF/lib` dependencies introduced by repackaging. Missing distributions must fail collection;

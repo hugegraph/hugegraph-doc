@@ -77,15 +77,21 @@ Id vertexId = IdGenerator.of("vertex-1");
 
 | 原 Java 入口 | 迁移后的入口 |
 |---|---|
-| `org.apache.hugegraph.backend.id.*` | `org.apache.hugegraph.id.*` |
+| `org.apache.hugegraph.backend.id` 中下方列出的共享类型 | `org.apache.hugegraph.id.*` |
 | `org.apache.hugegraph.schema.*` 元数据 | `org.apache.hugegraph.struct.schema.*` |
-| `org.apache.hugegraph.backend.query.*` | `org.apache.hugegraph.query.*` |
+| `org.apache.hugegraph.backend.query` 中下方列出的共享类型 | `org.apache.hugegraph.query.*` |
 | `org.apache.hugegraph.backend.store.Shard` | `org.apache.hugegraph.backend.Shard` |
 | `org.apache.hugegraph.backend.store.BackendEntry.BackendColumn` | `org.apache.hugegraph.backend.BackendColumn` |
 | `org.apache.hugegraph.structure.HugeIndex` | `org.apache.hugegraph.structure.Index` |
 | 后端序列化器中的共享字节与编码逻辑 | `org.apache.hugegraph.serializer.*` |
 | Core `HugeException` | `org.apache.hugegraph.exception.HugeException` |
 | `org.apache.hugegraph.SchemaGraph`/`SchemaDriver` | `org.apache.hugegraph.store.schema.*` |
+
+ID 包只迁移 `Id`、`IdGenerator`、`EdgeId`、`IdUtil`、`SplicingIdGenerator`。
+`SnowflakeIdGenerator` 保留在 core 的 `org.apache.hugegraph.backend.id`，继续使用原 import。
+查询包迁移 `Query`、`ConditionQuery`、`Condition`、`IdQuery`、`IdPrefixQuery`、`IdRangeQuery`、`BatchConditionQuery`、`Aggregate`。
+`QueryResults`、`ConditionQueryFlatten`、`EdgesQueryIterator`、`QueryBatch`、`QueryResultContext` 保留在 core 的
+`org.apache.hugegraph.backend.query`，继续使用原 import。
 
 Schema 修改 builder 和后端专用序列化器仍在 core，需按实际受影响类型应用表中的映射。
 客户端 REST DTO 保持独立，包括 Toolchain 的 `org.apache.hugegraph.structure.graph.Shard`。
@@ -156,6 +162,9 @@ pd:
 | `usePD=false` | 图配置的 `pd.cluster` |
 
 命名空间用于 schema、图配置、缓存监听和 TTL 清理器元数据。
+同一个 Server 进程内的所有 HStore 图必须使用同一元数据命名空间。
+`usePD=false` 时，首先打开的 HStore 图会用自身的 `pd.cluster` 绑定进程级 `MetaManager`。
+后续图显式配置的冲突 `pd.cluster` 会记录警告并被忽略，不会建立独立命名空间。
 同一个 Store 进程不能在冲突命名空间之间共享 schema driver。
 保留 backend `graphspace/store/table` 名称，例如 `DEFAULT/hugegraph/g`；REST 标识 `DEFAULT-hugegraph` 不是元数据 key。
 

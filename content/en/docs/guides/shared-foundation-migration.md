@@ -79,15 +79,21 @@ The [plugin examples](/docs/guides/custom-plugin/) still describe 1.7.0; apply t
 
 | Previous Java entry | Use in the migrated API |
 |---|---|
-| `org.apache.hugegraph.backend.id.*` | `org.apache.hugegraph.id.*` |
+| Shared types listed below in `org.apache.hugegraph.backend.id` | `org.apache.hugegraph.id.*` |
 | `org.apache.hugegraph.schema.*` metadata | `org.apache.hugegraph.struct.schema.*` |
-| `org.apache.hugegraph.backend.query.*` | `org.apache.hugegraph.query.*` |
+| Shared types listed below in `org.apache.hugegraph.backend.query` | `org.apache.hugegraph.query.*` |
 | `org.apache.hugegraph.backend.store.Shard` | `org.apache.hugegraph.backend.Shard` |
 | `org.apache.hugegraph.backend.store.BackendEntry.BackendColumn` | `org.apache.hugegraph.backend.BackendColumn` |
 | `org.apache.hugegraph.structure.HugeIndex` | `org.apache.hugegraph.structure.Index` |
 | Shared byte/encoding code in backend serializers | `org.apache.hugegraph.serializer.*` |
 | Core `HugeException` | `org.apache.hugegraph.exception.HugeException` |
 | `org.apache.hugegraph.SchemaGraph`/`SchemaDriver` | `org.apache.hugegraph.store.schema.*` |
+
+Only `Id`, `IdGenerator`, `EdgeId`, `IdUtil` and `SplicingIdGenerator` move from the ID package.
+`SnowflakeIdGenerator` remains in core under `org.apache.hugegraph.backend.id`; retain its existing import.
+The moved query types are `Query`, `ConditionQuery`, `Condition`, `IdQuery`, `IdPrefixQuery`, `IdRangeQuery`, `BatchConditionQuery` and `Aggregate`.
+`QueryResults`, `ConditionQueryFlatten`, `EdgesQueryIterator`, `QueryBatch` and `QueryResultContext` remain in core under
+`org.apache.hugegraph.backend.query`; retain their existing imports.
 
 Schema mutation builders and backend-specific serializers remain in core, so apply these mappings only to affected types.
 Client REST DTOs remain independent, including Toolchain's `org.apache.hugegraph.structure.graph.Shard`.
@@ -160,6 +166,9 @@ The equivalent environment variable is `PD_CLUSTER`.
 | `usePD=false` | The graph's `pd.cluster` |
 
 This namespace covers schema, graph configuration, cache watches and TTL-cleaner metadata.
+All HStore graphs in one Server process must use the same metadata namespace.
+With `usePD=false`, the first HStore graph opened binds the process-wide `MetaManager` to its `pd.cluster`.
+A later graph's explicit conflicting `pd.cluster` is logged and ignored; it does not create an independent namespace.
 One Store process cannot share a schema driver across conflicting namespaces.
 Preserve backend `graphspace/store/table` names such as `DEFAULT/hugegraph/g`; the REST identity `DEFAULT-hugegraph` is not a metadata key.
 
