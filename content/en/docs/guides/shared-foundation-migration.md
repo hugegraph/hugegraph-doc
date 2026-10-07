@@ -5,7 +5,7 @@ description: "Update Java imports and plugins, then prepare matching Server, PD 
 weight: 8
 ---
 
-The planned 1.8.0 migration changes Java imports and extension signatures, and requires Server, PD and Store to upgrade together.
+The 1.8.0 shared-foundation migration changes Java imports and extension signatures, and requires Server, PD and Store to upgrade together.
 Use this guide to identify affected code, rebuild your integrations and check existing data before deployment.
 
 ## Find the work that applies to you
@@ -19,8 +19,10 @@ Use this guide to identify affected code, rebuild your integrations and check ex
 | HStore deployment | Align the PD namespace, inspect legacy rebuilt indexes and upgrade all writers together. |
 | Loader or another REST-only caller | Keep the independent client DTOs; migrate any actual affected Java calls. |
 
-These changes are planned for 1.8.0 and have not been released.
-The [implementation PR](https://github.com/apache/hugegraph/pull/3270) includes the source migration document and compatibility fixtures.
+The implementation has merged into Server `master` through [apache/hugegraph#3270](https://github.com/apache/hugegraph/pull/3270), targeting 1.8.0.
+Use matching Server, PD, Store and downstream artifacts when upgrading.
+See the [source migration guide](https://github.com/apache/hugegraph/blob/master/docs/shared-foundation-migration.md)
+for Java mappings and compatibility fixtures.
 
 ## Where shared code now lives
 

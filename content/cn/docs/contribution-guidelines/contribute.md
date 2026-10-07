@@ -53,7 +53,11 @@ hugegraph-server/hugegraph-core/src/main/java/org/apache/hugegraph/
 
 上述名称来自根 `pom.xml` 及各子项目 `pom.xml`；代码结构以正在使用的分支为准。
 
-计划用于 1.8.0 的整合见[共享基础模块职责和 Java 迁移指南](/cn/docs/guides/shared-foundation-migration/)。
+已合入 Server `master`、面向 1.8.0 的整合见[共享基础模块职责和 Java 迁移指南](/cn/docs/guides/shared-foundation-migration/)。
+
+当前 Server `master` 使用 Java 17 和 Maven 3.6.3 或更高版本构建。
+CI-friendly 版本在 `process-resources` 阶段展开，安装或发布的 POM 使用具体版本号。
+单独构建模块前，先对整仓执行 `install`；使用 Maven 3.10 时也应保持 Resolver 校验开启。
 
 先运行与改动直接相关的测试。Server 常用测试入口如下：
 

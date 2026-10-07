@@ -53,7 +53,12 @@ Current top-level Maven modules are listed below. Server's `hugegraph-server/hug
 
 These names come from the root and subproject `pom.xml` files. Use the structure of the branch you are working on.
 
-For the planned 1.8.0 consolidation, see the [shared-foundation ownership and Java migration guide](/docs/guides/shared-foundation-migration/).
+For the 1.8.0 shared-foundation changes merged into Server `master`, see the
+[shared-foundation ownership and Java migration guide](/docs/guides/shared-foundation-migration/).
+
+Build current Server `master` with Java 17 and Maven 3.6.3 or later.
+CI-friendly versions are flattened during `process-resources`, so installed and deployed POMs contain concrete versions.
+Run the reactor with `install` before building modules separately, and keep Maven Resolver validation enabled, including with Maven 3.10.
 
 Run the tests directly related to your change first. Common Server test commands include:
 
