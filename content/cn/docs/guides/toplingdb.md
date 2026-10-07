@@ -5,7 +5,7 @@ weight: 11
 description: "从开发源码构建可选 ToplingDB 运行时，隔离数据目录，并了解启动与恢复边界。"
 ---
 
-> **尚未发布的开发接口。** 本文对应[三组件运行时接入](https://github.com/hugegraph/hugegraph/pull/266)。
+> **尚未发布的开发接口。** 本文对应[三组件运行时接入](https://github.com/apache/hugegraph/pull/3275)。
 > 请使用包含该修改的源码。已有发行版和镜像标签不能证明支持本文接口，实际运行时验收仍须在采用前完成。
 
 ## 确认数据库所属组件
@@ -96,7 +96,14 @@ export TOPLINGDB_ROCKSDB_PROVIDER=topling
 发行包中的 native 配置关闭 HTTP 服务，并保留 Java 写入路径要求的 `memtable_as_log_index=false`。
 请按机器条件调整该文件；它与业务 provider、数据目录配置分别生效。
 
-独立 Server 的 `bin/init-store.sh`、`bin/dump-store.sh` 与 `bin/start-hugegraph.sh` 使用同一显式运行时选择。
+独立 Server 使用全新图时，首次启动前先初始化一次存储：
+
+```bash
+bash bin/init-store.sh
+bash bin/start-hugegraph.sh
+```
+
+`bin/init-store.sh`、`bin/dump-store.sh` 与 `bin/start-hugegraph.sh` 使用同一显式运行时选择。
 HStore 按 PD、Store、Server 的顺序启动。在同一 shell 中启动 HStore Server 前，执行 `unset TOPLINGDB_ROCKSDB_PROVIDER`
 （或 `export TOPLINGDB_ROCKSDB_PROVIDER=rocksdb`）；不要在该 Server 上启用本地 Topling。
 业务 provider 与实际运行时不一致时，组件会在开库前拒绝启动。

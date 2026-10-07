@@ -5,7 +5,7 @@ weight: 11
 description: "Build the optional ToplingDB runtime from development source, isolate its data, and understand startup and recovery boundaries."
 ---
 
-> **Unreleased development interface.** This guide follows the [three-component runtime integration](https://github.com/hugegraph/hugegraph/pull/266).
+> **Unreleased development interface.** This guide follows the [three-component runtime integration](https://github.com/apache/hugegraph/pull/3275).
 > Use source containing that change. Existing releases and image tags do not establish support, and runtime acceptance remains a deployment prerequisite.
 
 ## Choose the database owner
@@ -97,7 +97,14 @@ The launcher uses that component's `conf/toplingdb.yaml`. Set `TOPLINGDB_EASY_MI
 The shipped native profile disables its HTTP server and keeps `memtable_as_log_index=false`, which the Java write path requires.
 Tune that profile for the host; it is separate from the business provider and data-path configuration.
 
-For a standalone Server, `bin/init-store.sh` and `bin/dump-store.sh` use the same explicit selection as `bin/start-hugegraph.sh`.
+For a fresh standalone Server graph, initialize its store once before the first startup:
+
+```bash
+bash bin/init-store.sh
+bash bin/start-hugegraph.sh
+```
+
+`bin/init-store.sh` and `bin/dump-store.sh` use the same explicit runtime selection as `bin/start-hugegraph.sh`.
 For HStore, start PD, then Store. Before starting the HStore-backed Server from the same shell, run `unset TOPLINGDB_ROCKSDB_PROVIDER`
 (or `export TOPLINGDB_ROCKSDB_PROVIDER=rocksdb`); do not enable local Topling on that Server.
 A configured provider/runtime mismatch fails before the component opens its database.
