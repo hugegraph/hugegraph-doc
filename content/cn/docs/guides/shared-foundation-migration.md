@@ -80,6 +80,7 @@ Id vertexId = IdGenerator.of("vertex-1");
 | `org.apache.hugegraph.backend.id` 中下方列出的共享类型 | `org.apache.hugegraph.id.*` |
 | `org.apache.hugegraph.schema.*` 元数据 | `org.apache.hugegraph.struct.schema.*` |
 | `org.apache.hugegraph.backend.query` 中下方列出的共享类型 | `org.apache.hugegraph.query.*` |
+| `org.apache.hugegraph.backend.query.serializer.*` | `org.apache.hugegraph.query.serializer.*` |
 | `org.apache.hugegraph.backend.store.Shard` | `org.apache.hugegraph.backend.Shard` |
 | `org.apache.hugegraph.backend.store.BackendEntry.BackendColumn` | `org.apache.hugegraph.backend.BackendColumn` |
 | `org.apache.hugegraph.structure.HugeIndex` | `org.apache.hugegraph.structure.Index` |

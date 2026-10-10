@@ -82,6 +82,7 @@ The [plugin examples](/docs/guides/custom-plugin/) still describe 1.7.0; apply t
 | Shared types listed below in `org.apache.hugegraph.backend.id` | `org.apache.hugegraph.id.*` |
 | `org.apache.hugegraph.schema.*` metadata | `org.apache.hugegraph.struct.schema.*` |
 | Shared types listed below in `org.apache.hugegraph.backend.query` | `org.apache.hugegraph.query.*` |
+| `org.apache.hugegraph.backend.query.serializer.*` | `org.apache.hugegraph.query.serializer.*` |
 | `org.apache.hugegraph.backend.store.Shard` | `org.apache.hugegraph.backend.Shard` |
 | `org.apache.hugegraph.backend.store.BackendEntry.BackendColumn` | `org.apache.hugegraph.backend.BackendColumn` |
 | `org.apache.hugegraph.structure.HugeIndex` | `org.apache.hugegraph.structure.Index` |

@@ -90,7 +90,8 @@ When adding a third-party dependency, also update the license information includ
    bash install-dist/scripts/dependency/regenerate_known_dependencies.sh
    ```
 
-   The clean phase removes the previous versioned distribution directories, preventing removed dependencies from remaining as stale jars.
+   Clean rebuilds the current revision's distributions to avoid stale dependency jars.
+   It also removes root-level `*.tar.gz` distribution archives; other revision directories remain.
 
    This build skips tests. Collection combines Maven runtime dependencies with actual flat and nested distribution jars,
    including Spring Boot `BOOT-INF/lib` dependencies introduced by repackaging. Missing distributions must fail collection;
