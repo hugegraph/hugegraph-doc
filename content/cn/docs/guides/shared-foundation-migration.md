@@ -94,7 +94,7 @@ ID 包只迁移 `Id`、`IdGenerator`、`EdgeId`、`IdUtil`、`SplicingIdGenerato
 `QueryResults`、`ConditionQueryFlatten`、`EdgesQueryIterator`、`QueryBatch`、`QueryResultContext` 保留在 core 的
 `org.apache.hugegraph.backend.query`，继续使用原 import。
 
-Schema 修改 builder 和后端专用序列化器仍在 core，需按实际受影响类型应用表中的映射。
+`SchemaManager`、Schema 修改 builder 和后端专用序列化器仍在 core，需按实际受影响类型应用表中的映射。
 客户端 REST DTO 保持独立，包括 Toolchain 的 `org.apache.hugegraph.structure.graph.Shard`。
 
 | 扩展点 | 实现需要怎样调整 |

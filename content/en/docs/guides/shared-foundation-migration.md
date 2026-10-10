@@ -96,7 +96,7 @@ The moved query types are `Query`, `ConditionQuery`, `Condition`, `IdQuery`, `Id
 `QueryResults`, `ConditionQueryFlatten`, `EdgesQueryIterator`, `QueryBatch` and `QueryResultContext` remain in core under
 `org.apache.hugegraph.backend.query`; retain their existing imports.
 
-Schema mutation builders and backend-specific serializers remain in core, so apply these mappings only to affected types.
+`SchemaManager`, schema mutation builders and backend-specific serializers remain in core, so apply these mappings only to affected types.
 Client REST DTOs remain independent, including Toolchain's `org.apache.hugegraph.structure.graph.Shard`.
 
 | Extension point | Change in your implementation |
