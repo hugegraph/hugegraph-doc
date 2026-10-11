@@ -709,9 +709,9 @@
   }
 }
 
-@media screen and (max-width: 575.98px) {
+@media screen {
   // Keep technical tokens readable and let OINK's labelled, focusable wrapper
-  // own mobile overflow instead of collapsing identifiers one letter per line.
+  // own overflow instead of collapsing identifiers one letter per line.
   .td-content .td-table-scroll > table :is(th, td),
   .td-content .td-table-scroll > table :is(th, td) :is(a, code) {
     overflow-wrap: normal;

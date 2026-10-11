@@ -25,7 +25,7 @@ the system store when the graph is initialized.
 
 Set the backend and the serializer in the graph properties file (`conf/graphs/<graph>.properties`):
 
-```properties
+```properties {title="conf/graphs/<graph>.properties · Properties" lineNos="inline"}
 gremlin.graph=org.apache.hugegraph.HugeFactory
 
 backend=rocksdb

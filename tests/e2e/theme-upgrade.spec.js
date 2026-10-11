@@ -11,6 +11,33 @@ for (const language of ['en', 'cn']) {
   const quickStart = `${prefix}/blog/2025/10/09/toplingdb-quick-start/`;
   const configuration = `${prefix}/blog/2025/09/30/toplingdb-yaml-configuration-file/`;
 
+  test(`${language} RocksDB parameter identifiers stay readable on desktop and mobile`, async ({ page }) => {
+    for (const width of [1280, 320]) {
+      await page.setViewportSize({ width, height: 900 });
+      await page.goto(`${prefix}/docs/config/config-backend-rocksdb/`);
+      await page.evaluate(() => document.fonts.ready);
+      const cells = page.locator('.td-table-scroll tbody tr > td:first-child');
+      expect(await cells.count()).toBeGreaterThan(20);
+      const identifiers = await cells.evaluateAll(nodes => nodes.map(node => {
+        const range = document.createRange();
+        range.selectNodeContents(node);
+        return { text: node.textContent.trim(), lines: range.getClientRects().length };
+      }));
+      for (const identifier of identifiers) {
+        expect(identifier.text).toMatch(/^rocksdb\./);
+        expect(identifier.lines, `${width}px: ${identifier.text}`).toBe(1);
+      }
+      expect(await page.evaluate(() => document.documentElement.scrollWidth > innerWidth)).toBe(false);
+      if (width === 320) {
+        const wrapper = page.locator('.td-table-scroll').first();
+        expect(await wrapper.evaluate(node => node.scrollWidth > node.clientWidth)).toBe(true);
+        await wrapper.focus();
+        await page.keyboard.press('ArrowRight');
+        await expect.poll(() => wrapper.evaluate(node => node.scrollLeft)).toBeGreaterThan(0);
+      }
+    }
+  });
+
   test(`${language} RocksDB file tree preserves store explanations and supports folding and keyboard resizing`, async ({ page }) => {
     await page.goto(`${prefix}/docs/config/config-backend-rocksdb/`);
     const tree = page.locator('.td-filetree');
