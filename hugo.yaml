@@ -137,7 +137,7 @@ params:
     sidebar_menu_foldable: true
     sidebar_expand_levels: 2
     wide_nav_sections: [community]
-    sidebar_icon_policy: groups
+    sidebar_icon_policy: all
     sidebar_item_overflow: wrap
     backlinks: true
     image_zoom: true

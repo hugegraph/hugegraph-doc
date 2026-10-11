@@ -81,6 +81,44 @@ for (const language of ['en', 'cn']) {
     await expect(panels.nth(0)).toBeVisible();
   });
 
+  test(`${language} explicit sidebar and section icons keep navigation labels aligned`, async ({ page }, testInfo) => {
+    await page.setViewportSize({ width: 1440, height: 1000 });
+    await page.goto(`${prefix}/blog/`);
+    await page.evaluate(() => document.fonts.ready);
+    const sidebar = page.locator('#td-section-nav');
+    const labelStarts = [];
+    for (const [section, icon] of [
+      ['hugegraph', 'fa-database'], ['toolchain', 'fa-screwdriver-wrench'],
+      ['hugegraph-ai', 'fa-brain'], ['computing', 'fa-diagram-project']
+    ]) {
+      const link = sidebar.locator(`a[href$="${prefix}/blog/${section}/"]`);
+      await expect(link.locator(`i.${icon}`)).toBeVisible();
+      const label = await link.locator(':scope > span').boundingBox();
+      expect(label).not.toBeNull();
+      labelStarts.push(label.x);
+    }
+    expect(Math.max(...labelStarts) - Math.min(...labelStarts)).toBeLessThan(1);
+    await page.screenshot({ path: testInfo.outputPath(`${language}-sidebar-icons.png`) });
+
+    await page.locator('[data-td-shell-root-toggle]').click();
+    const chooser = page.locator('.td-shell-root__pop');
+    await expect(chooser).toBeVisible();
+    const rootLabels = language === 'cn'
+      ? ['Documentation', '关于', '博客', '社区'] : ['Documentation', 'About', 'Blog', 'Community'];
+    for (const [index, section] of ['docs', 'about', 'blog', 'community'].entries()) {
+      const item = chooser.locator(`a[href$="${prefix}/${section}/"]`);
+      await expect(item.locator('.td-shell-root__icon > i')).toBeVisible();
+      const label = item.locator('.td-shell-root__item-title');
+      await expect(label).toHaveText(rootLabels[index]);
+    }
+    // Read all positions in one browser frame while the popover animates.
+    await expect.poll(() => chooser.locator('.td-shell-root__item-title').evaluateAll(labels => {
+      const starts = labels.map(label => label.getBoundingClientRect().x);
+      return Math.max(...starts) - Math.min(...starts);
+    })).toBeLessThan(1);
+    await page.screenshot({ path: testInfo.outputPath(`${language}-navigation-icons.png`) });
+  });
+
   test(`${language} blog covers load and category and series rails lead to real article indexes`, async ({ page }) => {
     await page.setViewportSize({ width: 1440, height: 1000 });
     await page.goto(`${prefix}/blog/`);
