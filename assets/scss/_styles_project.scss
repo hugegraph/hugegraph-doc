@@ -709,6 +709,13 @@
   }
 }
 
+// Keep the fixed right rail above the visible footer, as the native left panel does.
+@media screen and (min-width: 1200px) {
+  .td-shell-layout:not(.td-shell-layout--toc-flow) .td-shell-toc__panel {
+    inset-block-end: var(--td-shell-footer-offset, 0px);
+  }
+}
+
 @media screen {
   // Keep technical tokens readable and let OINK's labelled, focusable wrapper
   // own overflow instead of collapsing identifiers one letter per line.

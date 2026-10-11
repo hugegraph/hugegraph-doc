@@ -175,7 +175,7 @@ public class Loader {
 
 顶点 ID 为：
 
-```
+```text
 "2:ripple",
 "1:vadas",
 "1:peter",
@@ -186,7 +186,7 @@ public class Loader {
 
 边 ID 为：
 
-```
+```text
 "S1:peter>2>>S2:lop",
 "S1:josh>2>>S2:lop",
 "S1:josh>2>>S2:ripple",
@@ -216,7 +216,7 @@ public class Loader {
 
 ###### Method & Url
 
-```
+```text
 GET http://localhost:8080/graphspaces/DEFAULT/graphs/{graph}/traversers/kout?source="1:marko"&max_depth=2
 ```
 
@@ -290,7 +290,7 @@ GET http://localhost:8080/graphspaces/DEFAULT/graphs/{graph}/traversers/kout?sou
 
 ###### Method & Url
 
-```
+```text
 POST http://localhost:8080/graphspaces/DEFAULT/graphs/{graph}/traversers/kout
 ```
 
@@ -457,7 +457,7 @@ POST http://localhost:8080/graphspaces/DEFAULT/graphs/{graph}/traversers/kout
 
 ###### Method & Url
 
-```
+```text
 GET http://localhost:8080/graphspaces/DEFAULT/graphs/{graph}/traversers/kneighbor?source=%221:marko%22&max_depth=2
 ```
 
@@ -535,7 +535,7 @@ GET http://localhost:8080/graphspaces/DEFAULT/graphs/{graph}/traversers/kneighbo
 
 ###### Method & Url
 
-```
+```text
 POST http://localhost:8080/graphspaces/DEFAULT/graphs/{graph}/traversers/kneighbor
 ```
 
@@ -756,7 +756,7 @@ POST http://localhost:8080/graphspaces/DEFAULT/graphs/{graph}/traversers/kneighb
 
 ###### Method & Url
 
-```
+```text
 GET http://localhost:8080/graphspaces/DEFAULT/graphs/{graph}/traversers/sameneighbors?vertex=%221:marko%22&other=%221:josh%22
 ```
 
@@ -806,7 +806,7 @@ J(u,v) = \frac{|N(u) \cap N(v)|}{|N(u) \cup N(v)|}
 
 ###### Method & Url
 
-```
+```text
 GET http://localhost:8080/graphspaces/DEFAULT/graphs/{graph}/traversers/jaccardsimilarity?vertex="1:marko"&other="1:josh"
 ```
 
@@ -852,7 +852,7 @@ GET http://localhost:8080/graphspaces/DEFAULT/graphs/{graph}/traversers/jaccards
 
 ###### Method & Url
 
-```
+```text
 POST http://localhost:8080/graphspaces/DEFAULT/graphs/{graph}/traversers/jaccardsimilarity
 ```
 
@@ -912,7 +912,7 @@ POST http://localhost:8080/graphspaces/DEFAULT/graphs/{graph}/traversers/jaccard
 
 ###### Method & Url
 
-```
+```text
 GET http://localhost:8080/graphspaces/DEFAULT/graphs/{graph}/traversers/shortestpath?source="1:marko"&target="2:ripple"&max_depth=3
 ```
 
@@ -962,7 +962,7 @@ GET http://localhost:8080/graphspaces/DEFAULT/graphs/{graph}/traversers/shortest
 
 ###### Method & Url
 
-```
+```text
 GET http://localhost:8080/graphspaces/DEFAULT/graphs/{graph}/traversers/allshortestpaths?source="A"&target="Z"&max_depth=10
 ```
 
@@ -1026,7 +1026,7 @@ GET http://localhost:8080/graphspaces/DEFAULT/graphs/{graph}/traversers/allshort
 
 ###### Method & Url
 
-```
+```text
 GET http://localhost:8080/graphspaces/DEFAULT/graphs/{graph}/traversers/weightedshortestpath?source="1:marko"&target="2:ripple"&weight="weight"&with_vertex=true
 ```
 
@@ -1111,7 +1111,7 @@ GET http://localhost:8080/graphspaces/DEFAULT/graphs/{graph}/traversers/weighted
 
 ###### Method & Url
 
-```
+```text
 GET http://localhost:8080/graphspaces/DEFAULT/graphs/{graph}/traversers/singlesourceshortestpath?source="1:marko"&with_vertex=true
 ```
 
@@ -1263,7 +1263,7 @@ GET http://localhost:8080/graphspaces/DEFAULT/graphs/{graph}/traversers/singleso
 
 ###### Method & Url
 
-```
+```text
 POST http://localhost:8080/graphspaces/DEFAULT/graphs/{graph}/traversers/multinodeshortestpath
 ```
 
@@ -1491,7 +1491,7 @@ POST http://localhost:8080/graphspaces/DEFAULT/graphs/{graph}/traversers/multino
 
 ###### Method & Url
 
-```
+```text
 GET http://localhost:8080/graphspaces/DEFAULT/graphs/{graph}/traversers/paths?source="1:marko"&target="1:josh"&max_depth=5
 ```
 
@@ -1567,7 +1567,7 @@ GET http://localhost:8080/graphspaces/DEFAULT/graphs/{graph}/traversers/paths?so
 
 ###### Method & Url
 
-```
+```text
 POST http://localhost:8080/graphspaces/DEFAULT/graphs/{graph}/traversers/paths
 ```
 
@@ -1666,7 +1666,7 @@ POST http://localhost:8080/graphspaces/DEFAULT/graphs/{graph}/traversers/paths
 
 ###### Method & Url
 
-```
+```text
 POST http://localhost:8080/graphspaces/DEFAULT/graphs/{graph}/traversers/customizedpaths
 ```
 
@@ -1855,7 +1855,7 @@ POST http://localhost:8080/graphspaces/DEFAULT/graphs/{graph}/traversers/customi
 
 ###### Method & Url
 
-```
+```text
 POST http://localhost:8080/graphspaces/DEFAULT/graphs/{graph}/traversers/templatepaths
 ```
 
@@ -2019,7 +2019,7 @@ POST http://localhost:8080/graphspaces/DEFAULT/graphs/{graph}/traversers/templat
 
 ###### Method & Url
 
-```
+```text
 GET http://localhost:8080/graphspaces/DEFAULT/graphs/{graph}/traversers/crosspoints?source="2:lop"&target="2:ripple"&max_depth=5&direction=IN
 ```
 
@@ -2088,7 +2088,7 @@ GET http://localhost:8080/graphspaces/DEFAULT/graphs/{graph}/traversers/crosspoi
 
 ###### Method & Url
 
-```
+```text
 POST http://localhost:8080/graphspaces/DEFAULT/graphs/{graph}/traversers/customizedcrosspoints
 ```
 
@@ -2258,7 +2258,7 @@ POST http://localhost:8080/graphspaces/DEFAULT/graphs/{graph}/traversers/customi
 
 ###### Method & Url
 
-```
+```text
 GET http://localhost:8080/graphspaces/DEFAULT/graphs/{graph}/traversers/rings?source="1:marko"&max_depth=2
 ```
 
@@ -2327,7 +2327,7 @@ GET http://localhost:8080/graphspaces/DEFAULT/graphs/{graph}/traversers/rings?so
 
 ###### Method & Url
 
-```
+```text
 GET http://localhost:8080/graphspaces/DEFAULT/graphs/{graph}/traversers/rays?source="1:marko"&max_depth=2&direction=OUT
 ```
 
@@ -2414,7 +2414,7 @@ GET http://localhost:8080/graphspaces/DEFAULT/graphs/{graph}/traversers/rays?sou
 
 ###### Method & Url
 
-```
+```text
 POST http://localhost:8080/graphspaces/DEFAULT/graphs/hugegraph/traversers/fusiformsimilarity
 ```
 
@@ -2521,7 +2521,7 @@ POST http://localhost:8080/graphspaces/DEFAULT/graphs/hugegraph/traversers/fusif
 
 ###### Method & Url
 
-```
+```text
 GET http://localhost:8080/graphspaces/DEFAULT/graphs/hugegraph/traversers/vertices?ids="1:marko"&ids="2:lop"
 ```
 
@@ -2600,7 +2600,7 @@ GET http://localhost:8080/graphspaces/DEFAULT/graphs/hugegraph/traversers/vertic
 
 ###### Method & Url
 
-```
+```text
 GET http://localhost:8080/graphspaces/DEFAULT/graphs/hugegraph/traversers/vertices/shards?split_size=67108864
 ```
 
@@ -2653,7 +2653,7 @@ GET http://localhost:8080/graphspaces/DEFAULT/graphs/hugegraph/traversers/vertic
 
 ###### Method & Url
 
-```
+```text
 GET http://localhost:8080/graphspaces/DEFAULT/graphs/hugegraph/traversers/vertices/scan?start=0&end=4294967295
 ```
 
@@ -2837,7 +2837,7 @@ GET http://localhost:8080/graphspaces/DEFAULT/graphs/hugegraph/traversers/vertic
 
 ###### Method & Url
 
-```
+```text
 GET http://localhost:8080/graphspaces/DEFAULT/graphs/hugegraph/traversers/edges?ids="S1:josh>1>>S2:lop"&ids="S1:josh>1>>S2:ripple"
 ```
 
@@ -2892,7 +2892,7 @@ GET http://localhost:8080/graphspaces/DEFAULT/graphs/hugegraph/traversers/edges?
 
 ###### Method & Url
 
-```
+```text
 GET http://localhost:8080/graphspaces/DEFAULT/graphs/hugegraph/traversers/edges/shards?split_size=4294967295
 ```
 
@@ -2949,7 +2949,7 @@ GET http://localhost:8080/graphspaces/DEFAULT/graphs/hugegraph/traversers/edges/
 
 ###### Method & Url
 
-```
+```text
 GET http://localhost:8080/graphspaces/DEFAULT/graphs/hugegraph/traversers/edges/scan?start=0&end=3221225469
 ```
 
@@ -3070,7 +3070,7 @@ GET http://localhost:8080/graphspaces/DEFAULT/graphs/hugegraph/traversers/edges/
 
 ###### Method & Url
 
-```
+```text
 GET http://localhost:8080/graphspaces/DEFAULT/graphs/{graph}/traversers/adamicadar?vertex="1:marko"&other="1:josh"
 ```
 
@@ -3113,7 +3113,7 @@ GET http://localhost:8080/graphspaces/DEFAULT/graphs/{graph}/traversers/adamicad
 
 ###### Method & Url
 
-```
+```text
 GET http://localhost:8080/graphspaces/DEFAULT/graphs/{graph}/traversers/resourceallocation?vertex="1:marko"&other="1:josh"
 ```
 
@@ -3153,7 +3153,7 @@ GET http://localhost:8080/graphspaces/DEFAULT/graphs/{graph}/traversers/resource
 
 ###### Method & Url
 
-```
+```text
 GET http://localhost:8080/graphspaces/DEFAULT/graphs/{graph}/traversers/edgeexist?source="1:marko"&target="2:lop"
 ```
 
@@ -3211,7 +3211,7 @@ GET http://localhost:8080/graphspaces/DEFAULT/graphs/{graph}/traversers/edgeexis
 
 ###### Method & Url
 
-```
+```text
 POST http://localhost:8080/graphspaces/DEFAULT/graphs/{graph}/traversers/count
 ```
 

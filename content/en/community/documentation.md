@@ -11,7 +11,7 @@ outputs: [HTML, print, markdown]
 
 Use the tool versions pinned in the repository's `go.mod` and CI configuration. From the documentation repository root, check the tools and theme:
 
-```bash {filename="check-docs-theme.sh" wrap=true}
+```bash {wrap=true}
 hugo version
 go version
 hugo mod graph

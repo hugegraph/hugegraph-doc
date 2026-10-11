@@ -116,7 +116,7 @@ export HUGEGRAPH_GRAPH=hugegraph
 
 Another way is to set the environment variable in the bin/hugegraph script:
 
-```
+```text
 #!/bin/bash
 
 # Set environment here if needed

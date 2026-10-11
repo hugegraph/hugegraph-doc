@@ -115,7 +115,7 @@ export HUGEGRAPH_GRAPH=hugegraph
 
 另一种方式是在 bin/hugegraph 脚本中设置环境变量：
 
-```
+```text
 #!/bin/bash
 
 # Set environment here if needed

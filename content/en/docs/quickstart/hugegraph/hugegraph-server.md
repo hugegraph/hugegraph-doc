@@ -133,7 +133,7 @@ See [docker/README.md](https://github.com/apache/hugegraph/blob/master/docker/RE
 
 This example uses HugeGraph 1.7.0. For other versions, confirm the release and filenames in the [ASF download directory](https://downloads.apache.org/hugegraph/). A master source build is not a released binary.
 
-```bash {filename="download-release.sh" wrap=true}
+```bash {wrap=true}
 cd /path/to/downloads
 wget https://downloads.apache.org/hugegraph/1.7.0/apache-hugegraph-incubating-1.7.0.tar.gz
 wget https://downloads.apache.org/hugegraph/1.7.0/apache-hugegraph-incubating-1.7.0.tar.gz.sha512
@@ -160,7 +160,7 @@ Install `wget` or `curl` before building.
 
 Download HugeGraph source:
 
-```bash {filename="build-from-source.sh" wrap=true}
+```bash {wrap=true}
 git clone --branch master https://github.com/apache/hugegraph.git
 ```
 
@@ -396,7 +396,7 @@ First deploy PD and Store; see the [PD Quick Start](/docs/quickstart/hugegraph/h
 >
 > Create the authentication environment in `docker/` and generate HStore Hubble configuration. Replace the example administrator password; because `.env` uses single quotes, the password must contain neither single quotes nor newlines. The script generates random JWT and PD secrets and writes the PD secret to two untracked `.local.properties` files mounted by HStore Compose:
 >
-> ```bash {filename="create-hstore-env.sh" wrap=true collapse=9}
+> ```bash {wrap=true collapse=9}
 > (
 >   set -eu
 >   command -v openssl >/dev/null
@@ -523,7 +523,7 @@ The first response should contain `versions`; the second should contain `vertice
 #### 5.1.4 Create an example graph when startup
 Pass the `-p true` argument when starting the script to enable `preload`, which creates a sample graph.
 
-```
+```text
 bin/start-hugegraph.sh -p true
 Starting HugeGraphServer in daemon mode...
 Connecting to HugeGraphServer (http://127.0.0.1:8080/graphs)......OK
@@ -639,13 +639,13 @@ _explanation_
 
 1. Server can compress vertex, edge, and other list responses. Use `curl --compressed` for automatic decompression:
 
-    ```
+    ```text
     curl --compressed -fsS "http://localhost:8080/graphspaces/DEFAULT/graphs/hugegraph/graph/vertices"
     ```
 
 2. The default listener is `127.0.0.1`, inaccessible directly from other machines.
 
-    ```
+    ```text
     vim conf/rest-server.properties
     
     restserver.url=http://0.0.0.0:8080
@@ -658,7 +658,7 @@ _explanation_
 
 response body:
 
-```javasript
+```javascript
 {
     "vertices": [
         {

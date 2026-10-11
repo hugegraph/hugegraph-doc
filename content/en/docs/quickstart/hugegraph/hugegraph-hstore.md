@@ -306,7 +306,7 @@ The script refuses to start if `ulimit -n` or `ulimit -u` is below 1024, and it 
 
 After successful startup, you can see logs similar to the following in `logs/hugegraph-store-server.log`:
 
-```
+```text
 YYYY-mm-dd xx:xx:xx [main] [INFO] o.a.h.s.n.StoreNodeApplication - Started StoreNodeApplication in x.xxx seconds (JVM running for x.xxx)
 ```
 

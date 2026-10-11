@@ -79,6 +79,9 @@ markup:
         block: true
       wrapStandAloneImageWithinParagraph: false
   highlight:
+    lineNos: true
+    guessSyntax: true
+    lineNumbersInTable: false
     noClasses: false
     style: tango
 

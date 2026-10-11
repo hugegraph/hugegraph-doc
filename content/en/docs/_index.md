@@ -22,7 +22,7 @@ Apache HugeGraph includes graph database, graph computing, and graph AI componen
 
 ### Ecosystem Overview
 
-```
+```text
 ┌─────────────────────────────────────────────────────────────────┐
 │                  Apache HugeGraph Ecosystem                      │
 ├─────────────────────────────────────────────────────────────────┤

@@ -11,6 +11,46 @@ for (const language of ['en', 'cn']) {
   const quickStart = `${prefix}/blog/2025/10/09/toplingdb-quick-start/`;
   const configuration = `${prefix}/blog/2025/09/30/toplingdb-yaml-configuration-file/`;
 
+  test(`${language} fixed taxonomy rail stays above the footer and keeps tags reachable`, async ({ page }) => {
+    await page.setViewportSize({ width: 1440, height: 1000 });
+    await page.goto(quickStart);
+    await page.locator('footer').scrollIntoViewIfNeeded();
+    const rail = page.locator('.td-shell-toc__panel');
+    await expect.poll(async () => {
+      const panel = await rail.boundingBox();
+      const footer = await page.locator('footer').boundingBox();
+      return panel.y + panel.height <= footer.y + 1;
+    }).toBe(true);
+    const tags = rail.locator('a[href*="/tags/"]').last();
+    await tags.scrollIntoViewIfNeeded();
+    const box = await tags.boundingBox();
+    const footer = await page.locator('footer').boundingBox();
+    expect(box.y + box.height).toBeLessThanOrEqual(footer.y + 1);
+    await tags.click();
+    await expect(page).toHaveURL(/\/tags\//);
+    await expect(page.locator('main')).toContainText('Workflow');
+  });
+
+  test(`${language} native code blocks inherit global inline line numbers without custom headers`, async ({ page }) => {
+    for (const route of ['config/config-backend-rocksdb', 'clients/restful-api/vertex', 'quickstart/hugegraph/hugegraph-server',
+      'clients/restful-api/cypher', 'quickstart/toolchain/import/hugegraph-seatunnel-connector']) {
+      await page.goto(`${prefix}/docs/${route}/`);
+      const blocks = page.locator('[data-td-code]');
+      expect(await blocks.count()).toBeGreaterThan(0);
+      await expect(blocks.locator('.td-code__filename')).toHaveCount(0);
+      const results = await blocks.evaluateAll(nodes => nodes.map(node => ({
+        language: node.getAttribute('data-td-language'),
+        numbers: node.querySelectorAll('.ln').length,
+        tables: node.querySelectorAll('.lntable').length
+      })));
+      for (const result of results) {
+        expect(result.language).toBeTruthy();
+        expect(result.numbers, `${route}: ${result.language}`).toBeGreaterThan(0);
+        expect(result.tables).toBe(0);
+      }
+    }
+  });
+
   test(`${language} RocksDB parameter identifiers stay readable on desktop and mobile`, async ({ page }) => {
     for (const width of [1280, 320]) {
       await page.setViewportSize({ width, height: 900 });
@@ -560,7 +600,7 @@ for (const language of ['en', 'cn']) {
   test(`${language} long Server script initially shows nine source lines and copies its complete hidden tail`, async ({ page, context }) => {
     await context.grantPermissions(['clipboard-read', 'clipboard-write']);
     await page.goto(serverPath);
-    const code = page.locator('[data-td-code]').filter({ has: page.locator('.td-code__filename', { hasText: 'create-hstore-env.sh' }) });
+    const code = page.locator('[data-td-code][data-td-collapse-lines="9"]').filter({ hasText: 'set-hubble-pd-password.sh' });
     await code.scrollIntoViewIfNeeded();
     await expect(code).toHaveAttribute('data-td-collapse-lines', '9');
     await expect(code).toHaveClass(/td-is-collapsed/);

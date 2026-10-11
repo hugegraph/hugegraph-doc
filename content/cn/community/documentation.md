@@ -11,7 +11,7 @@ outputs: [HTML, print, markdown]
 
 使用仓库 `go.mod` 和 CI 配置指定的工具版本。在文档仓库根目录执行以下命令，检查工具链和主题版本：
 
-```bash {filename="check-docs-theme.sh" wrap=true}
+```bash {wrap=true}
 hugo version
 go version
 hugo mod graph

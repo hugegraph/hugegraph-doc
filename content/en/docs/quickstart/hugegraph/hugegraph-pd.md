@@ -323,7 +323,7 @@ Each flag also has an environment variable equivalent: `DAEMON`, `GC_OPTION`, `U
 
 After successful startup, you can see logs similar to the following in `logs/hugegraph-pd-stdout.log`:
 
-```
+```text
 YYYY-mm-dd xx:xx:xx [main] [INFO] o.a.h.p.b.HugePDServer - Started HugePDServer in x.xxx seconds (JVM running for x.xxx)
 ```
 

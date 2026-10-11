@@ -23,7 +23,7 @@ RocksDB 的 JNI 依赖在 `hugegraph-rocksdb/pom.xml` 中固定为 `8.10.2` 版�
 
 在图配置文件（`conf/graphs/<graph>.properties`）中设置后端与序列化器：
 
-```properties {title="conf/graphs/<graph>.properties · Properties" lineNos="inline"}
+```properties
 gremlin.graph=org.apache.hugegraph.HugeFactory
 
 backend=rocksdb

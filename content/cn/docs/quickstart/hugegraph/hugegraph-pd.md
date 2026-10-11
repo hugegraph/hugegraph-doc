@@ -321,7 +321,7 @@ HG_PD_RAFT_PEERS_LIST: pd0:8610,pd1:8610,pd2:8610
 
 启动成功后，可以在 `logs/hugegraph-pd-stdout.log` 中看到类似以下的日志：
 
-```
+```text
 YYYY-mm-dd xx:xx:xx [main] [INFO] o.a.h.p.b.HugePDServer - Started HugePDServer in x.xxx seconds (JVM running for x.xxx)
 ```
 

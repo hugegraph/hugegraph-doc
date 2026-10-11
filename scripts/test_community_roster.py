@@ -631,7 +631,8 @@ class CommunityContentContractTests(unittest.TestCase):
             config = (ROOT / "content" / language / "docs/config/config-guide.md").read_text()
             vertex = (ROOT / "content" / language / "docs/clients/restful-api/vertex.md").read_text()
             self.assertIn("{.cards}", server)
-            self.assertIn('filename="conf/gremlin-server.yaml"', config)
+            self.assertIn("```yaml\n", config)
+            self.assertNotIn("filename=", config)
             self.assertIn(".full-width", vertex)
             self.assertIn("{#vertex-id-strategy", vertex)
 

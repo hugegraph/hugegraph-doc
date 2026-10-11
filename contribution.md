@@ -113,6 +113,9 @@ over copied theme templates: `filetree` for annotated directory layouts, `{.card
 for parallel navigation choices, `{tab="..."}` for equivalent code alternatives,
 and `kbd` for physical keys. Use `{.steps}` only for actions performed in order.
 Keep important prerequisites visible; reserve folding for supplemental detail.
+Use standard language-labelled fences (`bash`, `properties`, `json`, or `text`
+for plain text). Inline line numbers come from the global Hugo highlight config;
+ordinary documentation code blocks do not need custom filename or title headers.
 For long code examples, show at least 5–9 source lines according to the reading
 context. Do not fold short examples that already fit within that range; preserve
 complete clipboard output, including hidden lines. Keep benchmark tables and test

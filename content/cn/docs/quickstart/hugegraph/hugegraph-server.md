@@ -133,7 +133,7 @@ HUGEGRAPH_VERSION=1.7.0 docker compose -f docker-compose.yml up -d --wait
 
 以下示例针对 HugeGraph 1.7.0。使用其他版本时，请先在 [ASF 下载目录](https://downloads.apache.org/hugegraph/) 确认该版本及对应文件名；不要把 `master` 源码构建包当作已发布的二进制包。
 
-```bash {filename="download-release.sh" wrap=true}
+```bash {wrap=true}
 cd /path/to/downloads
 wget https://downloads.apache.org/hugegraph/1.7.0/apache-hugegraph-incubating-1.7.0.tar.gz
 wget https://downloads.apache.org/hugegraph/1.7.0/apache-hugegraph-incubating-1.7.0.tar.gz.sha512
@@ -160,7 +160,7 @@ gpg --verify apache-hugegraph-incubating-1.7.0.tar.gz.asc apache-hugegraph-incub
 
 下载 HugeGraph 源代码
 
-```bash {filename="build-from-source.sh" wrap=true}
+```bash {wrap=true}
 git clone --branch master https://github.com/apache/hugegraph.git
 ```
 
@@ -390,7 +390,7 @@ HugeGraphServer 启动时会连接后端存储并检查其版本信息。如果�
 >
 > 先在 `docker/` 目录创建认证环境并生成 HStore Hubble 配置。用自己设置的管理员密码替换示例文本；因 `.env` 使用单引号包裹，密码不能含单引号或换行。脚本生成 JWT 与 PD 随机密钥，并将 PD 密钥写入两个 HStore Compose 会挂载的未跟踪 `.local.properties` 文件：
 >
-> ```bash {filename="create-hstore-env.sh" wrap=true collapse=9}
+> ```bash {wrap=true collapse=9}
 > (
 >   set -eu
 >   command -v openssl >/dev/null
@@ -522,7 +522,7 @@ curl --compressed -fsS \
 
 在启动脚本时携带 `-p true` 参数，表示开启 preload，即创建示例图。
 
-```
+```text
 bin/start-hugegraph.sh -p true
 Starting HugeGraphServer in daemon mode...
 Connecting to HugeGraphServer (http://127.0.0.1:8080/graphs)......OK
@@ -638,7 +638,7 @@ _说明_
 
 1. 对于顶点、边等列表请求，Server 可以压缩响应。使用 `curl --compressed` 可自动解压：
 
-    ```
+    ```text
     curl --compressed -fsS "http://localhost:8080/graphspaces/DEFAULT/graphs/hugegraph/graph/vertices"
     ```
 
@@ -649,7 +649,7 @@ _说明_
 >
 > 若将地址调整为 `0.0.0.0`，Server 将监听所有网卡。生产环境必须启用认证与授权、IP 白名单及最小权限授权，并保留和保护审计日志；不得将 Gremlin、Cypher 等接口直接暴露到公网。
 
-    ```
+    ```text
     vim conf/rest-server.properties
     
     restserver.url=http://0.0.0.0:8080
