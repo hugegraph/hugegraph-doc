@@ -3,7 +3,7 @@ title: "博客"
 linkTitle: "博客"
 icon: fa-solid fa-rss
 cascade:
-  images: [/img/social/hugegraph-default.png]
+  images: [/img/social/hugegraph-apache.png]
   reading_time: true
   featured_image: wash
 ---

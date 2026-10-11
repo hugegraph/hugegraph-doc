@@ -91,7 +91,7 @@ params:
   # Native module outlines load the local runtime only on pages with Markmap.
   markmap: true
   description: Apache HugeGraph is a full-stack graph database ecosystem for OLTP, OLAP, and graph AI.
-  images: [/img/social/hugegraph-default.png]
+  images: [/img/social/hugegraph-apache.png]
   github_repo: https://github.com/apache/hugegraph-doc
   github_project_repo: https://github.com/apache/hugegraph
   github_branch: master
