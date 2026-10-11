@@ -649,11 +649,11 @@ _说明_
 >
 > 若将地址调整为 `0.0.0.0`，Server 将监听所有网卡。生产环境必须启用认证与授权、IP 白名单及最小权限授权，并保留和保护审计日志；不得将 Gremlin、Cypher 等接口直接暴露到公网。
 
-    ```text
-    vim conf/rest-server.properties
-    
-    restserver.url=http://0.0.0.0:8080
-    ```
+```text
+vim conf/rest-server.properties
+
+restserver.url=http://0.0.0.0:8080
+```
 
 响应体如下：
 

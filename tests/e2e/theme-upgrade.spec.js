@@ -48,6 +48,12 @@ for (const language of ['en', 'cn']) {
         expect(result.numbers, `${route}: ${result.language}`).toBeGreaterThan(0);
         expect(result.tables).toBe(0);
       }
+      if (route === 'quickstart/hugegraph/hugegraph-server') {
+        const listener = blocks.filter({ hasText: 'vim conf/rest-server.properties' });
+        await expect(listener).toHaveCount(1);
+        await expect(listener.locator('.ln')).toHaveCount(3);
+        expect(await listener.textContent()).not.toContain('```');
+      }
     }
   });
 
