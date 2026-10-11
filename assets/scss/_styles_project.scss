@@ -228,9 +228,11 @@
 
   .td-landing-button--primary {
     background: #5930b8;
+    color: #fff;
 
     &:hover {
       background: #48239e;
+      color: #fff;
     }
   }
 
@@ -936,4 +938,29 @@
 // Use its public text token on both the container and generated SVG.
 .td-content .markmap {
   --markmap-text-color: var(--bs-body-color);
+}
+
+// Full store definitions must remain readable without pointer hover.
+// Scope wrapping to authored trees that opt in through OINK's public class attribute.
+.hg-filetree-notes {
+  .td-filetree__row {
+    block-size: auto;
+    min-block-size: var(--td-filetree-row);
+  }
+  .td-filetree__comment {
+    white-space: normal;
+  }
+  .td-filetree__comment-text {
+    overflow: visible;
+    text-overflow: clip;
+    overflow-wrap: anywhere;
+  }
+}
+
+@media screen {
+  // Let this wide PD environment table use OINK's intrinsic column widths.
+  // The native focusable wrapper owns scrolling; other tables and Print keep their defaults.
+  .td-content .td-table-scroll:not(.td-table-scroll--static) > table.hg-pd-env {
+    max-width: none;
+  }
 }

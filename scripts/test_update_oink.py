@@ -194,6 +194,59 @@ class UpgradeInventoryTest(unittest.TestCase):
             for name, contents in before.items():
                 self.assertEqual((root / name).read_bytes(), contents)
 
+    @unittest.skipUnless(shutil.which(os.environ.get("HUGO_BIN", "hugo")), "Hugo executable is required")
+    def test_real_hugo_graph_uses_production_in_both_environment_directions(self):
+        with tempfile.TemporaryDirectory() as directory:
+            root = Path(directory) / "site"
+            root.mkdir()
+            for name in ("go.mod", "go.sum"):
+                (root / name).write_bytes((update_oink.ROOT / name).read_bytes())
+            base_config = ("baseURL: https://example.test/\n"
+                           "disableKinds: [taxonomy, term, RSS, sitemap]\n"
+                           "module:\n  imports:\n    - path: " + MODULE + "\n")
+            development = root / "config/development"
+            development.mkdir(parents=True)
+            preview = root.parent / "preview"
+            (preview / "layouts/shortcodes").mkdir(parents=True)
+            (preview / "layouts/shortcodes/unpublished.html").write_text("unpublished development capability")
+            (root / "layouts").mkdir()
+            (root / "layouts/index.html").write_text("{{ .Content }}")
+            (root / "content").mkdir()
+            page = root / "content/_index.md"
+            page.write_text('---\ntitle: Environment fixture\n---\nPublished content.\n')
+            env = update_oink.release_environment()
+            env["HUGO_ENVIRONMENT"] = "development"
+            hugo = env.get("HUGO_BIN", "hugo")
+            before = {name: (root / name).read_bytes() for name in ("go.mod", "go.sum")}
+            with patch.dict(os.environ, env, clear=True):
+                version = update_oink.download_locked(root)["Version"]
+                (root / "hugo.yaml").write_text(base_config)
+                (development / "hugo.yaml").write_text(f"theme: [{preview}]\n")
+                inherited = subprocess.check_output([hugo, "mod", "graph", "--config", "hugo.yaml"],
+                                                    cwd=root, env=env, text=True)
+                self.assertIn(str(preview), inherited)
+                # A development-only import must not reject the production site.
+                accepted = update_oink.verify_hugo_graph(root, version)
+                self.assertNotIn(str(preview), accepted)
+                production = [hugo, "--config", "hugo.yaml", "--environment", "production", "--panicOnWarning"]
+                built = subprocess.run(production, cwd=root, env=env, text=True, capture_output=True)
+                self.assertEqual(built.returncode, 0, built.stdout + built.stderr)
+                # Conversely, development clearing a production theme must not
+                # conceal its unpublished shortcode from the production gate.
+                (root / "hugo.yaml").write_text(base_config + f"theme: [{preview}]\n")
+                (development / "hugo.yaml").write_text("theme: []\n")
+                page.write_text('---\ntitle: Environment fixture\n---\n{{< unpublished >}}\n')
+                inherited = subprocess.check_output([hugo, "mod", "graph", "--config", "hugo.yaml"],
+                                                    cwd=root, env=env, text=True)
+                self.assertNotIn(str(preview), inherited)
+                with self.assertRaisesRegex(ValueError, "expected Hugo root"):
+                    update_oink.verify_hugo_graph(root, version)
+                built = subprocess.run(production, cwd=root, env=env, text=True, capture_output=True)
+                self.assertEqual(built.returncode, 0, built.stdout + built.stderr)
+                self.assertIn("unpublished development capability", (root / "public/index.html").read_text())
+            for name, contents in before.items():
+                self.assertEqual((root / name).read_bytes(), contents)
+
     def test_validation_subprocesses_inherit_isolation_and_absolute_hugo_path(self):
         with tempfile.TemporaryDirectory() as directory:
             work = Path(directory)

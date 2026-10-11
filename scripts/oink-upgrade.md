@@ -183,7 +183,9 @@ and record the revised inventory; use the version currently pinned in `go.mod`.
 
 Hugo can fetch imports and rewrite locks even during `hugo mod graph`. The
 diagnostic runs it in a sibling temporary workspace with independent lock copies,
-preserving current configuration and relative paths. The checkout's parent must
+preserving current configuration and relative paths. It explicitly uses
+`--config hugo.yaml --environment production`, matching the release build
+entry and ignoring a caller's development environment selection. The checkout's parent must
 be writable; failure leaves the original `go.mod` and `go.sum` unchanged.
 
 The baseline advances only after manual compatibility review and the full

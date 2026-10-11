@@ -87,7 +87,8 @@ def verify_hugo_graph(root, version):
         raise ValueError("_vendor is unsupported by this module-only updater; move it aside and rerun, or refresh and review it separately")
     env = release_environment()
     with graph_workspace(root) as workspace:
-        graph = subprocess.check_output([env.get("HUGO_BIN", "hugo"), "mod", "graph"],
+        graph = subprocess.check_output([env.get("HUGO_BIN", "hugo"), "mod", "graph",
+                                         "--config", "hugo.yaml", "--environment", "production"],
                                         cwd=workspace, env=env, text=True)
         graph = graph.replace(str(workspace), str(Path(root).resolve()))
     expected = MODULE + "@" + version

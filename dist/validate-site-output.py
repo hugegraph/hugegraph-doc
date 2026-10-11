@@ -679,6 +679,7 @@ def document_security_errors(
 ) -> list[str]:
     """Return fail-closed resource and authored-markup errors for one page."""
 
+    parser._check_markmap_sources()
     errors = [
         f"{page_name}: unsafe content markup: {violation}"
         for violation in parser.authored_violations
@@ -756,6 +757,11 @@ class DocumentParser(html.parser.HTMLParser):
         self._in_style = False
         self._svg_depth = 0
         self._media_elements: list[str] = []
+        self._pre_sources: list[dict] = []
+        self._markmap_containers: list[dict] = []
+        self._markmap_sources: list[str] = []
+        self._markmap_carrier_errors: list[str] = []
+        self._markmap_checked = False
 
     def handle_starttag(self, tag: str, attrs: list[tuple[str, str | None]]) -> None:
         tag = tag.lower()
@@ -798,6 +804,19 @@ class DocumentParser(html.parser.HTMLParser):
         # script. Reject every non-template carrier even outside article/main.
         if OINK_CONFIG_MARKERS.intersection(values) and not is_inert_oink_component_source(tag, values):
             self.authored_violations.append(f"noncanonical OINK component configuration on <{tag}>")
+        for container in self._markmap_containers:
+            if tag == container["tag"]:
+                container["depth"] += 1
+        if tag == "pre":
+            self._pre_sources.append({"source": "", "markmap": False})
+        classes = values.get("class", "").split()
+        if "language-markmap" in classes:
+            if tag == "code" and self._pre_sources:
+                self._pre_sources[-1]["markmap"] = True
+            else:
+                self._markmap_carrier_errors.append("noncanonical Markmap source carrier")
+        if "markmap" in classes:
+            self._markmap_containers.append({"tag": tag, "depth": 1, "source": ""})
         if tag == "nav" and "TableOfContents" in [
             value or "" for key, value in attrs if key.lower() == "id"
         ]:
@@ -989,6 +1008,10 @@ class DocumentParser(html.parser.HTMLParser):
             self._in_style = True
 
     def handle_data(self, data: str) -> None:
+        for pre in self._pre_sources:
+            pre["source"] += data
+        for container in self._markmap_containers:
+            container["source"] += data
         if self._component_source:
             self._component_json += data
         if self._in_action_manifest:
@@ -999,6 +1022,16 @@ class DocumentParser(html.parser.HTMLParser):
 
     def handle_endtag(self, tag: str) -> None:
         tag = tag.lower()
+        if tag == "pre" and self._pre_sources:
+            pre = self._pre_sources.pop()
+            if pre["markmap"]:
+                self._markmap_sources.append(pre["source"])
+        for container in self._markmap_containers[:]:
+            if tag == container["tag"]:
+                container["depth"] -= 1
+                if not container["depth"]:
+                    self._markmap_sources.append(container["source"])
+                    self._markmap_containers.remove(container)
         if tag == "script" and self._component_source:
             self._check_component_payload()
             self._component_source = ""
@@ -1022,6 +1055,57 @@ class DocumentParser(html.parser.HTMLParser):
                 )
         if tag in {"main", "article"} and self._content_depth:
             self._content_depth -= 1
+
+    def _check_markmap_sources(self) -> None:
+        if self._markmap_checked:
+            return
+        self._markmap_checked = True
+        # Only the native enabled runtime turns these code sources into HTML.
+        enabled = any(tag == "script" and attribute == "src" and re.search(
+            r"/(?:third_party/markmap/markmap-autoloader|js/chunks/markmap-[^/]+)[^/]*\.js$",
+            urllib.parse.urlsplit(url).path) for tag, attribute, url in self.resources)
+        if not enabled:
+            return
+        self.authored_violations.extend(self._markmap_carrier_errors)
+        for source in self._markmap_sources:
+            lines = source.splitlines()
+            if lines and lines[0].strip() == "---":
+                end = next((index for index in range(1, len(lines)) if lines[index].strip() in {"---", "..."}), None)
+                header = lines[1:end] if end is not None else lines[1:]
+                allowed = all(not line.strip() or line.lstrip().startswith("#") or
+                              re.fullmatch(r"markmap:\s*(?:#.*)?", line) or
+                              re.fullmatch(r"  spacingHorizontal:\s*(?:\d+(?:\.\d*)?|\.\d+)\s*(?:#.*)?", line)
+                              for line in header)
+                roots = sum(bool(re.fullmatch(r"markmap:\s*(?:#.*)?", line)) for line in header)
+                spacing_values = [re.match(r"  spacingHorizontal:\s*((?:\d+(?:\.\d*)?|\.\d+))", line)[1]
+                                  for line in header if re.match(r"  spacingHorizontal:\s*((?:\d+(?:\.\d*)?|\.\d+))", line)]
+                spacing_valid = all(finite_json_number(float(value)) for value in spacing_values)
+                if end is None or not allowed or roots != 1 or len(spacing_values) > 1 or not spacing_valid:
+                    self.authored_violations.append("Markmap plain-text policy permits only numeric markmap.spacingHorizontal frontmatter")
+                lines = lines[end + 1:] if end is not None else []
+            # MarkdownIt keeps inline/fenced code inert. Preserve that property
+            # instead of mistaking a displayed image example for active markup.
+            ordinary = []
+            fence = None
+            for line in lines:
+                if fence:
+                    if re.fullmatch(r" {0,3}" + re.escape(fence[0]) + "{" + str(fence[1]) + r",}\s*", line):
+                        fence = None
+                    continue
+                opening = re.match(r" {0,3}(`{3,}|~{3,})", line)
+                if opening:
+                    fence = (opening[1][0], len(opening[1]))
+                else:
+                    ordinary.append(line)
+            body = "\n".join(ordinary)
+            body = re.sub(r"(?<!`)(`+)(?!`)[\s\S]*?\1(?!`)", "", body)
+            # Consume Markdown escapes pairwise: an escaped bang/bracket is
+            # literal, while an escaped backslash followed by ![ is active.
+            body = re.sub(r"\\([!\\<>\[\]()])", " ", body)
+            if ("![" in body or re.search(r"<[A-Za-z!/][^>]*>", body) or
+                    re.search(r"\[[^\]\n]*\]\s*(?:\(|\[)", body) or
+                    re.search(r"(?m)^ {0,3}\[[^\]\n]+\]:", body)):
+                self.authored_violations.append("Markmap is limited to plain-text outlines; images, links and raw HTML are forbidden")
 
     def _check_component_payload(self) -> None:
         try:
@@ -1078,16 +1162,22 @@ class DocumentParser(html.parser.HTMLParser):
             if path[:1] == ("dataset",) and "source" in path:
                 continue
             option_path = tuple(part for part in path if part != "[]")
+            text_style_sink = option_path[-3:-1] == ("tooltip", "textStyle") or (option_path[:1] == ("textStyle",) and len(option_path) == 2)
+            # Series/item string tooltip shorthand becomes {formatter: value}
+            # in ECharts' model; dataset columns were excluded above.
+            if option_path[:1] == ("series",) and option_path[-1:] == ("tooltip",) and isinstance(value, str):
+                self._check_component_html(value)
+                continue
             marker_color_sink = option_path in {
                 ("color",), ("colorLayer",), ("series", "color"), ("series", "colorLayer"),
-                ("visualMap", "inRange", "color"), ("visualMap", "outOfRange", "color"),
+                ("visualMap", "inRange", "color"), ("visualMap", "outOfRange", "color"), ("visualMap", "pieces", "color"),
             } or (option_path[:1] == ("series",) and option_path[-2:] in {("itemStyle", "color"), ("lineStyle", "color")})
             if marker_color_sink and not echarts_marker_color(value):
                 self.authored_violations.append("invalid ECharts tooltip marker colour: " + ".".join(option_path))
                 continue
             color_sink = option_path[-2:] in {
-                ("tooltip", "backgroundColor"), ("tooltip", "borderColor"), ("tooltip", "shadowColor"),
-            } or option_path[-3:] in {("tooltip", "textStyle", "color"), ("tooltip", "textStyle", "textShadowColor")} or option_path in {
+                ("tooltip", "backgroundColor"), ("tooltip", "borderColor"), ("tooltip", "defaultBorderColor"), ("tooltip", "shadowColor"),
+            } or (text_style_sink and option_path[-1] in {"color", "textShadowColor"}) or option_path in {
                 ("toolbox", "feature", "dataView", "buttonColor"),
                 ("toolbox", "feature", "dataView", "buttonTextColor"),
             }
@@ -1104,16 +1194,15 @@ class DocumentParser(html.parser.HTMLParser):
             # fields. Apply their declared types before browser coercion.
             tooltip_number = option_path[-2:] in {
                 ("tooltip", key) for key in ("shadowBlur", "shadowOffsetX", "shadowOffsetY", "borderWidth", "borderRadius", "padding")
-            } or option_path[-3:] in {
-                ("tooltip", "textStyle", key) for key in
-                ("fontSize", "lineHeight", "textShadowBlur", "textShadowOffsetX", "textShadowOffsetY")
-            }
+            } or (text_style_sink and option_path[-1] in {
+                "fontSize", "lineHeight", "textShadowBlur", "textShadowOffsetX", "textShadowOffsetY"
+            })
             if tooltip_number and value is not None:
                 numbers = value if isinstance(value, list) and option_path[-1] in {"padding", "borderRadius"} else [value]
                 if not numbers or not all(finite_json_number(number) for number in numbers):
                     self.authored_violations.append("ECharts tooltip CSS number must be finite: " + ".".join(option_path))
                     continue
-            if option_path[-3:-1] == ("tooltip", "textStyle") and value is not None:
+            if text_style_sink and value is not None:
                 key = option_path[-1]
                 font_valid = True
                 if key == "fontFamily":

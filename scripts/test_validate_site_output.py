@@ -596,6 +596,89 @@ class SiteOutputSecurityTest(unittest.TestCase):
                          VALIDATOR.document_url_shape_errors(parser, "index.html")
                 self.assertEqual(bool(errors), rejected, errors)
 
+    def test_echarts_tooltip_shorthand_inherited_fonts_and_fallback_colors(self) -> None:
+        hostile = '<img src="/missing" onerror="evil()">'
+        unsafe = [
+            {"series": [{"tooltip": hostile}]}, {"series": [{"data": [{"value": 5, "tooltip": hostile}]}]},
+            {"textStyle": {"fontFamily": "serif;background:url(https://evil.example/font.png)"}},
+            {"visualMap": {"pieces": [{"min": 0, "max": 10, "color": "red;background:url(https://evil.example/color.png)"}]}},
+            {"tooltip": {"defaultBorderColor": "red;background:url(https://evil.example/border.png)"}},
+        ]
+        safe = [
+            {"series": [{"tooltip": "<b>{b}</b>: {c}"}]},
+            {"series": [{"data": [{"value": 5, "tooltip": "{b}: {c}"}]}]},
+            {"textStyle": {"fontFamily": 'Arial, "思源黑体", sans-serif', "fontSize": 14}},
+            {"visualMap": {"pieces": [{"color": {"type": "linear", "colorStops": [{"offset": 0, "color": "red"}]}}]}},
+            {"tooltip": {"defaultBorderColor": "rgba(0,0,0,.5)"}},
+            {"dataset": {"source": [{"tooltip": hostile, "textStyle": {"fontFamily": unsafe[2]["textStyle"]["fontFamily"]}}]}},
+        ]
+        for option, rejected in [(option, True) for option in unsafe] + [(option, False) for option in safe]:
+            with self.subTest(option=option):
+                parser = parse('<script type="application/json" data-td-echarts-options>' +
+                               json.dumps(option).replace("<", "\\u003c") + '</script>')
+                self.assertEqual(bool(VALIDATOR.document_security_errors(parser, "index.html", BASE)), rejected)
+
+    def test_enabled_markmap_uses_explicit_plain_text_contract(self) -> None:
+        import html
+        runtime = '<script src="/third_party/markmap/markmap-autoloader.hash.js"></script>'
+        plain = "---\n# layout comment\nmarkmap:\n  spacingHorizontal: 40 # layout\n---\n# HugeGraph\n- server\n- `core`"
+        for source in [plain, "# Outline\n- `![image](https://evil.example/code.png)`", "# Outline\n```text\n![image](https://evil.example/code.png)\n```", "# Outline\n- &lt;img src=/literal&gt;"]:
+            parser = parse('<pre><code class="language-markmap">' + html.escape(source) + '</code></pre>' + runtime)
+            self.assertEqual(VALIDATOR.document_security_errors(parser, "index.html", BASE), [], source)
+        blocked = ["# Parent\n- ![image](https://evil.example/map.png)", "# Parent\n- ![image](/img/allowed.png)",
+                   "# Parent\n- ![image][ref]\n[ref]: /img/allowed.png", "# Parent\n- <img src=/allowed.png onerror=evil()>",
+                   "---\nmarkmap:\n  extraJs: [/local.js]\n---\n# Parent", "---\ntitle: '<img src=/allowed.png>'\n---",
+                   "# Parent\n- [link](/docs/)"]
+        for source in blocked:
+            with self.subTest(source=source):
+                encoded = '<pre><code class="language-markmap">' + html.escape(source) + '</code></pre>'
+                parser = parse(encoded + runtime)
+                self.assertTrue(VALIDATOR.document_security_errors(parser, "index.html", BASE))
+                # Disabled runtime and ordinary Markdown demonstrations remain
+                # inert, even if their displayed text contains an image URL.
+                self.assertEqual(VALIDATOR.document_security_errors(parse(encoded), "index.html", BASE), [])
+                ordinary = encoded.replace("language-markmap", "language-markdown")
+                self.assertEqual(VALIDATOR.document_security_errors(parse(ordinary + runtime), "index.html", BASE), [])
+
+    @unittest.skipUnless(shutil.which("hugo"), "Hugo is required to render the pinned Markmap fixture")
+    def test_native_markmap_runtime_on_off_obeys_plain_text_contract(self) -> None:
+        repo = VALIDATOR_PATH.parents[1]
+        with tempfile.TemporaryDirectory(prefix="oink-markmap-security-") as temporary:
+            root = pathlib.Path(temporary)
+            for name in ("go.mod", "go.sum"):
+                shutil.copyfile(repo / name, root / name)
+            (root / "layouts").mkdir()
+            (root / "layouts/single.html").write_text('<article>{{ .Content }}</article>{{ partial "scripts.html" . }}')
+            (root / "content").mkdir()
+            sources = [
+                ("# HugeGraph\n- server\n- core", False),
+                ("---\nmarkmap:\n  spacingHorizontal: 40\n---\n# HugeGraph\n- server", False),
+                ("# Parent\n- ![image](/img/local.png)", True),
+                ("# Parent\n- ![image][ref]\n\n[ref]: https://evil.example/ref.png", True),
+                # This pinned hook double-escapes raw HTML; textContent still
+                # contains &lt; so MarkdownIt renders literal text, not an img.
+                ("# Parent\n- <img src=/local.png onerror=evil()>", False),
+                ("---\nmarkmap:\n  extraJs: [/local.js]\n---\n# Parent", True),
+                ("# Parent\n- `![image](https://evil.example/code.png)`", False),
+            ]
+            for index, (source, _) in enumerate(sources):
+                (root / f"content/map-{index}.md").write_text('---\ntitle: Map fixture\n---\n```markmap\n' + source + '\n```\n')
+            artifact = root / "artifact"
+            artifact.mkdir()
+            for enabled in (True, False):
+                (root / "hugo.yaml").write_text(
+                    f'baseURL: {BASE.geturl()}\nparams:\n  markmap: {str(enabled).lower()}\n'
+                    'module:\n  imports:\n  - path: github.com/pgsty/oink\n')
+                result = subprocess.run([shutil.which("hugo"), "--source", str(root), "--destination", str(root / "public"),
+                                         "--environment", "production", "--panicOnWarning"], text=True, capture_output=True)
+                self.assertEqual(result.returncode, 0, result.stdout + result.stderr)
+                for index, (_, rejected) in enumerate(sources):
+                    with self.subTest(enabled=enabled, source=index):
+                        shutil.copyfile(root / f"public/map-{index}/index.html", artifact / "index.html")
+                        result = subprocess.run([sys.executable, str(VALIDATOR_PATH), str(artifact), BASE.geturl(), "--security-only"],
+                                                text=True, capture_output=True)
+                        self.assertEqual(bool(result.returncode), enabled and rejected, result.stdout + result.stderr)
+
     def test_echarts_effective_option_roots_reuse_all_sink_checks(self) -> None:
         wrappers = [lambda option: option, lambda option: {"baseOption": option},
                     lambda option: {"baseOption": {}, "options": [option]},
@@ -749,6 +832,11 @@ class SiteOutputSecurityTest(unittest.TestCase):
                 }) + '\n```\n')
             html_option = {"toolbox": {"feature": {"dataView": {"lang": ['<img src="/missing" onerror="evil()">']}}}}
             native_counterexamples = [
+                ({"series": [{"tooltip": '<img src="/missing" onerror="evil()">'}]}, "onerror"),
+                ({"series": [{"data": [{"value": 5, "tooltip": '<img src="/missing" onerror="evil()">'}]}]}, "onerror"),
+                ({"textStyle": {"fontFamily": "serif;background:url(https://evil.example/font.png)"}}, "invalid ECharts tooltip CSS font"),
+                ({"visualMap": {"pieces": [{"color": "red;background:url(https://evil.example/piece.png)"}]}}, "invalid ECharts tooltip marker colour"),
+                ({"tooltip": {"defaultBorderColor": "red;background:url(https://evil.example/border.png)"}}, "invalid ECharts CSS colour"),
                 ({"color": ["red;background:url(https://evil.example/palette.png)"]}, "invalid ECharts tooltip marker colour"),
                 ({"series": [{"itemStyle": {"color": "red;background:url(https://evil.example/itemstyle.png)"}}]},
                  "invalid ECharts tooltip marker colour"),

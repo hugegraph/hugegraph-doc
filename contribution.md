@@ -113,6 +113,9 @@ over copied theme templates: `filetree` for annotated directory layouts, `{.card
 for parallel navigation choices, `{tab="..."}` for equivalent code alternatives,
 and `kbd` for physical keys. Use `{.steps}` only for actions performed in order.
 Keep important prerequisites visible; reserve folding for supplemental detail.
+Published Markmap diagrams are limited to text outlines and code. Only a finite,
+nonnegative `spacingHorizontal` is allowed in frontmatter; active images, links, raw HTML
+and other frontmatter fail the site's safety validation.
 Use standard language-labelled fences (`bash`, `properties`, `json`, or `text`
 for plain text). Inline line numbers come from the global Hugo highlight config;
 ordinary documentation code blocks do not need custom filename or title headers.
