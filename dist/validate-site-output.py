@@ -23,6 +23,7 @@ from concurrent.futures import ProcessPoolExecutor
 from functools import partial
 import html.parser
 import json
+import math
 import pathlib
 import re
 import urllib.parse
@@ -175,6 +176,83 @@ def is_inert_oink_component_source(tag: str, values: dict[str, str]) -> bool:
     # (including class, src and handlers) are not part of the trusted shape.
     return any(set(values) == {"type", marker} and values[marker] == ""
                for marker in OINK_CONFIG_MARKERS)
+
+
+# Named colours supported by the pinned ECharts/ZRender colour parser.
+ECHARTS_COLOR_NAMES = frozenset("""
+transparent aliceblue antiquewhite aqua aquamarine azure beige bisque black blanchedalmond blue blueviolet
+brown burlywood cadetblue chartreuse chocolate coral cornflowerblue cornsilk crimson cyan darkblue darkcyan
+darkgoldenrod darkgray darkgreen darkgrey darkkhaki darkmagenta darkolivegreen darkorange darkorchid darkred
+darksalmon darkseagreen darkslateblue darkslategray darkslategrey darkturquoise darkviolet deeppink
+deepskyblue dimgray dimgrey dodgerblue firebrick floralwhite forestgreen fuchsia gainsboro ghostwhite gold
+goldenrod gray green greenyellow grey honeydew hotpink indianred indigo ivory khaki lavender lavenderblush
+lawngreen lemonchiffon lightblue lightcoral lightcyan lightgoldenrodyellow lightgray lightgreen lightgrey
+lightpink lightsalmon lightseagreen lightskyblue lightslategray lightslategrey lightsteelblue lightyellow lime
+limegreen linen magenta maroon mediumaquamarine mediumblue mediumorchid mediumpurple mediumseagreen
+mediumslateblue mediumspringgreen mediumturquoise mediumvioletred midnightblue mintcream mistyrose moccasin
+navajowhite navy oldlace olive olivedrab orange orangered orchid palegoldenrod palegreen paleturquoise
+palevioletred papayawhip peachpuff peru pink plum powderblue purple red rosybrown royalblue saddlebrown salmon
+sandybrown seagreen seashell sienna silver skyblue slateblue slategray slategrey snow springgreen steelblue
+tan teal thistle tomato turquoise violet wheat white whitesmoke yellow yellowgreen
+""".split())
+
+
+def echarts_css_color(value: object) -> bool:
+    """Accept explicit colour syntax, never CSS declarations or HTML markup."""
+
+    if not isinstance(value, str):
+        return False
+    value = value.strip().lower()
+    if value in ECHARTS_COLOR_NAMES or re.fullmatch(r"#(?:[0-9a-f]{3,4}|[0-9a-f]{6}|[0-9a-f]{8})", value):
+        return True
+    function = re.fullmatch(r"(rgba?|hsla?)\(\s*([^()]*)\s*\)", value)
+    if not function:
+        return False
+    name, arguments = function.groups()
+    parts = [part.strip() for part in arguments.split(",")]
+    expected = 4 if name.endswith("a") else 3
+    return len(parts) == expected and all(re.fullmatch(r"[+-]?(?:\d+(?:\.\d*)?|\.\d+)%?", part) for part in parts)
+
+
+def echarts_marker_color(value: object) -> bool:
+    """Validate actual palette/style colour sources before tooltip markup."""
+
+    if value is None:
+        return True
+    if isinstance(value, str):
+        return echarts_css_color(value) or value in {"auto", "inherit"}
+    if isinstance(value, list):
+        return all(echarts_marker_color(color) for color in value)
+    if isinstance(value, dict):
+        if isinstance(value.get("colorStops"), list):
+            return all(isinstance(stop, dict) and echarts_css_color(stop.get("color")) for stop in value["colorStops"])
+        # ECharts pattern fills accept image URLs; the resource traversal below
+        # checks that URL against the same-origin policy, including local URLs.
+        return isinstance(value.get("image"), str)
+    return False
+
+
+def finite_json_number(value: object) -> bool:
+    try:
+        return type(value) in {int, float} and math.isfinite(value)
+    except OverflowError:
+        return False
+
+
+def echarts_option_roots(payload: dict) -> list[dict]:
+    """Enumerate ECharts OptionManager's base, timeline, and media options."""
+
+    roots = [payload["baseOption"] if isinstance(payload.get("baseOption"), dict) else payload]
+    options = payload.get("options")
+    # ECharts' each() also visits object values; numeric keys can be selected
+    # by its timeline index even though the documented form is an array.
+    if isinstance(options, (list, dict)):
+        roots.extend(option for option in (options.values() if isinstance(options, dict) else options)
+                     if isinstance(option, dict))
+    if isinstance(payload.get("media"), list):
+        roots.extend(media["option"] for media in payload["media"]
+                     if isinstance(media, dict) and isinstance(media.get("option"), dict))
+    return roots
 
 
 def srcset_urls(value: str) -> list[str]:
@@ -994,12 +1072,68 @@ class DocumentParser(html.parser.HTMLParser):
             return
         # Match ECharts 6.1 sinks by option path. Arbitrary dataset columns
         # (including names such as url/image/formatter) remain inert data.
-        pending = [((), payload)]
+        pending = [((), option) for option in echarts_option_roots(payload)]
         while pending:
             path, value = pending.pop()
             if path[:1] == ("dataset",) and "source" in path:
                 continue
             option_path = tuple(part for part in path if part != "[]")
+            marker_color_sink = option_path in {
+                ("color",), ("colorLayer",), ("series", "color"), ("series", "colorLayer"),
+                ("visualMap", "inRange", "color"), ("visualMap", "outOfRange", "color"),
+            } or (option_path[:1] == ("series",) and option_path[-2:] in {("itemStyle", "color"), ("lineStyle", "color")})
+            if marker_color_sink and not echarts_marker_color(value):
+                self.authored_violations.append("invalid ECharts tooltip marker colour: " + ".".join(option_path))
+                continue
+            color_sink = option_path[-2:] in {
+                ("tooltip", "backgroundColor"), ("tooltip", "borderColor"), ("tooltip", "shadowColor"),
+            } or option_path[-3:] in {("tooltip", "textStyle", "color"), ("tooltip", "textStyle", "textShadowColor")} or option_path in {
+                ("toolbox", "feature", "dataView", "buttonColor"),
+                ("toolbox", "feature", "dataView", "buttonTextColor"),
+            }
+            if color_sink and value is not None:
+                # Tooltip border gradients use their first stop via Nf(). A
+                # background gradient becomes inert [object Object] in HTML.
+                gradient = (isinstance(value, dict) and isinstance(value.get("colorStops"), list) and
+                            all(isinstance(stop, dict) and echarts_css_color(stop.get("color"))
+                                for stop in value["colorStops"]))
+                if not echarts_css_color(value) and not gradient:
+                    self.authored_violations.append("invalid ECharts CSS colour: " + ".".join(option_path))
+                    continue
+            # NY() constructs tooltip cssText from these numeric and font
+            # fields. Apply their declared types before browser coercion.
+            tooltip_number = option_path[-2:] in {
+                ("tooltip", key) for key in ("shadowBlur", "shadowOffsetX", "shadowOffsetY", "borderWidth", "borderRadius", "padding")
+            } or option_path[-3:] in {
+                ("tooltip", "textStyle", key) for key in
+                ("fontSize", "lineHeight", "textShadowBlur", "textShadowOffsetX", "textShadowOffsetY")
+            }
+            if tooltip_number and value is not None:
+                numbers = value if isinstance(value, list) and option_path[-1] in {"padding", "borderRadius"} else [value]
+                if not numbers or not all(finite_json_number(number) for number in numbers):
+                    self.authored_violations.append("ECharts tooltip CSS number must be finite: " + ".".join(option_path))
+                    continue
+            if option_path[-3:-1] == ("tooltip", "textStyle") and value is not None:
+                key = option_path[-1]
+                font_valid = True
+                if key == "fontFamily":
+                    # Match quoted families or identifier-word families, not
+                    # arbitrary CSS text; supports Unicode family names.
+                    family = r"(?:[\w+-]+(?:[ ]+[\w+-]+)*|'[\w +\-]+'|\"[\w +\-]+\")"
+                    font_valid = isinstance(value, str) and bool(re.fullmatch(family + r"(?:\s*,\s*" + family + r")*", value.strip()))
+                elif key == "fontStyle":
+                    font_valid = isinstance(value, str) and value in {"normal", "italic", "oblique"}
+                elif key == "fontWeight":
+                    font_valid = ((finite_json_number(value)) or
+                                  (isinstance(value, str) and (value in {"normal", "bold", "bolder", "lighter"} or
+                                                            bool(re.fullmatch(r"(?:[1-9][0-9]{0,2}|1000)", value)))))
+                elif key == "decoration":
+                    font_valid = isinstance(value, str) and value in {"none", "underline", "overline", "line-through"}
+                elif key == "align":
+                    font_valid = isinstance(value, str) and value in {"left", "right", "center", "justify", "start", "end"}
+                if not font_valid:
+                    self.authored_violations.append("invalid ECharts tooltip CSS font option: " + ".".join(option_path))
+                    continue
             navigation_sink = ((option_path[:1] == ("title",) and option_path[-1:] in {("link",), ("sublink",)}) or
                                (option_path[:1] == ("series",) and "data" in path and option_path[-1:] == ("link",)))
             string_sink = navigation_sink or option_path[-2:] in {
@@ -1019,15 +1153,16 @@ class DocumentParser(html.parser.HTMLParser):
                 self.authored_violations.append("ECharts string option requires a string: " + ".".join(option_path))
                 continue
             if isinstance(value, dict):
-                pending.extend((path + (key,), child) for key, child in value.items())
+                pending.extend((path + (key,), child) for key, child in value.items()
+                               if path or key not in {"baseOption", "options", "media"})
             elif isinstance(value, list):
                 pending.extend((path + ("[]",), child) for child in value)
             elif isinstance(value, str):
-                key = path[-1]
+                key = option_path[-1]
                 resource = None
                 if key in {"symbol", "icon"} and value.startswith("image://"):
                     resource = value[len("image://"):]
-                elif key == "image" and ("graphic" in path or "backgroundColor" in path):
+                elif key == "image" and ("graphic" in path or any(part in path for part in {"backgroundColor", "color", "fill", "stroke"})):
                     resource = value
                 if resource:
                     self.resources.append(("echarts-options", "resource", resource))

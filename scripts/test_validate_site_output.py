@@ -596,6 +596,109 @@ class SiteOutputSecurityTest(unittest.TestCase):
                          VALIDATOR.document_url_shape_errors(parser, "index.html")
                 self.assertEqual(bool(errors), rejected, errors)
 
+    def test_echarts_effective_option_roots_reuse_all_sink_checks(self) -> None:
+        wrappers = [lambda option: option, lambda option: {"baseOption": option},
+                    lambda option: {"baseOption": {}, "options": [option]},
+                    lambda option: {"baseOption": {}, "options": {"0": option}},
+                    lambda option: {"media": [{"query": {"maxWidth": 600}, "option": option}]},
+                    lambda option: {"media": [{"option": option}]}]
+        unsafe_options = [
+            {"title": {"link": "javascript:evil()"}},
+            {"toolbox": {"feature": {"dataView": {"lang": ['<img src="/missing" onerror="evil()">']}}}},
+            {"toolbox": {"feature": {"saveAsImage": {"lang": ['unsafe fallback']}}}},
+            {"tooltip": {"backgroundColor": 'red;"><img src=/missing onerror=evil()>'}},
+        ]
+        safe = {"dataset": {"source": [{"symbol": "image://https://external.example/ordinary-data",
+                                         "color": {"image": "https://external.example/ordinary-data"}}]},
+                "tooltip": {"backgroundColor": "rgba(255, 255, 255, 0.8)"}}
+        for wrap in wrappers:
+            for option, rejected in [(option, True) for option in unsafe_options] + [(safe, False)]:
+                with self.subTest(payload=wrap(option)):
+                    parser = parse('<article><script type="application/json" data-td-echarts-options>' +
+                                   json.dumps(wrap(option)).replace("<", "\\u003c") + '</script></article>')
+                    errors = VALIDATOR.document_security_errors(parser, "index.html", BASE) + \
+                             VALIDATOR.document_url_shape_errors(parser, "index.html")
+                    self.assertEqual(bool(errors), rejected, errors)
+
+    def test_echarts_html_css_color_sinks_accept_explicit_colors(self) -> None:
+        legitimate = ["red", "AliceBlue", "transparent", "#f00", "#abcd", "#112233", "#11223388",
+                      "rgb(255, 0, 0)", "rgba(100%, 0%, 50%, .8)", "hsl(120, 50%, 50%)", "hsla(120, 50%, 50%, 0.5)"]
+        malicious = ['red;"><img src=/missing onerror=evil()>', "red;background-image:url(https://evil.example/a.png)",
+                     ["red;background-image:url(https://evil.example/a.png)"], "var(--untrusted)", "not-a-color"]
+        sinks = [lambda color: {"tooltip": {"backgroundColor": color}},
+                 lambda color: {"series": [{"tooltip": {"borderColor": color}}]},
+                 lambda color: {"tooltip": {"shadowColor": color, "textStyle": {"color": color, "textShadowColor": color}}},
+                 lambda color: {"toolbox": {"feature": {"dataView": {"buttonColor": color, "buttonTextColor": color}}}}]
+        for sink in sinks:
+            for color, rejected in [(color, False) for color in legitimate] + [(color, True) for color in malicious]:
+                with self.subTest(payload=sink(color)):
+                    parser = parse('<script type="application/json" data-td-echarts-options>' +
+                                   json.dumps(sink(color)).replace("<", "\\u003c") + '</script>')
+                    self.assertEqual(bool(VALIDATOR.document_security_errors(parser, "index.html", BASE)), rejected)
+        for stop, rejected in [("#f00", False), ('red;"><img src=/missing onerror=evil()>', True)]:
+            parser = parse('<script type="application/json" data-td-echarts-options>' + json.dumps({
+                "tooltip": {"borderColor": {"type": "linear", "colorStops": [{"offset": 0, "color": stop}]}}}) + '</script>')
+            self.assertEqual(bool(VALIDATOR.document_security_errors(parser, "index.html", BASE)), rejected)
+
+    def test_echarts_marker_color_sources_accept_palettes_gradients_and_patterns(self) -> None:
+        gradient = {"type": "linear", "colorStops": [{"offset": 0, "color": "#f00"}, {"offset": 1, "color": "blue"}]}
+        pattern = {"image": "/local.png", "repeat": "repeat"}
+        safe_colors = ["#f00", "auto", "inherit", ["red", "#123456"], gradient, pattern]
+        bad_colors = ["red;background:url(https://evil.example/a.png)", "$fn:uncheckedColor",
+                      ["red", "blue;background:url(https://evil.example/a.png)"],
+                      {"type": "linear", "colorStops": [{"offset": 0, "color": "red;background:url(https://evil.example/a.png)"}]}]
+        sinks = [lambda color: {"color": color}, lambda color: {"colorLayer": [color]},
+                 lambda color: {"series": [{"color": color}]},
+                 lambda color: {"series": [{"itemStyle": {"color": color}}]},
+                 lambda color: {"series": [{"data": [{"value": 1, "itemStyle": {"color": color}}]}]},
+                 lambda color: {"series": [{"lineStyle": {"color": color}}]},
+                 lambda color: {"visualMap": {"inRange": {"color": color}, "outOfRange": {"color": color}}}]
+        for sink in sinks:
+            for color, rejected in [(color, False) for color in safe_colors] + [(color, True) for color in bad_colors]:
+                with self.subTest(option=sink(color)):
+                    parser = parse('<script type="application/json" data-td-echarts-options>' + json.dumps(sink(color)) + '</script>')
+                    errors = VALIDATOR.document_security_errors(parser, "index.html", BASE) + \
+                             VALIDATOR.document_url_shape_errors(parser, "index.html")
+                    self.assertEqual(bool(errors), rejected, errors)
+        # The same fields in a dataset row are data, without a model style.
+        parser = parse('<script type="application/json" data-td-echarts-options>' + json.dumps({
+            "dataset": {"source": [{"color": bad_colors[0], "itemStyle": {"color": bad_colors[0]}}]}}) + '</script>')
+        self.assertEqual(VALIDATOR.document_security_errors(parser, "index.html", BASE), [])
+
+    def test_echarts_tooltip_css_numbers_and_font_options_use_declared_types(self) -> None:
+        safe = {"shadowBlur": 4, "shadowOffsetX": -2, "shadowOffsetY": 0, "borderWidth": 1, "borderRadius": [4, 6],
+                "padding": [4, 8], "textStyle": {"fontSize": 14, "lineHeight": 20, "textShadowBlur": 2,
+                "textShadowOffsetX": 0, "textShadowOffsetY": 1, "fontFamily": "Arial, 'Noto Sans CJK SC', sans-serif",
+                "fontStyle": "italic", "fontWeight": 600, "decoration": "underline", "align": "left"}}
+        cases = [(safe, False)]
+        for key in ("shadowBlur", "shadowOffsetX", "shadowOffsetY", "borderWidth", "borderRadius", "padding"):
+            cases.append(({key: "1px;background:url(https://evil.example/a.png)"}, True))
+        for key in ("fontSize", "lineHeight", "textShadowBlur", "textShadowOffsetX", "textShadowOffsetY",
+                    "fontFamily", "fontStyle", "fontWeight", "decoration", "align"):
+            cases.append(({"textStyle": {key: "1px;background:url(https://evil.example/a.png)"}}, True))
+        cases.extend([({"shadowBlur": float("inf")}, True), ({"textStyle": {"fontSize": float("nan")}}, True),
+                      ({"textStyle": {"fontFamily": '"思源黑体", sans-serif', "fontWeight": "bold"}}, False),
+                      ({"textStyle": {"fontWeight": "600"}}, False), ({"shadowBlur": 10 ** 400}, True)])
+        for tooltip, rejected in cases:
+            with self.subTest(tooltip=tooltip):
+                parser = parse('<script type="application/json" data-td-echarts-options>' +
+                               json.dumps({"tooltip": tooltip}) + '</script>')
+                self.assertEqual(bool(VALIDATOR.document_security_errors(parser, "index.html", BASE)), rejected)
+
+    def test_echarts_array_symbols_and_pattern_images_are_active_resources(self) -> None:
+        shapes = [lambda image: {"series": [{"markLine": {"symbol": ["image://" + image, "none"]}}]},
+                  lambda image: {"visualMap": {"inRange": {"symbol": ["circle", "image://" + image]}}},
+                  lambda image: {"series": [{"itemStyle": {"color": {"image": image, "repeat": "repeat"}}}]},
+                  lambda image: {"graphic": {"style": {"fill": {"image": image}}}}]
+        for shape in shapes:
+            for image, rejected in [("https://evil.example/image.png", True), ("//evil.example/image.png", True),
+                                    ("/local.png", False), ("https://hugegraph-oink.staged.apache.org/local.png", False)]:
+                with self.subTest(payload=shape(image)):
+                    parser = parse('<script type="application/json" data-td-echarts-options>' + json.dumps(shape(image)) + '</script>')
+                    errors = VALIDATOR.document_security_errors(parser, "index.html", BASE) + \
+                             VALIDATOR.document_url_shape_errors(parser, "index.html")
+                    self.assertEqual(bool(errors), rejected, errors)
+
     @unittest.skipUnless(shutil.which("hugo"), "Hugo is required to render the pinned component fixture")
     def test_tagged_hugo_component_output_and_security_cli(self) -> None:
         repo = VALIDATOR_PATH.parents[1]
@@ -644,9 +747,34 @@ class SiteOutputSecurityTest(unittest.TestCase):
                     "toolbox": {"feature": {"dataView": {"lang": ['<img src="/ok.png" onerror="evil()">']}}},
                     "title": {"link": "javascript:evil()"},
                 }) + '\n```\n')
+            html_option = {"toolbox": {"feature": {"dataView": {"lang": ['<img src="/missing" onerror="evil()">']}}}}
+            native_counterexamples = [
+                ({"color": ["red;background:url(https://evil.example/palette.png)"]}, "invalid ECharts tooltip marker colour"),
+                ({"series": [{"itemStyle": {"color": "red;background:url(https://evil.example/itemstyle.png)"}}]},
+                 "invalid ECharts tooltip marker colour"),
+                ({"baseOption": html_option}, "onerror"),
+                ({"baseOption": {}, "options": [html_option]}, "onerror"),
+                ({"media": [{"query": {"maxWidth": 600}, "option": html_option}]}, "onerror"),
+                ({"tooltip": {"backgroundColor": 'red;"><img src=/missing onerror=evil()>'}}, "invalid ECharts CSS colour"),
+                ({"toolbox": {"feature": {"dataView": {"buttonColor": "red;background:url(https://evil.example/a.png)"}}}},
+                 "invalid ECharts CSS colour"),
+                ({"series": [{"markLine": {"symbol": ["image://https://evil.example/a.png", "none"]}}]}, "external active resource"),
+                ({"visualMap": {"inRange": {"symbol": ["circle", "image://https://evil.example/a.png"]}}}, "external active resource"),
+                ({"series": [{"itemStyle": {"color": {"image": "https://evil.example/a.png"}}}]}, "external active resource"),
+            ]
+            for index, (option, _) in enumerate(native_counterexamples):
+                (root / f"content/unsafe-{index}.md").write_text(
+                    '---\ntitle: Unsafe fixture\n---\n```echarts\n' + json.dumps(option) + '\n```\n')
             result = subprocess.run([shutil.which("hugo"), "--source", str(root), "--destination", str(root / "public")],
                                     text=True, capture_output=True)
             self.assertEqual(result.returncode, 0, result.stdout + result.stderr)
+            for index, (_, message) in enumerate(native_counterexamples):
+                with self.subTest(native_counterexample=index):
+                    shutil.copyfile(root / f"public/unsafe-{index}/index.html", artifact / "index.html")
+                    result = subprocess.run([sys.executable, str(VALIDATOR_PATH), str(artifact), BASE.geturl(), "--security-only"],
+                                            text=True, capture_output=True)
+                    self.assertNotEqual(result.returncode, 0, result.stdout + result.stderr)
+                    self.assertIn(message, result.stdout)
             shutil.copyfile(root / "public/fixture/index.html", artifact / "index.html")
             result = subprocess.run([sys.executable, str(VALIDATOR_PATH), str(artifact), BASE.geturl(), "--security-only"],
                                     text=True, capture_output=True)

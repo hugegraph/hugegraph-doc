@@ -189,6 +189,12 @@ be writable; failure leaves the original `go.mod` and `go.sum` unchanged.
 The baseline advances only after manual compatibility review and the full
 automated verification pass.
 
+The output validator checks ECharts option roots, active resource paths and
+HTML/CSS sinks. Ordinary dataset columns remain data. Checked colour sources
+accept literal colours, palettes, gradients and same-origin image patterns;
+`$fn:` colour callbacks are unsupported because their returned colours cannot
+be checked statically. Add a reviewed runtime output contract before using them.
+
 ## Rollback
 
 Keep the upgrade in a dedicated commit. To undo an already committed upgrade,
