@@ -58,7 +58,15 @@ for (const [name, url, viewport, theme, state] of states) {
         for (const image of await component.locator("img").all()) {
           await expect.poll(() => image.evaluate(node => node.complete && node.naturalWidth > 0)).toBe(true);
         }
-      } else if (state === "chart") await expect(component.locator("canvas")).toBeVisible();
+      } else if (state === "chart") {
+        await expect(component.locator("canvas")).toBeVisible();
+        // Canvas creation precedes ECharts' initial bar animation. Wait for
+        // the actual renderer to finish so the capture shows final data heights.
+        await expect.poll(() => component.evaluate(node => {
+          const chart = window.echarts.getInstanceByDom(node);
+          return Boolean(chart && chart.getZr().animation.isFinished());
+        })).toBe(true);
+      }
       else if (state === "terminal") {
         await component.locator(".ap-overlay-start .ap-play-button").click();
         await expect(component).toContainText("github.com/pgsty/oink@v1.2.0", { timeout: 15000 });
