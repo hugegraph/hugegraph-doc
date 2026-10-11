@@ -306,14 +306,22 @@ Previously, all three entrypoints ended with `tail -f /dev/null`, keeping contai
 Entrypoints now monitor Java directly:
 
 - **PD and Store**: The entrypoint passes `-d false` to the startup script, which replaces itself with Java using `exec`. When Java exits, the container exits immediately and Docker's restart policy applies.
-- **Server**: The entrypoint waits with `tail --pid=$PID -f /dev/null`. `SIGTERM`/`SIGINT` traps forward Docker stop signals to Java and wait for graceful shutdown (exit 0). If Java crashes, the entrypoint exits with code 1, triggering the restart policy.
+- **Server**: The entrypoint owns the foreground launcher and waits for Java. After readiness, it preserves Java's exit status,
+  including `0`, `42`, and `137` for `SIGKILL`. `SIGTERM` and `SIGINT` request cooperative shutdown, reap owned readiness/partition checks,
+  and return `143` and `130` respectively after shutdown.
 - PID 1 in every image is `dumb-init`, which forwards Docker signals to the entrypoint.
 
 ### Server Startup Timeout
 
-`HG_SERVER_STARTUP_TIMEOUT_S` controls how long the Server startup script waits for a REST response; the default is **120 seconds**. Values must be decimal integers without leading zeros, from **1 to 86400 seconds**. Empty strings, `0`, negative numbers, fractions, and out-of-range values log an error and exit with code `1`.
+`HG_SERVER_STARTUP_TIMEOUT_S` sets the Docker entrypoint's REST readiness deadline; the default is **120 seconds**.
+Values must be decimal integers without leading zeros, from **1 to 86400 seconds**.
+Empty strings, `0`, negative numbers, fractions, and out-of-range values log an error and exit with code `1`.
 
-The entrypoint passes this value to `bin/start-hugegraph.sh -t`. If Server does not become ready within the deadline or exits early, startup fails and the container exits with code `1`; its restart policy may restart it. This duration excludes earlier storage initialization and backend readiness waits.
+The entrypoint also passes this value to `bin/start-hugegraph.sh -t`; the foreground launcher itself waits for Java, without polling REST.
+A startup deadline failure or Java exiting with `0` before readiness returns `1`;
+an early nonzero Java exit keeps its status. The deadline excludes earlier storage initialization and backend readiness waits.
+Readiness and partition checks remain interruptible during shutdown. A deadline failure requests termination and returns without an indefinite wait;
+an unresponsive Java process relies on container termination for final cleanup.
 
 For example, from the HugeGraph repository's `docker/` directory, extend the standalone Server wait to 300 seconds (Compose passes this variable to the container):
 

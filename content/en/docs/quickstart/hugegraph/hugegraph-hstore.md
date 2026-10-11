@@ -22,8 +22,8 @@ Each Store node keeps graph data in RocksDB and replicates it with Raft (JRaft):
 #### 2.1 Requirements
 
 - Operating System: Linux or macOS (Windows has not been fully tested)
-- Java version: ≥ 11 (enforced by the build and re-checked by `bin/start-hugegraph-store.sh`)
-- Maven version: ≥ 3.5.0
+- Java version: ≥ 17 (enforced by the build and re-checked by `bin/start-hugegraph-store.sh`)
+- Maven version: ≥ 3.6.3
 - Deploy HugeGraph-PD first for multi-node deployment
 
 ### 3 Deployment
@@ -291,7 +291,7 @@ The script accepts four flags:
 | Flag | Values | Default | Description |
 |------|--------|---------|-------------|
 | `-d` | `true`, `false` | `true` | Daemon mode. See below. |
-| `-g` | `ZGC`, `zgc` | not set | Garbage collector. Omit the flag for G1, which is the default. Any value other than `ZGC` or `zgc` aborts the start, including `g1`, even though the script's own usage line suggests it. |
+| `-g` | `g1`, `G1`, `zgc`, `ZGC` | not set | Unset preserves caller/JVM GC; supplied values select G1 or ZGC (Java 17+). |
 | `-j` | JVM options string | empty | Extra JVM options, for example `-j "-Xmx16g -Xms8g"`. |
 | `-y` | `true`, `false` | `false` | Attach the OpenTelemetry Java agent, downloading it into `plugins/` on first use, and export traces to `127.0.0.1:4317`. |
 
@@ -303,6 +303,9 @@ Daemon mode:
 JVM memory, unless you set `JAVA_OPTIONS` yourself: `-Xms512m`, and `-Xmx` set to half the free memory, clamped to the 512 MB to 2048 MB range. The script also adds `-XX:MetaspaceSize=256M`, a heap dump on out-of-memory into `logs/`, and a rolling GC log at `logs/gc.log`. Production nodes normally need a much larger heap, so pass one explicitly, for example `-j "-Xmx32g -Xms32g"`.
 
 The script refuses to start if `ulimit -n` or `ulimit -u` is below 1024, and it preloads jemalloc on x86_64 and arm64 when the shared object can be downloaded and verified.
+
+Each optional jemalloc download allows 5 seconds to connect and 30 seconds in total. A timeout or failed verification follows the existing fallback:
+startup continues without preloading the downloaded library. Verified cached libraries can still be reused; partial downloads are removed.
 
 After successful startup, you can see logs similar to the following in `logs/hugegraph-store-server.log`:
 

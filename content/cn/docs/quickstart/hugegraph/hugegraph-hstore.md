@@ -22,8 +22,8 @@ HugeGraph-Store 是 HugeGraph 分布式版本的存储节点组件，负责实�
 #### 2.1 前置条件
 
 - 操作系统：Linux 或 macOS（Windows 尚未经过完整测试）
-- Java 版本：≥ 11（编译期强制校验，`bin/start-hugegraph-store.sh` 启动时会再次检查）
-- Maven 版本：≥ 3.5.0
+- Java 版本：≥ 17（编译期强制校验，`bin/start-hugegraph-store.sh` 启动时会再次检查）
+- Maven 版本：≥ 3.6.3
 - 如需进行多节点部署，请先部署 HugeGraph-PD
 
 ### 3 部署
@@ -290,7 +290,7 @@ Store 从 `conf/` 读取两个配置文件。1.7.0 发布标签的源文件见 [
 | 参数 | 取值 | 默认值 | 说明 |
 |------|------|--------|------|
 | `-d` | `true`、`false` | `true` | 守护进程模式，见下文。 |
-| `-g` | `ZGC`、`zgc` | 未设置 | 垃圾回收器。不传该参数即使用默认的 G1。除 `ZGC` 和 `zgc` 之外的任何取值都会直接退出，包括 `g1`，尽管脚本自身的用法提示里写了它。 |
+| `-g` | `g1`、`G1`、`zgc`、`ZGC` | 未设置 | 未传参数时保留 JVM/调用方的 GC 选择；传入参数时显式选择 G1 或 ZGC，后者需要 Java 17+。 |
 | `-j` | JVM 参数字符串 | 空 | 附加的 JVM 参数，例如 `-j "-Xmx16g -Xms8g"`。 |
 | `-y` | `true`、`false` | `false` | 挂载 OpenTelemetry Java agent（首次使用时下载到 `plugins/`），并将 trace 导出到 `127.0.0.1:4317`。 |
 
@@ -302,6 +302,9 @@ Store 从 `conf/` 读取两个配置文件。1.7.0 发布标签的源文件见 [
 JVM 内存方面，如果没有自行设置 `JAVA_OPTIONS`：`-Xms512m`，`-Xmx` 取空闲内存的一半并限制在 512 MB 到 2048 MB 之间。脚本还会加上 `-XX:MetaspaceSize=256M`、OOM 时把堆转储写入 `logs/`，以及滚动的 GC 日志 `logs/gc.log`。生产节点通常需要大得多的堆，请显式指定，例如 `-j "-Xmx32g -Xms32g"`。
 
 当 `ulimit -n` 或 `ulimit -u` 低于 1024 时脚本会拒绝启动；在 x86_64 和 arm64 上，如果能成功下载并校验对应的动态库，脚本会预加载 jemalloc。
+
+每次可选 jemalloc 下载的连接时限为 5 秒，总时限为 30 秒。超时或校验失败时沿用已有回退路径，不预加载下载库并继续启动。
+校验有效的缓存库仍可复用，失败下载的临时文件会被清理。
 
 启动成功后，可以在 `logs/hugegraph-store-server.log` 中看到类似以下的日志：
 
