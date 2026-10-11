@@ -167,7 +167,7 @@ TEXT 是自定义分隔符的文本文件，第一行通常是标题，记录了
 
 示例如下：
 
-```
+```text
 id|name|lang|price|ISBN
 1|lop|java|328|ISBN978-7-107-18618-5
 2|ripple|java|199|ISBN978-7-100-13678-5
@@ -175,7 +175,7 @@ id|name|lang|price|ISBN
 
 CSV 是分隔符为逗号`,`的 TEXT 文件，当列值本身包含逗号时，该列值需要用双引号包起来，如：
 
-```
+```text
 marko,29,Beijing
 "li,nary",26,"Wu,han"
 ```
@@ -201,17 +201,17 @@ loader 还支持以部分关系型数据库作为数据源，目前支持 MySQL�
 
 举个例子：假设有三张表，person、software 和 created
 
-```
+```text
 // person 表结构
 id | name | age | city 
 ```
 
-```
+```text
 // software 表结构
 id | name | lang | price
 ```
 
-```
+```text
 // created 表结构
 id | p_id | s_id | date
 ```
@@ -1254,7 +1254,7 @@ sh bin/hugegraph-spark-loader.sh --master yarn \
 
 `bin/get-params.sh` 负责拆分命令行：只有下列参数会交给 loader，其余参数原样传给 `spark-submit`。该拆分只识别参数全称，因此 `-f`、`-g` 这类缩写不会被识别。
 
-```
+```text
 --graph --schema --host --port --username --token --protocol
 --trust-store-file --trust-store-password --clear-all-data --clear-timeout
 --incremental-mode --failure-mode --batch-insert-threads --single-insert-threads

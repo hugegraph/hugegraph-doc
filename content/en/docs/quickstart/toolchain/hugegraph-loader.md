@@ -164,7 +164,7 @@ TEXT is a text file with custom delimiters, the first line is usually the header
 
 An example is as follows:
 
-```
+```text
 id|name|lang|price|ISBN
 1|lop|java|328|ISBN978-7-107-18618-5
 2|ripple|java|199|ISBN978-7-100-13678-5
@@ -172,7 +172,7 @@ id|name|lang|price|ISBN
 
 CSV is a TEXT file with commas `,` as delimiters. When a column value itself contains a comma, the column value needs to be enclosed in double quotes, for example:
 
-```
+```text
 marko,29,Beijing
 "li,nary",26,"Wu,han"
 ```
@@ -198,17 +198,17 @@ However, the requirements for the table structure are relatively strict at prese
 
 For example, Suppose there are three tables, person, software and created
 
-```
+```text
 // person schema
 id | name | age | city
 ```
 
-```
+```text
 // software schema
 id | name | lang | price
 ```
 
-```
+```text
 // created schema
 id | p_id | s_id | date
 ```
@@ -1256,7 +1256,7 @@ sh bin/hugegraph-spark-loader.sh --master yarn \
 
 `bin/get-params.sh` splits the command line: only the options below are handed to the loader, every other argument is passed to `spark-submit` unchanged. The splitter matches long option names only, so short forms such as `-f` and `-g` are not recognised.
 
-```
+```text
 --graph --schema --host --port --username --token --protocol
 --trust-store-file --trust-store-password --clear-all-data --clear-timeout
 --incremental-mode --failure-mode --batch-insert-threads --single-insert-threads
