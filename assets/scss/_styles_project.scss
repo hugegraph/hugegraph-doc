@@ -917,3 +917,13 @@
     .btn { font-size: inherit; }
   }
 }
+.hg-toolchain-recording {
+  width: 100%;
+  max-width: 36rem;
+}
+
+// The bundled Markmap runtime defaults to #333 even in the site's dark mode.
+// Use its public text token on both the container and generated SVG.
+.td-content .markmap {
+  --markmap-text-color: var(--bs-body-color);
+}

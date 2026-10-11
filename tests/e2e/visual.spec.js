@@ -31,6 +31,9 @@ const states = [
       [`${language}-selected-hubble-gallery`, `${prefix}/docs/quickstart/toolchain/hugegraph-hubble/`, { width: 1440, height: 1000 }, "light", "gallery"],
       [`${language}-selected-historical-chart`, `${prefix}/docs/performance/hugegraph-benchmark-0.5.6/`, { width: 1440, height: 1000 }, "light", "chart"],
       [`${language}-selected-code-mobile`, `${prefix}/docs/quickstart/hugegraph/hugegraph-server/`, { width: 390, height: 844 }, "light", "longcode"],
+      [`${language}-selected-map-narrow-mobile`, `${prefix}/docs/quickstart/hugegraph/hugegraph-server/`, { width: 320, height: 844 }, "light", "markmap"],
+      [`${language}-selected-map-narrow-mobile-dark`, `${prefix}/docs/quickstart/hugegraph/hugegraph-server/`, { width: 320, height: 844 }, "dark", "markmap"],
+      [`${language}-selected-map-mobile-dark`, `${prefix}/docs/quickstart/hugegraph/hugegraph-server/`, { width: 390, height: 844 }, "dark", "markmap"],
       [`${language}-selected-map-mobile`, `${prefix}/docs/quickstart/hugegraph/hugegraph-server/`, { width: 390, height: 844 }, "light", "markmap"],
       [`${language}-selected-terminal-mobile`, `${prefix}/community/documentation/`, { width: 390, height: 844 }, "light", "terminal"],
       [`${language}-selected-jaccard-math`, `${prefix}/docs/clients/restful-api/traverser/`, { width: 1440, height: 1000 }, "light", "math"]
@@ -52,6 +55,11 @@ for (const [name, url, viewport, theme, state] of states) {
         longcode: "[data-td-collapse-lines]", markmap: ".markmap svg",
         terminal: "[data-td-asciinema]", math: ".katex-display" }[state];
       const component = page.locator(selector).first();
+      if (state === "terminal") {
+        const optionalDemo = page.locator("details").filter({ has: component });
+        await expect(optionalDemo).not.toHaveAttribute("open", "");
+        await optionalDemo.locator(":scope > summary").click();
+      }
       await component.scrollIntoViewIfNeeded();
       await expect(component).toBeVisible();
       if (state === "gallery") {
@@ -66,6 +74,16 @@ for (const [name, url, viewport, theme, state] of states) {
           const chart = window.echarts.getInstanceByDom(node);
           return Boolean(chart && chart.getZr().animation.isFinished());
         })).toBe(true);
+      }
+      else if (state === "markmap") {
+        // Ensure the fit animation has settled into legible labels before capture.
+        await expect.poll(() => component.locator("foreignObject").evaluateAll(nodes => nodes.every(node => {
+          const matrix = node.getScreenCTM();
+          const text = node.querySelector("div");
+          const bounds = node.getBoundingClientRect();
+          return parseFloat(getComputedStyle(text).fontSize) * Math.hypot(matrix.a, matrix.b) >= 12 &&
+            bounds.left >= 0 && bounds.right <= innerWidth;
+        }))).toBe(true);
       }
       else if (state === "terminal") {
         await component.locator(".ap-overlay-start .ap-play-button").click();

@@ -428,23 +428,69 @@ for (const language of ['en', 'cn']) {
 
   test(`${language} Server map folds nodes while steps and outdated status retain real context`, async ({ page }) => {
     await page.goto(serverPath);
-    const map = page.locator('.markmap');
+    const map = page.locator('div.markmap');
     await expect(map.locator('svg')).toBeVisible();
     const nodes = map.locator('.markmap-node');
     await expect.poll(() => nodes.count()).toBeGreaterThan(3);
-    const branch = nodes.filter({ hasText: /^hugegraph-server$/ }).locator('circle');
+    const branch = nodes.filter({ hasText: /^server$/ }).locator('circle');
     const before = await nodes.count();
     await branch.click();
     await expect.poll(() => nodes.count()).toBeLessThan(before);
     await branch.click();
     await expect.poll(() => nodes.count()).toBe(before);
-    await expect(page.locator('.td-content ol.steps > li')).toHaveCount(5);
+    const steps = page.locator('.td-content ol.steps > li');
+    await expect(steps).toHaveCount(5);
+    await expect(steps.nth(1).locator('a')).toHaveAttribute('href', /#33-/);
+    await expect(steps.nth(1)).toContainText('master');
+    await expect(steps.nth(1)).not.toContainText(language === 'cn' ? '发布包' : 'release archive');
     const outdated = page.locator('details').filter({ hasText: language === 'cn' ? '过时的 tools' : 'Outdated tools' }).filter({ has: page.locator('.td-badge') });
     await outdated.locator(':scope > summary').click();
     await expect(outdated.locator('.td-badge')).toBeVisible();
     await expect(outdated).toContainText(language === 'cn' ? '一键' : 'one-click');
     await expect(page.locator('.td-content .td-callout').first()).toBeVisible();
   });
+
+  for (const colorTheme of ['light', 'dark']) {
+    for (const width of [320, 390]) {
+      test(`${language} Server map remains readable after fitting to ${width}px in ${colorTheme} mode`, async ({ page }) => {
+        await page.setViewportSize({ width, height: 844 });
+        await page.addInitScript(value => localStorage.setItem('td-color-theme', value), colorTheme);
+        await page.goto(serverPath);
+        await expect(page.locator('html')).toHaveAttribute('data-bs-theme', colorTheme);
+        const map = page.locator('div.markmap');
+        await map.scrollIntoViewIfNeeded();
+        await expect(map.locator('.markmap-node')).toHaveCount(7);
+        // Markmap scales the SVG group, so computed font-size alone can report
+        // 16px while the labels actually render at only 4px on a narrow screen.
+        await expect.poll(() => map.locator('foreignObject').evaluateAll(nodes => {
+          const labels = nodes.map(node => {
+            const text = node.querySelector('div');
+            const transform = node.getScreenCTM();
+            const { left, right } = node.getBoundingClientRect();
+            return { left, right,
+              font: parseFloat(getComputedStyle(text).fontSize) * Math.hypot(transform.a, transform.b) };
+          });
+          return labels.every(label => label.font >= 12 && label.left >= 0 && label.right <= innerWidth);
+        })).toBe(true);
+        const colors = await map.locator('.markmap-foreign div').first().evaluate(node => {
+          const rgb = color => color.match(/[\d.]+/g).slice(0, 3).map(Number);
+          let ancestor = node;
+          while (ancestor && !/^rgb\(/.test(getComputedStyle(ancestor).backgroundColor)) ancestor = ancestor.parentElement;
+          const foreground = getComputedStyle(node).color;
+          const background = getComputedStyle(ancestor || document.body).backgroundColor;
+          const luminance = color => rgb(color).map(value => {
+            const channel = value / 255;
+            return channel <= 0.04045 ? channel / 12.92 : ((channel + 0.055) / 1.055) ** 2.4;
+          }).reduce((sum, channel, i) => sum + channel * [0.2126, 0.7152, 0.0722][i], 0);
+          const light = luminance(foreground), dark = luminance(background);
+          return { foreground, bodyText: getComputedStyle(document.body).color, background,
+            contrast: (Math.max(light, dark) + 0.05) / (Math.min(light, dark) + 0.05) };
+        });
+        expect(colors.foreground).toBe(colors.bodyText);
+        expect(colors.contrast).toBeGreaterThanOrEqual(4.5);
+      });
+    }
+  }
 
   test(`${language} long Server script initially shows nine source lines and copies its complete hidden tail`, async ({ page, context }) => {
     await context.grantPermissions(['clipboard-read', 'clipboard-write']);
@@ -492,13 +538,25 @@ for (const language of ['en', 'cn']) {
   });
 
   test(`${language} local terminal recording plays the actual Hugo and OINK verification output`, async ({ page }) => {
+    await page.setViewportSize({ width: 390, height: 844 });
+    const playbackRequests = [];
+    page.on('request', request => {
+      if (new URL(request.url()).pathname === '/casts/oink-upgrade-check.cast') playbackRequests.push(request.url());
+    });
     await page.goto(`${prefix}/community/documentation/`);
     const player = page.locator('[data-td-asciinema]');
+    const optionalDemo = page.locator('details').filter({ has: player });
+    await expect(optionalDemo).not.toHaveAttribute('open', '');
+    await expect(page.locator('[data-td-code]').filter({ hasText: 'hugo mod graph' })).toBeVisible();
+    expect(playbackRequests).toHaveLength(0);
+    await optionalDemo.locator(':scope > summary').click();
     await player.scrollIntoViewIfNeeded();
     await expect(player.locator('.ap-overlay-start .ap-play-button')).toBeVisible();
     await player.locator('.ap-overlay-start .ap-play-button').click();
     await expect(player).toContainText('hugo v0.165.0', { timeout: 15000 });
     await expect(player).toContainText('github.com/pgsty/oink@v1.2.0', { timeout: 15000 });
+    await expect.poll(() => player.locator('.ap-term-text .ap-line span').first()
+      .evaluate(node => node.getBoundingClientRect().height)).toBeGreaterThanOrEqual(11);
   });
 
   test(`${language} selected components fit a narrow screen and retain native output fallbacks`, async ({ page, request }) => {

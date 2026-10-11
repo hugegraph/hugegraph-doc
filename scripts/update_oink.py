@@ -18,7 +18,7 @@ import subprocess
 import sys
 import tempfile
 
-from oink_module import MODULE, VERSION, command, download_locked, locked_version
+from oink_module import MODULE, SITE_MODULE, VERSION, command, download_locked, locked_version
 
 ROOT = Path(__file__).resolve().parents[1]
 BASELINE = ROOT / "scripts/oink-overrides.json"
@@ -39,6 +39,7 @@ def release_environment():
     """Release checks must use the published module, never a local preview."""
     env = dict(os.environ)
     env.pop("HUGO_MODULE_REPLACEMENTS", None)
+    env.pop("HUGO_THEME", None)
     env.update(GOWORK="off", HUGO_MODULE_WORKSPACE="off")
     # Version assembly changes cwd; relative HUGO_BIN paths would stop working.
     hugo = env.get("HUGO_BIN")
@@ -68,12 +69,16 @@ def verify_hugo_graph(root, version):
     graph = subprocess.check_output([env.get("HUGO_BIN", "hugo"), "mod", "graph"],
                                     cwd=root, env=env, text=True)
     expected = MODULE + "@" + version
-    matches = [line.split() for line in graph.splitlines()
-               if any(token == MODULE or token.startswith(MODULE + "@") for token in line.split())]
-    nodes = [token for tokens in matches for token in tokens
+    edges = [line.split() for line in graph.splitlines() if line.strip()]
+    root_imports = [tokens[1] for tokens in edges if len(tokens) == 2 and tokens[0] == SITE_MODULE]
+    nodes = [token for tokens in edges for token in tokens
              if token == MODULE or token.startswith(MODULE + "@")]
-    if not nodes or any(node != expected for node in nodes) or any(len(tokens) != 2 for tokens in matches):
-        raise ValueError(f"expected Hugo to use published {MODULE}@{version}; actual graph: {graph}")
+    # Check every root import: an additional local theme can supply unpublished
+    # templates even when the pinned OINK edge itself is correct. Dependencies
+    # imported by OINK (and their transitive edges) remain valid.
+    if (root_imports != [expected] or not nodes or any(node != expected for node in nodes)
+            or any(len(tokens) != 2 for tokens in edges)):
+        raise ValueError(f"expected Hugo root {SITE_MODULE} to import only published {MODULE}@{version}; actual graph: {graph}")
     return graph
 
 

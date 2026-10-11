@@ -163,6 +163,7 @@ RUNTIME_ACTIVE_URL_ATTRIBUTES = {
     "data-td-action-url",
 }
 RUNTIME_IMAGE_URL_ATTRIBUTES = {"data-td-image-zoom"}
+OINK_CONFIG_MARKERS = {"data-td-diagram-source", "data-td-echarts-options", "data-td-asciinema-config"}
 
 
 def is_inert_oink_component_source(tag: str, values: dict[str, str]) -> bool:
@@ -173,7 +174,7 @@ def is_inert_oink_component_source(tag: str, values: dict[str, str]) -> bool:
     # These templates emit only type and one empty marker. Extra attributes
     # (including class, src and handlers) are not part of the trusted shape.
     return any(set(values) == {"type", marker} and values[marker] == ""
-               for marker in ("data-td-diagram-source", "data-td-echarts-options", "data-td-asciinema-config"))
+               for marker in OINK_CONFIG_MARKERS)
 
 
 def srcset_urls(value: str) -> list[str]:
@@ -715,6 +716,10 @@ class DocumentParser(html.parser.HTMLParser):
                     "unexpected authored-content end marker"
                 )
             self._in_content_marker = False
+        # Runtime configOf() queries the marker on any element, not just a
+        # script. Reject every non-template carrier even outside article/main.
+        if OINK_CONFIG_MARKERS.intersection(values) and not is_inert_oink_component_source(tag, values):
+            self.authored_violations.append(f"noncanonical OINK component configuration on <{tag}>")
         if tag == "nav" and "TableOfContents" in [
             value or "" for key, value in attrs if key.lower() == "id"
         ]:
@@ -974,8 +979,10 @@ class DocumentParser(html.parser.HTMLParser):
                     # recording timestamp; it does not load an image/URL.
                     valid = isinstance(value, str) and value.startswith(("npt:", "data:text/plain,"))
                 elif key == "markers":
-                    valid = isinstance(value, list) and all(isinstance(item, list) and len(item) == 2 and
-                            type(item[0]) in {int, float} and item[0] >= 0 and isinstance(item[1], str) for item in value)
+                    # Hugo append flattens the shortcode's [time, label] slices.
+                    valid = (isinstance(value, list) and len(value) % 2 == 0 and
+                             all(type(value[index]) in {int, float} and value[index] >= 0 and
+                                 isinstance(value[index + 1], str) for index in range(0, len(value), 2)))
                 if not valid:
                     self.authored_violations.append(f"invalid Asciinema shortcode option: {key}")
             source = payload.get("src")
@@ -985,37 +992,75 @@ class DocumentParser(html.parser.HTMLParser):
                 self.resources.append(("asciinema-config", "src", source))
                 self.urls.append(("src", source))
             return
-        # ECharts directly loads image:// symbols/icons and image URLs in
-        # graphic styles/rich-text backgrounds. Formatter strings can become
-        # HTML inside its default tooltip renderer and need the authored rules.
-        pending = [("", payload)]
+        # Match ECharts 6.1 sinks by option path. Arbitrary dataset columns
+        # (including names such as url/image/formatter) remain inert data.
+        pending = [((), payload)]
         while pending:
-            key, value = pending.pop()
+            path, value = pending.pop()
+            if path[:1] == ("dataset",) and "source" in path:
+                continue
+            option_path = tuple(part for part in path if part != "[]")
+            navigation_sink = ((option_path[:1] == ("title",) and option_path[-1:] in {("link",), ("sublink",)}) or
+                               (option_path[:1] == ("series",) and "data" in path and option_path[-1:] == ("link",)))
+            string_sink = navigation_sink or option_path[-2:] in {
+                ("tooltip", "formatter"), ("tooltip", "extraCssText"),
+            } or option_path == ("toolbox", "feature", "dataView", "title")
+            if option_path == ("toolbox", "feature", "saveAsImage", "lang"):
+                # Its legacy fallback interpolates lang into an HTML attribute.
+                self.authored_violations.append("custom ECharts saveAsImage.lang is unsupported")
+                continue
+            if option_path == ("toolbox", "feature", "dataView", "lang") and "[]" not in path[-1:]:
+                if not isinstance(value, list) or not all(isinstance(label, str) for label in value):
+                    self.authored_violations.append("ECharts dataView.lang requires a list of strings")
+                    continue
+            # Browser DOM APIs coerce arrays/objects to strings. Do not let an
+            # alternate JSON type bypass checks at a known string-valued sink.
+            if string_sink and not isinstance(value, str):
+                self.authored_violations.append("ECharts string option requires a string: " + ".".join(option_path))
+                continue
             if isinstance(value, dict):
-                pending.extend(value.items())
+                pending.extend((path + (key,), child) for key, child in value.items())
             elif isinstance(value, list):
-                pending.extend((key, item) for item in value)
+                pending.extend((path + ("[]",), child) for child in value)
             elif isinstance(value, str):
-                resource = value[len("image://"):] if value.startswith("image://") else value if key in {"image", "src", "url", "href"} else None
+                key = path[-1]
+                resource = None
+                if key in {"symbol", "icon"} and value.startswith("image://"):
+                    resource = value[len("image://"):]
+                elif key == "image" and ("graphic" in path or "backgroundColor" in path):
+                    resource = value
                 if resource:
                     self.resources.append(("echarts-options", "resource", resource))
                     self.urls.append(("src", resource))
-                if key == "formatter":
-                    if "data-hg-authored-content" in value.lower():
-                        self.authored_violations.append("ECharts formatter cannot contain authored-content markers")
-                    fragment = DocumentParser()
-                    fragment.feed('<template data-hg-authored-content="start"></template>' + value +
-                                  '<template data-hg-authored-content="end"></template>')
-                    self.authored_violations.extend(fragment.authored_violations)
-                    if fragment._content_markers[0] != fragment._content_markers[1]:
-                        self.authored_violations.append("unbalanced ECharts formatter content markers")
-                    self.resources.extend(fragment.resources)
-                    self.urls.extend(fragment.urls)
-                    self.navigation_urls.extend(fragment.navigation_urls)
-                    self.resources.extend(("echarts-options", "resource", resource) for _, _, resource in fragment.image_urls)
-                    self.image_urls.extend(fragment.image_urls)
-                    self.inline_css_sources.extend(fragment.inline_css_sources)
-                    self.inline_css_http_resources.extend(fragment.inline_css_http_resources)
+                if navigation_sink:
+                    self.navigation_urls.append(("a", "href", value))
+                    self.urls.append(("href", value))
+                if option_path[-2:] == ("tooltip", "extraCssText"):
+                    self.inline_css_sources.append(value)
+                    self.inline_css_http_resources.extend(css_http_resources(value))
+                html_sink = option_path[-2:] == ("tooltip", "formatter") or option_path in {
+                    ("toolbox", "feature", "dataView", "lang"),
+                    ("toolbox", "feature", "dataView", "title"),
+                }
+                if html_sink:
+                    self._check_component_html(value)
+
+    def _check_component_html(self, value: str) -> None:
+        if "data-hg-authored-content" in value.lower():
+            self.authored_violations.append("ECharts HTML cannot contain authored-content markers")
+        fragment = DocumentParser()
+        fragment.feed('<template data-hg-authored-content="start"></template>' + value +
+                      '<template data-hg-authored-content="end"></template>')
+        self.authored_violations.extend(fragment.authored_violations)
+        if fragment._content_markers[0] != fragment._content_markers[1]:
+            self.authored_violations.append("unbalanced ECharts HTML content markers")
+        self.resources.extend(fragment.resources)
+        self.urls.extend(fragment.urls)
+        self.navigation_urls.extend(fragment.navigation_urls)
+        self.resources.extend(("echarts-options", "resource", resource) for _, _, resource in fragment.image_urls)
+        self.image_urls.extend(fragment.image_urls)
+        self.inline_css_sources.extend(fragment.inline_css_sources)
+        self.inline_css_http_resources.extend(fragment.inline_css_http_resources)
 
 
 def output_path(root: pathlib.Path, url_path: str) -> pathlib.Path:

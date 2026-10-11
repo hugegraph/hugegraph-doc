@@ -10,6 +10,7 @@ from __future__ import annotations
 import importlib.util
 import json
 import pathlib
+import shutil
 import subprocess
 import sys
 import tempfile
@@ -557,6 +558,107 @@ class SiteOutputSecurityTest(unittest.TestCase):
                            json.dumps(payload) + "</script></article>")
             self.assertEqual(VALIDATOR.document_security_errors(parser, "index.html", BASE), [])
 
+    def test_reserved_component_markers_require_exact_carrier_on_every_element(self) -> None:
+        for marker in VALIDATOR.OINK_CONFIG_MARKERS:
+            for tag in ("pre", "div", "template", "span"):
+                for attributes in (marker, f'{marker}="true"', f'{marker} data-extra="true"'):
+                    with self.subTest(marker=marker, tag=tag, attributes=attributes):
+                        parser = parse(f'<{tag} {attributes}>{{"src":"https://evil.example/cast"}}</{tag}>')
+                        self.assertTrue(VALIDATOR.document_security_errors(parser, "index.html", BASE))
+
+    def test_echarts_runtime_sink_paths_and_inert_dataset_columns(self) -> None:
+        unsafe = [
+            {"tooltip": {"extraCssText": "background:url(https://evil.example/a.png)"}},
+            {"series": [{"tooltip": {"extraCssText": "background:url(//evil.example/a.png)"}}]},
+            {"tooltip": {"extraCssText": "background:url(javascript:evil())"}},
+            {"toolbox": {"feature": {"dataView": {"lang": ['<img src="/ok.png" onerror="evil()">', "Close", "Refresh"]}}}},
+            {"toolbox": {"feature": {"dataView": {"title": '<img src="https://evil.example/a.png">'}}}},
+            {"toolbox": {"feature": {"dataView": {"lang": {"0": '<img src="/ok.png" onerror="evil()">'}}}}},
+            {"title": [{"link": "javascript:evil()", "target": "self"}]},
+            {"title": {"sublink": "data:text/html,evil"}},
+            {"title": {"link": ["javascript:evil()"]}},
+            {"tooltip": {"extraCssText": ["background:url(https://evil.example/a.png)"]}},
+            {"series": [{"type": "treemap", "data": [{"link": "javascript:evil()"}]}]},
+            {"toolbox": {"feature": {"saveAsImage": {"lang": ['" onerror="evil()']}}}},
+        ]
+        safe = [
+            {"dataset": {"source": [{"url": "https://external.example/data", "image": "https://external.example/a.png",
+                                     "formatter": '<img src="/ok.png" onerror="evil()">', "value": 42}]}},
+            {"title": {"link": "https://example.org/docs", "sublink": "/docs/"}},
+            {"tooltip": {"extraCssText": "background:url(/local.png);padding:4px"}},
+            {"toolbox": {"feature": {"dataView": {"lang": ["<b>Values</b>", "Close", "Refresh"]}}}},
+        ]
+        for payload, rejected in [(payload, True) for payload in unsafe] + [(payload, False) for payload in safe]:
+            with self.subTest(payload=payload):
+                parser = parse('<article><script type="application/json" data-td-echarts-options>' +
+                               json.dumps(payload).replace("<", "\\u003c") + '</script></article>')
+                errors = VALIDATOR.document_security_errors(parser, "index.html", BASE) + \
+                         VALIDATOR.document_url_shape_errors(parser, "index.html")
+                self.assertEqual(bool(errors), rejected, errors)
+
+    @unittest.skipUnless(shutil.which("hugo"), "Hugo is required to render the pinned component fixture")
+    def test_tagged_hugo_component_output_and_security_cli(self) -> None:
+        repo = VALIDATOR_PATH.parents[1]
+        with tempfile.TemporaryDirectory(prefix="oink-component-security-") as temporary:
+            root = pathlib.Path(temporary)
+            for name in ("go.mod", "go.sum"):
+                shutil.copyfile(repo / name, root / name)
+            (root / "hugo.yaml").write_text(
+                "baseURL: https://hugegraph-oink.staged.apache.org/\nmodule:\n  imports:\n  - path: github.com/pgsty/oink\n")
+            (root / "layouts").mkdir()
+            (root / "layouts/single.html").write_text("<article>{{ .Content }}</article>")
+            (root / "content").mkdir()
+            (root / "content/fixture.md").write_text(
+                '---\ntitle: Fixture\n---\n'
+                '{{< asciinema file="/recording.cast" markers="10:Boot,25:Configure" >}}\n\n'
+                '```echarts\n{"dataset":{"source":[{"url":"https://example.org/inert","value":42}]},'
+                '"series":[{"type":"bar"}]}\n```\n')
+            result = subprocess.run([shutil.which("hugo"), "--source", str(root), "--destination", str(root / "public")],
+                                    text=True, capture_output=True)
+            self.assertEqual(result.returncode, 0, result.stdout + result.stderr)
+            html = (root / "public/fixture/index.html").read_text()
+            self.assertIn('"markers":[10,"Boot",25,"Configure"]', html)
+            parser = parse(html)
+            self.assertEqual(VALIDATOR.document_security_errors(parser, "fixture/index.html", BASE), [])
+            # Check the rendered component page in isolation; the fixture does
+            # not include HugeGraph's SEO/CSS customizations for theme defaults.
+            artifact = root / "artifact"
+            artifact.mkdir()
+            (artifact / "index.html").write_text(html)
+            result = subprocess.run([sys.executable, str(VALIDATOR_PATH), str(artifact), BASE.geturl(), "--security-only"],
+                                    text=True, capture_output=True)
+            self.assertEqual(result.returncode, 0, result.stdout + result.stderr)
+            # The actual native wrappers plus an alternate config carrier must
+            # fail the same CLI, not just a manually constructed parser test.
+            malicious = html.replace('<script type="application/json" data-td-asciinema-config>',
+                                     '<pre data-td-asciinema-config>', 1)
+            malicious = malicious.replace('</script>', '</pre>', 1)
+            (artifact / "index.html").write_text(malicious)
+            result = subprocess.run([sys.executable, str(VALIDATOR_PATH), str(artifact), BASE.geturl(), "--security-only"],
+                                    text=True, capture_output=True)
+            self.assertNotEqual(result.returncode, 0)
+            self.assertIn("noncanonical OINK component", result.stdout)
+            (root / "content/fixture.md").write_text(
+                '---\ntitle: Unsafe fixture\n---\n```echarts\n' + json.dumps({
+                    "tooltip": {"extraCssText": "background:url(https://evil.example/a.png)"},
+                    "toolbox": {"feature": {"dataView": {"lang": ['<img src="/ok.png" onerror="evil()">']}}},
+                    "title": {"link": "javascript:evil()"},
+                }) + '\n```\n')
+            result = subprocess.run([shutil.which("hugo"), "--source", str(root), "--destination", str(root / "public")],
+                                    text=True, capture_output=True)
+            self.assertEqual(result.returncode, 0, result.stdout + result.stderr)
+            shutil.copyfile(root / "public/fixture/index.html", artifact / "index.html")
+            result = subprocess.run([sys.executable, str(VALIDATOR_PATH), str(artifact), BASE.geturl(), "--security-only"],
+                                    text=True, capture_output=True)
+            self.assertNotEqual(result.returncode, 0)
+            # URL-shape errors take priority in this CLI; independently verify
+            # all three runtime sinks on the very same rendered fixture.
+            parser = parse((artifact / "index.html").read_text())
+            errors = VALIDATOR.document_security_errors(parser, "index.html", BASE) + \
+                     VALIDATOR.document_url_shape_errors(parser, "index.html")
+            for message in ("external CSS", "onerror", "forbidden URL scheme"):
+                self.assertIn(message, "\n".join(errors))
+
     def test_asciinema_payload_rejects_player_apis_outside_shortcode_schema(self) -> None:
         payload = {"src": "/recording.cast", "theme": "auto", "options": {"autoPlay": False}}
         variants = [dict(payload, audioUrl="https://evil.example/audio.mp3"),
@@ -564,6 +666,8 @@ class SiteOutputSecurityTest(unittest.TestCase):
                     dict(payload, options={"driver": "benchmark"}),
                     dict(payload, options={"poster": "https://evil.example/poster.png"}),
                     dict(payload, options={"markers": [{"src": "https://evil.example/x"}]}),
+                    dict(payload, options={"markers": [[1.0, "start"]]}),
+                    dict(payload, options={"markers": [1.0]}),
                     dict(payload, options={"speed": {"url": "https://evil.example/x"}})]
         for variant in variants:
             with self.subTest(variant=variant):
@@ -572,7 +676,7 @@ class SiteOutputSecurityTest(unittest.TestCase):
                 self.assertTrue(VALIDATOR.document_security_errors(parser, "index.html", BASE))
         for poster in ("npt:0:10", "data:text/plain,hello"):
             parser = parse('<article><script type="application/json" data-td-asciinema-config>' +
-                           json.dumps(dict(payload, options={"poster": poster, "markers": [[1.0, "start"]]})) + "</script></article>")
+                           json.dumps(dict(payload, options={"poster": poster, "markers": [1.0, "start"]})) + "</script></article>")
             self.assertEqual(VALIDATOR.document_security_errors(parser, "index.html", BASE), [])
 
     def test_http_resources_are_distinct_from_ordinary_links(self) -> None:

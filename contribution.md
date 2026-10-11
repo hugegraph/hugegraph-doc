@@ -119,6 +119,33 @@ complete clipboard output, including hidden lines. Keep benchmark tables and tes
 conditions beside charts, and use Gallery summaries alongside detailed screenshots
 when readers need to follow UI steps. Math should clarify a real documented formula.
 
+Use terminal recordings only when timing, interactive input or changing output
+adds useful information, such as a startup or troubleshooting walkthrough. Keep
+the commands as copyable code; a version check alone does not need a player.
+The local preview guide includes one optional player-authoring example in both
+languages; it demonstrates component usage rather than replacing version checks.
+Asciicast files store terminal text and timestamps, not video or executable
+commands. Change the shortcode's `title` or `speed` for presentation; re-record
+when commands or output change. Record at the intended terminal dimensions rather
+than overriding `cols` or `rows`, which can crop the recording.
+
+With the optional [Asciinema recorder](https://oink.pgsty.com/docs/components/asciinema/)
+installed, record a real session, run the demonstration commands, then exit:
+
+```bash
+asciinema rec --cols=48 --rows=14 demo.cast
+```
+
+Save the checked recording under `static/casts/` and reference it from Markdown:
+
+```text
+{{< asciinema file="/casts/demo.cast" title="Startup walkthrough" speed="1" >}}
+```
+
+The recorder is an authoring tool, not a site build dependency. Check both desktop
+and mobile playback, keep output readable, and review the plain-text file before
+committing it so credentials or private output are not included.
+
 Blog section metadata supplies default cover images and reading time; individual
 articles supply real categories, tags and series order. Confirm original authorship
 before creating an author profile. Keep both languages aligned, public article

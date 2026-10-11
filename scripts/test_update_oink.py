@@ -10,13 +10,14 @@ import tempfile
 import unittest
 import json
 import os
+import shutil
 import subprocess
 import sys
 from unittest.mock import patch
 
 import update_oink
 
-from oink_module import MODULE
+from oink_module import MODULE, SITE_MODULE
 from update_oink import describe_changes, prune_checksums, snapshot
 
 
@@ -34,12 +35,13 @@ class UpgradeInventoryTest(unittest.TestCase):
             hugo.write_text(f"#!{sys.executable}\n" +
                             "import os\n" +
                             "assert 'HUGO_MODULE_REPLACEMENTS' not in os.environ\n" +
+                            "assert 'HUGO_THEME' not in os.environ\n" +
                             "assert os.environ['GOWORK'] == 'off'\n" +
                             "assert os.environ['HUGO_MODULE_WORKSPACE'] == 'off'\n" +
-                            f"print('site {MODULE}@v1.2.0')\n")
+                            f"print('{SITE_MODULE} {MODULE}@v1.2.0')\n")
             hugo.chmod(0o755)
             preview = {"HUGO_BIN": str(hugo), "HUGO_MODULE_REPLACEMENTS": "oink -> /tmp/local-theme",
-                       "GOWORK": "/tmp/go.work", "HUGO_MODULE_WORKSPACE": "/tmp/hugo.work"}
+                       "HUGO_THEME": "/tmp/local-preview", "GOWORK": "/tmp/go.work", "HUGO_MODULE_WORKSPACE": "/tmp/hugo.work"}
             with patch.dict(os.environ, preview):
                 with update_oink.isolated_release():
                     update_oink.verify_hugo_graph(root, "v1.2.0")
@@ -49,11 +51,13 @@ class UpgradeInventoryTest(unittest.TestCase):
     def test_hugo_graph_rejects_wrong_release_replacement_and_vendor(self):
         with tempfile.TemporaryDirectory() as directory:
             root = Path(directory)
-            for graph in (f"site {MODULE}@v1.1.0\n", f"site {MODULE}@v1.2.0+vendor\n",
-                          f"site {MODULE}@v1.2.0 => /tmp/local\n", "site unrelated@v1.2.0\n",
-                          f"site {MODULE}@v1.2.0\nsite {MODULE}@v1.1.0\n",
-                          f"site {MODULE}@v1.2.0\n{MODULE}@v1.1.0 dependency@v1.0.0\n",
-                          f"site {MODULE}@v1.2.0\n{MODULE}@v1.2.0 => /tmp/local\n"):
+            for graph in (f"{SITE_MODULE} {MODULE}@v1.1.0\n", f"{SITE_MODULE} {MODULE}@v1.2.0+vendor\n",
+                          f"{SITE_MODULE} {MODULE}@v1.2.0 => /tmp/local\n", f"{SITE_MODULE} unrelated@v1.2.0\n",
+                          f"{SITE_MODULE} {MODULE}@v1.2.0\n{SITE_MODULE} /tmp/local-preview\n",
+                          f"{SITE_MODULE} {MODULE}@v1.2.0\n{SITE_MODULE} extra@v1.0.0\n",
+                          f"{SITE_MODULE} {MODULE}@v1.2.0\n{SITE_MODULE} {MODULE}@v1.1.0\n",
+                          f"{SITE_MODULE} {MODULE}@v1.2.0\n{MODULE}@v1.1.0 dependency@v1.0.0\n",
+                          f"{SITE_MODULE} {MODULE}@v1.2.0\n{MODULE}@v1.2.0 => /tmp/local\n"):
                 with patch.object(update_oink.subprocess, "check_output", return_value=graph):
                     with self.assertRaisesRegex(ValueError, "expected Hugo"):
                         update_oink.verify_hugo_graph(root, "v1.2.0")
@@ -67,9 +71,62 @@ class UpgradeInventoryTest(unittest.TestCase):
 
     def test_hugo_graph_accepts_published_theme_with_outgoing_dependencies(self):
         with tempfile.TemporaryDirectory() as directory:
-            graph = f"site {MODULE}@v1.2.0\n{MODULE}@v1.2.0 dependency@v1.0.0\n"
+            graph = (f"{SITE_MODULE} {MODULE}@v1.2.0\n{MODULE}@v1.2.0 dependency@v1.0.0\n"
+                     "dependency@v1.0.0 transitive@v2.0.0\n")
             with patch.object(update_oink.subprocess, "check_output", return_value=graph):
                 self.assertEqual(update_oink.verify_hugo_graph(Path(directory), "v1.2.0"), graph)
+
+    @unittest.skipUnless(shutil.which(os.environ.get("HUGO_BIN", "hugo")), "Hugo executable is required")
+    def test_real_hugo_rejects_unpublished_local_theme_capability(self):
+        """A valid Go lock does not exclude additional Hugo root theme imports."""
+        with tempfile.TemporaryDirectory() as directory:
+            root = Path(directory)
+            for name in ("go.mod", "go.sum"):
+                (root / name).write_bytes((update_oink.ROOT / name).read_bytes())
+            config = ("baseURL: https://example.test/\n"
+                      "disableKinds: [taxonomy, term, RSS, sitemap]\n"
+                      "module:\n  imports:\n    - path: " + MODULE + "\n")
+            (root / "hugo.yaml").write_text(config)
+            (root / "layouts").mkdir()
+            (root / "layouts/index.html").write_text("{{ .Content }}")
+            (root / "content").mkdir()
+            page = root / "content/_index.md"
+            page.write_text('---\ntitle: Fixture\n---\n{{< unpublished >}}\n')
+            preview = root / "preview"
+            shortcodes = preview / "layouts/shortcodes"
+            shortcodes.mkdir(parents=True)
+            (shortcodes / "unpublished.html").write_text("unpublished fixture capability")
+            env = update_oink.release_environment()
+            env["HUGO_THEME"] = str(preview)
+            hugo = env.get("HUGO_BIN", "hugo")
+            argv = [hugo, "--environment", "production", "--panicOnWarning"]
+            with patch.dict(os.environ, env, clear=True):
+                version = update_oink.download_locked(root)["Version"]
+                graph = subprocess.check_output([hugo, "mod", "graph"], cwd=root, env=env, text=True)
+                self.assertIn(f"{SITE_MODULE} {MODULE}@{version}", graph)
+                self.assertIn(f"{SITE_MODULE} {preview}", graph)
+                # Reproduce the former false pass with real Hugo and Go commands.
+                contaminated = subprocess.run(argv, cwd=root, env=env, text=True, capture_output=True)
+                self.assertEqual(contaminated.returncode, 0, contaminated.stdout + contaminated.stderr)
+                self.assertIn("unpublished fixture capability", (root / "public/index.html").read_text())
+                with update_oink.isolated_release():
+                    self.assertNotIn("HUGO_THEME", os.environ)
+                    isolated_graph = update_oink.verify_hugo_graph(root, version)
+                    self.assertNotIn(str(preview), isolated_graph)
+                    isolated = subprocess.run(argv, cwd=root, text=True, capture_output=True)
+                    self.assertNotEqual(isolated.returncode, 0)
+                    self.assertIn('template for shortcode "unpublished" not found', isolated.stdout + isolated.stderr)
+                self.assertEqual(os.environ["HUGO_THEME"], str(preview))
+                # A local theme in checked-in configuration must also fail the
+                # graph gate, even after environment isolation removes HUGO_THEME.
+                (root / "hugo.yaml").write_text(config + f"    - path: {preview}\n")
+                with self.assertRaisesRegex(ValueError, "expected Hugo root"):
+                    update_oink.verify_hugo_graph(root, version)
+                (root / "hugo.yaml").write_text(config)
+                page.write_text('---\ntitle: Fixture\n---\nPublished theme only.\n')
+                with update_oink.isolated_release():
+                    published = subprocess.run(argv, cwd=root, text=True, capture_output=True)
+                    self.assertEqual(published.returncode, 0, published.stdout + published.stderr)
 
     def test_validation_subprocesses_inherit_isolation_and_absolute_hugo_path(self):
         with tempfile.TemporaryDirectory() as directory:
@@ -81,6 +138,7 @@ class UpgradeInventoryTest(unittest.TestCase):
                 env = kwargs.get("env") or os.environ
                 observations.append(list(argv))
                 self.assertNotIn("HUGO_MODULE_REPLACEMENTS", env)
+                self.assertNotIn("HUGO_THEME", env)
                 self.assertEqual(env["GOWORK"], "off")
                 self.assertEqual(env["HUGO_MODULE_WORKSPACE"], "off")
                 self.assertEqual(env["HUGO_BIN"], "/resolved/hugo")

@@ -17,12 +17,21 @@ go version
 hugo mod graph
 ```
 
-The recording below captures these three read-only commands on 2026-10-11 with Hugo 0.165 Extended, Go 1.27.1 and OINK 1.2.0.
-Playback runs at 0.1 times the recorded speed to make the short output easier to read. The cast is served locally with the site.
-
-{{< asciinema file="/casts/oink-upgrade-check.cast" title="Recorded documentation toolchain and theme check" speed="0.1" rows="24" >}}
-
-[Download the original recording](/casts/oink-upgrade-check.cast).
+> [!DETAILS]- Optional: terminal player authoring example
+>
+> Use the copyable commands above to check versions. This optional example shows maintainers how the player works.
+> Recordings are suitable for interactive operations, startup sequences and troubleshooting walkthroughs.
+> Change `file`, `title` or `speed` in Markdown to adjust the file, title or speed; re-record the `.cast` when commands or output change.
+> It was recorded on 2026-10-11 with Hugo 0.165 Extended, Go 1.27.1 and OINK 1.2.0.
+> Playback runs at 0.1 times the recorded speed to make the short output easier to read. The cast is served locally with the site.
+>
+> <div class="hg-toolchain-recording">
+>
+> {{< asciinema file="/casts/oink-upgrade-check.cast" title="Recorded documentation toolchain and theme check" speed="0.1" >}}
+>
+> </div>
+>
+> [Download the original recording](/casts/oink-upgrade-check.cast).
 
 ## Preview and validate
 

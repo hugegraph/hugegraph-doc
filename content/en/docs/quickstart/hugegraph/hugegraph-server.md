@@ -34,16 +34,21 @@ flowchart TD
 ```
 
 
-The map summarizes the repository modules described above.
+The map uses short labels for the repository modules described above. `server`, `core`, `api`, `dist`, `pd`, and `store` refer to the corresponding
+`hugegraph-` modules; `dist` packages the distribution.
 
 ```markmap
-# apache/hugegraph
-## hugegraph-server
-- hugegraph-core: property graph model, transactions, TinkerPop interfaces
-- hugegraph-api: HTTP service
-- hugegraph-dist: distribution packaging
-## hugegraph-pd
-## hugegraph-store
+---
+markmap:
+  spacingHorizontal: 40
+---
+# HugeGraph
+## server
+- core
+- api
+- dist
+## pd
+## store
 ```
 
 ## 2 Dependency for Building/Running
@@ -440,9 +445,9 @@ First deploy PD and Store; see the [PD Quick Start](/docs/quickstart/hugegraph/h
 
 The minimal standalone flow below uses a master build and preloads sample data to verify graph reads and writes.
 
-1. [Check Java](#21-install-java-11-jdk-11) against the selected version's requirements.
-2. [Obtain and verify a release archive](#32-download-a-released-archive), or [build master source](#33-build-from-master-source); their identities differ.
-3. [Confirm RocksDB configuration](#4-configuration), then enter the extracted Server directory.
+1. [Check Java](#21-install-java-11-jdk-11) against the master build requirements.
+2. [Build master source](#33-build-from-master-source); the commands below use its nested Server directory.
+3. [Confirm RocksDB configuration](#4-configuration), then enter the build output's nested Server directory.
 4. Initialize storage, then start the service with sample data using the commands below.
 5. Request `/versions` and sample graph vertices, and check the actual response contents.
 {.steps}

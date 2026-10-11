@@ -160,6 +160,13 @@ DOM controller or automated text migration for content that already works.
 | Sidebar expansion memory | `assets/js/hugegraph-shell.js` | Public OinkSidebar API, storage/focus/keyboard browser tests |
 | Authorized Ask AI, remembered consent/dismissal, withdrawal and community entry | `assets/js/kapa-adapter.js`, `layouts/_partials/hooks/body-end.html`, `layouts/_partials/footer.html` | Public search-tail API, adapter tests and AI browser contracts |
 | Brand and layout | `assets/scss/`, `data/`, `i18n/` | Bilingual desktop/mobile, dark/light and print captures |
+| Native content components | `content/`, `assets/scss/_styles_project.scss`, `dist/validate-site-output.py` | Exact component data carriers and payload sinks; Markmap scaled text and contrast in both themes |
+
+The local Markmap styling uses the native `--markmap-text-color` token and the
+site's `--bs-body-color`, so labels stay readable in both light and dark modes.
+Component payload validation follows the pinned runtime's actual URL, HTML and
+CSS sinks. Recheck those contracts when component runtimes change; an unchanged
+template name does not prove that an updated runtime consumes data safely.
 
 `scripts/oink-overrides.json` records upstream hashes, not copies of upstream
 code. The generated inventory covers same-name local layouts/assets/translations/data,

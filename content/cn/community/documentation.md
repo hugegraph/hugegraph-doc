@@ -17,12 +17,20 @@ go version
 hugo mod graph
 ```
 
-下面的录像实际录制于 2026-10-11，使用 Hugo 0.165 Extended、Go 1.27.1 和 OINK 1.2.0，记录了这三条只读检查命令。
-播放器以原始速度的 0.1 倍播放，便于阅读简短输出。录像文件由本站本地提供。
-
-{{< asciinema file="/casts/oink-upgrade-check.cast" title="文档工具链与主题版本检查实录" speed="0.1" rows="24" >}}
-
-[下载原始录像](/casts/oink-upgrade-check.cast)。
+> [!DETAILS]- 可选：终端播放器用法示例
+>
+> 版本检查使用上方可复制的命令即可。此处仅供维护者了解播放器用法；交互操作、启动过程和排障演示才适合录制。
+> 修改 Markdown 中的 `file`、`title`、`speed` 可以更换文件、标题和速度；命令或输出变化时应重新录制 `.cast`。
+> 录像实际录制于 2026-10-11，使用 Hugo 0.165 Extended、Go 1.27.1 和 OINK 1.2.0。
+> 播放速度为原速的 0.1 倍，便于阅读简短输出；录像文件由本站本地提供。
+>
+> <div class="hg-toolchain-recording">
+>
+> {{< asciinema file="/casts/oink-upgrade-check.cast" title="文档工具链与主题版本检查实录" speed="0.1" >}}
+>
+> </div>
+>
+> [下载原始录像](/casts/oink-upgrade-check.cast)。
 
 ## 预览与验证
 

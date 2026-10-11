@@ -33,16 +33,20 @@ flowchart TD
     S --> Q["请求 /versions 和图顶点接口"]
 ```
 
-主仓库模块概览如下；上方文字保留各模块的说明。
+主仓库模块概览使用短名称；`server`、`core`、`api`、`dist`、`pd` 和 `store` 对应带 `hugegraph-` 前缀的模块。上方保留功能说明，`dist` 负责发行打包。
 
 ```markmap
-# apache/hugegraph
-## hugegraph-server
-- hugegraph-core：属性图模型、事务、TinkerPop 接口
-- hugegraph-api：HTTP 服务
-- hugegraph-dist：发行打包
-## hugegraph-pd
-## hugegraph-store
+---
+markmap:
+  spacingHorizontal: 40
+---
+# HugeGraph
+## server
+- core
+- api
+- dist
+## pd
+## store
 ```
 
 ## 2 依赖
@@ -435,9 +439,9 @@ HugeGraphServer 启动时会连接后端存储并检查其版本信息。如果�
 
 从 `master` 构建的单机最小流程如下。此例启用内置样例数据，以便后续请求能验证图数据读写路径。
 
-1. [检查 Java 环境](#21-安装-java-11-jdk-11)，确认满足所选版本要求。
-2. [获取并校验发布包](#32-下载已发布的-tar-包)，或[构建 master 源码](#33-从-master-源码构建)；两者身份不同。
-3. [确认 RocksDB 配置](#4-配置)，再进入解压后的 Server 目录。
+1. [检查 Java 环境](#21-安装-java-11-jdk-11)，确认满足主线构建要求。
+2. [构建 master 源码](#33-从-master-源码构建)；下方命令使用该构建包中的 Server 子目录。
+3. [确认 RocksDB 配置](#4-配置)，再进入构建产物中的 Server 子目录。
 4. 初始化存储，然后启动服务并加载样例图，命令见下方。
 5. 请求 `/versions` 和样例图顶点接口，检查实际返回内容。
 {.steps}
