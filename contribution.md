@@ -126,14 +126,14 @@ The local preview guide includes one optional player-authoring example in both
 languages; it demonstrates component usage rather than replacing version checks.
 Asciicast files store terminal text and timestamps, not video or executable
 commands. Change the shortcode's `title` or `speed` for presentation; re-record
-when commands or output change. Record at the intended terminal dimensions rather
-than overriding `cols` or `rows`, which can crop the recording.
+when commands or output change. Resize the terminal to the intended dimensions
+before recording; overriding the player's `cols` or `rows` can crop the recording.
 
 With the optional [Asciinema recorder](https://oink.pgsty.com/docs/components/asciinema/)
 installed, record a real session, run the demonstration commands, then exit:
 
 ```bash
-asciinema rec --cols=48 --rows=14 demo.cast
+asciinema rec demo.cast
 ```
 
 Save the checked recording under `static/casts/` and reference it from Markdown:
