@@ -863,7 +863,28 @@ The import process is controlled by commands submitted by the user, and the user
 | `--scheduler-type`                       | distributed |      | The task scheduler type when creating graph if not exists          |
 | `--batch-failure-fallback`               | true        |      | Whether to fallback to single insert when batch insert fails       |
 
-> The loader prints its usage and exits when it is given fewer than three arguments, so `-f struct.json` on its own is not enough.
+The mapping file option `--file` (`-f`) is required; other options use their defaults. A valid minimal invocation is:
+
+```bash
+bin/hugegraph-loader.sh --file struct.json
+```
+
+The launcher also accepts JCommander's native `@file` syntax. Put each option and value on separate lines in `loader.args`:
+
+```text
+--file
+struct.json
+```
+
+```bash
+bin/hugegraph-loader.sh @loader.args
+```
+
+This is equivalent to the minimal invocation above. Relative path values resolve from the Loader process working directory.
+If the argument file contains credentials, restrict it to mode `0600` with `chmod 0600 loader.args`.
+The `@file` form keeps credential values out of process arguments.
+Loader must be able to create and write the mapping-prefix directory used for progress output.
+Copy a mapping mounted from a read-only Kubernetes ConfigMap to a writable volume before running Loader.
 
 ##### 3.4.2 Breakpoint Continuation Mode
 
@@ -874,7 +895,7 @@ Recorded in the progress file, the progress file is located in the `${struct}` d
 moment, formatted as `yyyyMMdd-HHmmss`. For example, for an import task started at `2019-10-10 12:30:30`, the mapping file used is `struct-example.json`, then the path of the progress file is the same as struct-example.json
 Sibling `struct-example/load-progress_20191010-123030`. When the directory holds several progress files, the resumed import reads the last one in name order, which is the most recent one.
 
-> Note: The generation of progress files is independent of whether --incremental-mode is turned on or not, and a progress file is generated at the end of each import.
+> Note: Progress files are generated after every import, regardless of `--incremental-mode` or `--print-progress`.
 
 If the data file formats are all legal and the import task is stopped by the user (CTRL + C or kill, kill -9 is not supported), that is to say, if there is no error record, the next import only needs to be set to 
 Continue for the breakpoint.
