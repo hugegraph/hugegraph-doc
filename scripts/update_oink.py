@@ -88,7 +88,7 @@ def verify_hugo_graph(root, version):
     env = release_environment()
     with graph_workspace(root) as workspace:
         graph = subprocess.check_output([env.get("HUGO_BIN", "hugo"), "mod", "graph",
-                                         "--config", "hugo.yaml", "--environment", "production"],
+                                         "--config", "hugo.yaml", "--environment", "production", "--quiet"],
                                         cwd=workspace, env=env, text=True)
         graph = graph.replace(str(workspace), str(Path(root).resolve()))
     expected = MODULE + "@" + version

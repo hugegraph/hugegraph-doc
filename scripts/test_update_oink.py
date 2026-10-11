@@ -23,6 +23,35 @@ from update_oink import describe_changes, prune_checksums, snapshot
 
 
 class UpgradeInventoryTest(unittest.TestCase):
+    @unittest.skipUnless(shutil.which(os.environ.get("HUGO_BIN", "hugo")), "Hugo executable is required")
+    def test_real_hugo_graph_with_empty_module_cache(self):
+        with tempfile.TemporaryDirectory() as directory:
+            root = Path(directory) / "site"
+            root.mkdir()
+            before = {}
+            for name in ("go.mod", "go.sum"):
+                before[name] = (update_oink.ROOT / name).read_bytes()
+                (root / name).write_bytes(before[name])
+            (root / "hugo.yaml").write_text("module:\n  imports:\n    - path: " + MODULE + "\n")
+            with patch.dict(os.environ, {"HUGO_CACHEDIR": str(Path(directory) / "empty-cache")}):
+                version = update_oink.download_locked(root)["Version"]
+                graph = update_oink.verify_hugo_graph(root, version)
+                self.assertEqual(graph.strip(), f"{SITE_MODULE} {MODULE}@{version}")
+                self.assertNotIn("downloading modules", graph)
+            for name, contents in before.items():
+                self.assertEqual((root / name).read_bytes(), contents)
+
+    def test_hugo_graph_suppresses_cold_cache_progress_without_relaxing_validation(self):
+        with tempfile.TemporaryDirectory() as directory:
+            root = Path(directory)
+            graph = f"{SITE_MODULE} {MODULE}@v1.2.0\n"
+            with patch.object(update_oink.subprocess, "check_output", return_value=graph) as command:
+                self.assertEqual(update_oink.verify_hugo_graph(root, "v1.2.0"), graph)
+                self.assertIn("--quiet", command.call_args.args[0])
+            with patch.object(update_oink.subprocess, "check_output", return_value=graph + "unexpected diagnostic output\n"):
+                with self.assertRaises(ValueError):
+                    update_oink.verify_hugo_graph(root, "v1.2.0")
+
     def test_default_hugo_is_resolved_from_subprocess_path(self):
         with patch.dict(os.environ, {}, clear=True), \
              patch.object(update_oink.shutil, "which") as which:
