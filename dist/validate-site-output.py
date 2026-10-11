@@ -950,6 +950,34 @@ class DocumentParser(html.parser.HTMLParser):
             self.authored_violations.append("OINK component JSON payload must be an object")
             return
         if self._component_source == "data-td-asciinema-config":
+            # Trust only the shortcode schema, not the player's much broader
+            # API (audioUrl, custom drivers, etc. can initiate other requests).
+            option_keys = {"autoPlay", "fit", "loop", "preload", "speed", "startAt", "poster", "cols", "rows",
+                           "idleTimeLimit", "pauseOnMarkers", "markers"}
+            options = payload.get("options")
+            if (set(payload) != {"src", "theme", "options"} or not isinstance(payload.get("theme"), str)
+                    or not isinstance(options, dict) or set(options) - option_keys):
+                self.authored_violations.append("Asciinema JSON payload does not match the OINK shortcode schema")
+                return
+            for key, value in options.items():
+                valid = True
+                if key in {"autoPlay", "loop", "preload", "pauseOnMarkers"}:
+                    valid = isinstance(value, bool)
+                elif key == "fit":
+                    valid = isinstance(value, str) and value in {"width", "height", "both", "none"}
+                elif key in {"cols", "rows"}:
+                    valid = type(value) is int and value > 0
+                elif key in {"speed", "startAt", "idleTimeLimit"}:
+                    valid = type(value) in {int, float} and value >= 0 and (key != "speed" or value > 0)
+                elif key == "poster":
+                    # The pinned player _parsePoster accepts terminal text or a
+                    # recording timestamp; it does not load an image/URL.
+                    valid = isinstance(value, str) and value.startswith(("npt:", "data:text/plain,"))
+                elif key == "markers":
+                    valid = isinstance(value, list) and all(isinstance(item, list) and len(item) == 2 and
+                            type(item[0]) in {int, float} and item[0] >= 0 and isinstance(item[1], str) for item in value)
+                if not valid:
+                    self.authored_violations.append(f"invalid Asciinema shortcode option: {key}")
             source = payload.get("src")
             if not isinstance(source, str) or not source:
                 self.authored_violations.append("Asciinema JSON payload requires a source URL")

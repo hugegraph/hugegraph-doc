@@ -517,12 +517,12 @@ class SiteOutputSecurityTest(unittest.TestCase):
                        "javascript:evil()", "data:text/plain,cast", "\\\\evil.example\\x.cast"):
             with self.subTest(source=source):
                 parser = parse('<article><script type="application/json" data-td-asciinema-config>' +
-                               json.dumps({"src": source, "options": {"autoPlay": False}}) + "</script></article>")
+                               json.dumps({"src": source, "theme": "auto", "options": {"autoPlay": False}}) + "</script></article>")
                 errors = VALIDATOR.document_security_errors(parser, "index.html", BASE) + \
                          VALIDATOR.document_url_shape_errors(parser, "index.html")
                 self.assertTrue(errors)
         parser = parse('<article><script type="application/json" data-td-asciinema-config>' +
-                       json.dumps({"src": "/recording.cast", "options": {"autoPlay": False}}) + "</script></article>")
+                       json.dumps({"src": "/recording.cast", "theme": "auto", "options": {"autoPlay": False}}) + "</script></article>")
         self.assertEqual(VALIDATOR.document_security_errors(parser, "index.html", BASE), [])
         self.assertEqual(VALIDATOR.document_url_shape_errors(parser, "index.html"), [])
 
@@ -555,6 +555,24 @@ class SiteOutputSecurityTest(unittest.TestCase):
                         {"series": [{"symbol": "image:///local.png"}]}):
             parser = parse('<article><script type="application/json" data-td-echarts-options>' +
                            json.dumps(payload) + "</script></article>")
+            self.assertEqual(VALIDATOR.document_security_errors(parser, "index.html", BASE), [])
+
+    def test_asciinema_payload_rejects_player_apis_outside_shortcode_schema(self) -> None:
+        payload = {"src": "/recording.cast", "theme": "auto", "options": {"autoPlay": False}}
+        variants = [dict(payload, audioUrl="https://evil.example/audio.mp3"),
+                    dict(payload, options={"audioUrl": "https://evil.example/audio.mp3"}),
+                    dict(payload, options={"driver": "benchmark"}),
+                    dict(payload, options={"poster": "https://evil.example/poster.png"}),
+                    dict(payload, options={"markers": [{"src": "https://evil.example/x"}]}),
+                    dict(payload, options={"speed": {"url": "https://evil.example/x"}})]
+        for variant in variants:
+            with self.subTest(variant=variant):
+                parser = parse('<article><script type="application/json" data-td-asciinema-config>' +
+                               json.dumps(variant) + "</script></article>")
+                self.assertTrue(VALIDATOR.document_security_errors(parser, "index.html", BASE))
+        for poster in ("npt:0:10", "data:text/plain,hello"):
+            parser = parse('<article><script type="application/json" data-td-asciinema-config>' +
+                           json.dumps(dict(payload, options={"poster": poster, "markers": [[1.0, "start"]]})) + "</script></article>")
             self.assertEqual(VALIDATOR.document_security_errors(parser, "index.html", BASE), [])
 
     def test_http_resources_are_distinct_from_ordinary_links(self) -> None:
