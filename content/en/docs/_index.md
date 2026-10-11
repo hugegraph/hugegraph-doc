@@ -3,6 +3,7 @@ title: "Documentation"
 linkTitle: "Documentation"
 weight: 20
 outputs: [HTML, RSS, print, markdown, LLMSFULL]
+icon: fa-solid fa-book
 ---
 
 ## Apache HugeGraph Documentation

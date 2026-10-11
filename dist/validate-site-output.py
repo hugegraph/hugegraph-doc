@@ -79,6 +79,8 @@ DOCS_NAV_GROUP_TITLES = {
     "cn": ("开始", "组件", "开发", "配置", "参考"),
 }
 EXTERNAL_ACTIVE_RESOURCE_ATTRIBUTES = {
+    ("asciinema-config", "src"),
+    ("echarts-options", "resource"),
     ("script", "src"),
     ("link", "href"),
     ("iframe", "src"),
@@ -163,15 +165,15 @@ RUNTIME_ACTIVE_URL_ATTRIBUTES = {
 RUNTIME_IMAGE_URL_ATTRIBUTES = {"data-td-image-zoom"}
 
 
-def is_inert_oink_diagram_source(tag: str, values: dict[str, str]) -> bool:
-    """Match only OINK's inert Mermaid source carrier, not authored JSON scripts."""
+def is_inert_oink_component_source(tag: str, values: dict[str, str]) -> bool:
+    """Match the exact inert JSON carriers emitted by OINK 1.2 components."""
 
-    return (
-        tag == "script"
-        and set(values) == {"type", "data-td-diagram-source"}
-        and values["type"].strip().lower() == "application/json"
-        and values["data-td-diagram-source"] == ""
-    )
+    if tag != "script" or values.get("type", "").strip().lower() != "application/json":
+        return False
+    # These templates emit only type and one empty marker. Extra attributes
+    # (including class, src and handlers) are not part of the trusted shape.
+    return any(set(values) == {"type", marker} and values[marker] == ""
+               for marker in ("data-td-diagram-source", "data-td-echarts-options", "data-td-asciinema-config"))
 
 
 def srcset_urls(value: str) -> list[str]:
@@ -667,6 +669,8 @@ class DocumentParser(html.parser.HTMLParser):
         self.toc_nav_labels: list[list[str]] = []
         self.action_manifest = ""
         self._in_action_manifest = False
+        self._component_source = ""
+        self._component_json = ""
         self._content_depth = 0
         self._content_markers = [0, 0]
         self._in_content_marker = False
@@ -720,7 +724,7 @@ class DocumentParser(html.parser.HTMLParser):
         if tag in {"main", "article"}:
             self._content_depth += 1
         if self._content_depth or self._in_content_marker:
-            if tag in UNSAFE_AUTHORED_ELEMENTS and not is_inert_oink_diagram_source(
+            if tag in UNSAFE_AUTHORED_ELEMENTS and not is_inert_oink_component_source(
                 tag, values
             ):
                 self.authored_violations.append(f"authored <{tag}>")
@@ -893,10 +897,17 @@ class DocumentParser(html.parser.HTMLParser):
             self.meta.append(values)
         if tag == "script" and values.get("id") == "td-action-manifest":
             self._in_action_manifest = True
+        if is_inert_oink_component_source(tag, values):
+            for marker in ("data-td-echarts-options", "data-td-asciinema-config"):
+                if marker in values:
+                    self._component_source = marker
+                    self._component_json = ""
         if tag == "style":
             self._in_style = True
 
     def handle_data(self, data: str) -> None:
+        if self._component_source:
+            self._component_json += data
         if self._in_action_manifest:
             self.action_manifest += data
         if self._in_style:
@@ -905,6 +916,10 @@ class DocumentParser(html.parser.HTMLParser):
 
     def handle_endtag(self, tag: str) -> None:
         tag = tag.lower()
+        if tag == "script" and self._component_source:
+            self._check_component_payload()
+            self._component_source = ""
+            self._component_json = ""
         if tag == "script" and self._in_action_manifest:
             self._in_action_manifest = False
         if tag == "style":
@@ -924,6 +939,55 @@ class DocumentParser(html.parser.HTMLParser):
                 )
         if tag in {"main", "article"} and self._content_depth:
             self._content_depth -= 1
+
+    def _check_component_payload(self) -> None:
+        try:
+            payload = json.loads(self._component_json)
+        except (ValueError, RecursionError):
+            self.authored_violations.append("invalid OINK component JSON payload")
+            return
+        if not isinstance(payload, dict):
+            self.authored_violations.append("OINK component JSON payload must be an object")
+            return
+        if self._component_source == "data-td-asciinema-config":
+            source = payload.get("src")
+            if not isinstance(source, str) or not source:
+                self.authored_violations.append("Asciinema JSON payload requires a source URL")
+            else:
+                self.resources.append(("asciinema-config", "src", source))
+                self.urls.append(("src", source))
+            return
+        # ECharts directly loads image:// symbols/icons and image URLs in
+        # graphic styles/rich-text backgrounds. Formatter strings can become
+        # HTML inside its default tooltip renderer and need the authored rules.
+        pending = [("", payload)]
+        while pending:
+            key, value = pending.pop()
+            if isinstance(value, dict):
+                pending.extend(value.items())
+            elif isinstance(value, list):
+                pending.extend((key, item) for item in value)
+            elif isinstance(value, str):
+                resource = value[len("image://"):] if value.startswith("image://") else value if key in {"image", "src", "url", "href"} else None
+                if resource:
+                    self.resources.append(("echarts-options", "resource", resource))
+                    self.urls.append(("src", resource))
+                if key == "formatter":
+                    if "data-hg-authored-content" in value.lower():
+                        self.authored_violations.append("ECharts formatter cannot contain authored-content markers")
+                    fragment = DocumentParser()
+                    fragment.feed('<template data-hg-authored-content="start"></template>' + value +
+                                  '<template data-hg-authored-content="end"></template>')
+                    self.authored_violations.extend(fragment.authored_violations)
+                    if fragment._content_markers[0] != fragment._content_markers[1]:
+                        self.authored_violations.append("unbalanced ECharts formatter content markers")
+                    self.resources.extend(fragment.resources)
+                    self.urls.extend(fragment.urls)
+                    self.navigation_urls.extend(fragment.navigation_urls)
+                    self.resources.extend(("echarts-options", "resource", resource) for _, _, resource in fragment.image_urls)
+                    self.image_urls.extend(fragment.image_urls)
+                    self.inline_css_sources.extend(fragment.inline_css_sources)
+                    self.inline_css_http_resources.extend(fragment.inline_css_http_resources)
 
 
 def output_path(root: pathlib.Path, url_path: str) -> pathlib.Path:

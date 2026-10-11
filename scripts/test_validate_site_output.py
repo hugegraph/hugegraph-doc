@@ -468,6 +468,95 @@ class SiteOutputSecurityTest(unittest.TestCase):
                 parser = parse(f"<article>{script}</article>")
                 self.assertIn("authored <script>", parser.authored_violations)
 
+    def test_exact_oink_chart_and_terminal_json_carriers_are_allowed(self) -> None:
+        # Shapes emitted by tagged OINK 1.2 render-codeblock-echarts.html and
+        # _shortcodes/asciinema.html, including their native wrapper markup.
+        fragments = [
+            '<div id="td-echarts-placeholder-f0" class="td-echarts td-max-width-on-larger-screens" data-td-echarts>'
+            '<div data-td-echarts-canvas style="height:360px"></div>'
+            '<script type="application/json" data-td-echarts-options>'
+            '{"series":[{"type":"bar","data":[1,2]}]}</script></div>',
+            '<div id="td-asciinema-placeholder-0" class="td-asciinema td-max-width-on-larger-screens" '
+            'data-td-asciinema data-td-timer-label="Playback time">'
+            '<div class="td-asciinema__chrome"><span class="td-asciinema__title" dir="auto">Demo</span></div>'
+            '<div data-td-asciinema-player></div>'
+            '<script type="application/json" data-td-asciinema-config>'
+            '{"src":"/recording.cast","theme":"auto","options":{"autoPlay":false,"speed":1}}</script></div>',
+        ]
+        for fragment in fragments:
+            with self.subTest(fragment=fragment):
+                parser = parse(f"<main><article>{fragment}</article></main>")
+                self.assertEqual(parser.authored_violations, [])
+                self.assertEqual(VALIDATOR.document_security_errors(parser, "index.html", BASE), [])
+
+    def test_component_json_carrier_disguises_and_breakouts_are_rejected(self) -> None:
+        for marker in ("data-td-diagram-source", "data-td-echarts-options", "data-td-asciinema-config"):
+            variants = [
+                f'<script {marker}>alert(1)</script>',
+                f'<script type="module" {marker}>alert(1)</script>',
+                f'<script type="text/javascript" {marker}>alert(1)</script>',
+                f'<script type="application/json" {marker}="true">{{}}</script>',
+                f'<script type="application/json" {marker} src="/evil.js">{{}}</script>',
+                f'<script type="application/json" {marker} onload="evil()">{{}}</script>',
+                f'<script type="application/json" {marker} class="disguise">{{}}</script>',
+                f'<script type="application/json" {marker} data-extra="true">{{}}</script>',
+                f'<script type="application/json" {marker} data-td-fake-config>{{}}</script>',
+                f'<script type="application/json" {marker}>{{"text":"</script><script>alert(1)</script>"}}',
+                '<script type="application/json" data-td-fake-config>{}</script>',
+            ]
+            for variant in variants:
+                with self.subTest(marker=marker, variant=variant):
+                    parser = parse(f"<article>{variant}</article>")
+                    self.assertIn("authored <script>", parser.authored_violations)
+            duplicate = f'<script type="application/json" {marker} {marker}>{{}}</script>'
+            parser = parse(f"<article>{duplicate}</article>")
+            self.assertTrue(any("duplicate" in violation for violation in parser.authored_violations))
+
+    def test_asciinema_payload_source_uses_active_resource_boundary(self) -> None:
+        for source in ("https://evil.example/x.cast", "http://evil.example/x.cast", "//evil.example/x.cast",
+                       "javascript:evil()", "data:text/plain,cast", "\\\\evil.example\\x.cast"):
+            with self.subTest(source=source):
+                parser = parse('<article><script type="application/json" data-td-asciinema-config>' +
+                               json.dumps({"src": source, "options": {"autoPlay": False}}) + "</script></article>")
+                errors = VALIDATOR.document_security_errors(parser, "index.html", BASE) + \
+                         VALIDATOR.document_url_shape_errors(parser, "index.html")
+                self.assertTrue(errors)
+        parser = parse('<article><script type="application/json" data-td-asciinema-config>' +
+                       json.dumps({"src": "/recording.cast", "options": {"autoPlay": False}}) + "</script></article>")
+        self.assertEqual(VALIDATOR.document_security_errors(parser, "index.html", BASE), [])
+        self.assertEqual(VALIDATOR.document_url_shape_errors(parser, "index.html"), [])
+
+    def test_echarts_payload_images_and_formatter_html_are_validated(self) -> None:
+        payloads = [
+            {"series": [{"symbol": "image://https://evil.example/symbol.png"}]},
+            {"graphic": {"style": {"image": "https://evil.example/image.png"}}},
+            {"textStyle": {"rich": {"a": {"backgroundColor": {"image": "//evil.example/image.png"}}}}},
+            {"tooltip": {"formatter": '<img src="https://evil.example/x.png">'}},
+            {"tooltip": {"formatter": '<img src="/ok.png" onerror="evil()">'}},
+            {"tooltip": {"formatter": '</article><script>evil()</script>'}},
+            {"tooltip": {"formatter": '<template data-hg-authored-content="end"></template>'
+                                       '<script>evil()</script><template data-hg-authored-content="start"></template>'}},
+            {"tooltip": {"formatter": '<iframe src="/frame"></iframe>'}},
+            {"tooltip": {"formatter": '<a href="javascript:evil()">link</a>'}},
+            {"tooltip": {"formatter": '<div style="background:url(https://evil.example/x)">x</div>'}},
+        ]
+        for payload in payloads:
+            with self.subTest(payload=payload):
+                # Hugo's jsonify escapes HTML characters in the script body;
+                # exercise runtime formatter markup after JSON decoding.
+                encoded = json.dumps(payload).replace("<", "\\u003c").replace(">", "\\u003e")
+                parser = parse('<article><script type="application/json" data-td-echarts-options>' +
+                               encoded + "</script></article>")
+                errors = VALIDATOR.document_security_errors(parser, "index.html", BASE) + \
+                         VALIDATOR.document_url_shape_errors(parser, "index.html")
+                self.assertTrue(errors)
+        for payload in ({"tooltip": {"formatter": "<b>{b}</b>: {c}"}},
+                        {"tooltip": {"trigger": "axis"}, "series": [{"type": "bar", "data": [1, 2]}]},
+                        {"series": [{"symbol": "image:///local.png"}]}):
+            parser = parse('<article><script type="application/json" data-td-echarts-options>' +
+                           json.dumps(payload) + "</script></article>")
+            self.assertEqual(VALIDATOR.document_security_errors(parser, "index.html", BASE), [])
+
     def test_http_resources_are_distinct_from_ordinary_links(self) -> None:
         parser = parse(
             '<a href="http://example.com/docs">docs</a>'

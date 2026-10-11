@@ -790,6 +790,12 @@ Find the common neighbors of two vertices:
 
 Compute the Jaccard similarity between two vertices (the intersection of the neighbors of the two vertices divided by the union of the neighbors of the two vertices).
 
+For neighbor sets `N(u)` and `N(v)` with a nonempty union, the definition above is:
+
+```math
+J(u,v) = \frac{|N(u) \cap N(v)|}{|N(u) \cup N(v)|}
+```
+
 ###### Params
 
 - vertex: ID of one vertex, required.

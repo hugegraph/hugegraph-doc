@@ -788,6 +788,12 @@ GET http://localhost:8080/graphspaces/DEFAULT/graphs/{graph}/traversers/sameneig
 
 计算两个顶点的 jaccard similarity（两个顶点邻居的交集比上两个顶点邻居的并集）
 
+对于并集非空的邻居集合 `N(u)` 和 `N(v)`，上述定义可写为：
+
+```math
+J(u,v) = \frac{|N(u) \cap N(v)|}{|N(u) \cup N(v)|}
+```
+
 ###### Params
 
 - vertex：一个顶点 id，必填项
