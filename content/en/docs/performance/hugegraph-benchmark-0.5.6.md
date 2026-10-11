@@ -86,7 +86,8 @@ the original table remains available for exact values.
 ```echarts {height="340px"}
 {
   "tooltip": {
-    "trigger": "axis"
+    "trigger": "axis",
+    "confine": true
   },
   "legend": {
     "data": [

@@ -125,7 +125,7 @@ for (const language of ['en', 'cn']) {
       labelStarts.push(label.x);
     }
     expect(Math.max(...labelStarts) - Math.min(...labelStarts)).toBeLessThan(1);
-    await page.screenshot({ path: testInfo.outputPath(`${language}-sidebar-icons.png`) });
+    await page.screenshot({ path: testInfo.outputPath(`${language}-sidebar-icons.png`), animations: 'disabled' });
 
     await page.locator('[data-td-shell-root-toggle]').click();
     const chooser = page.locator('.td-shell-root__pop');
@@ -143,7 +143,7 @@ for (const language of ['en', 'cn']) {
       const starts = labels.map(label => label.getBoundingClientRect().x);
       return Math.max(...starts) - Math.min(...starts);
     })).toBeLessThan(1);
-    await page.screenshot({ path: testInfo.outputPath(`${language}-navigation-icons.png`) });
+    await page.screenshot({ path: testInfo.outputPath(`${language}-navigation-icons.png`), animations: 'disabled' });
   });
 
   test(`${language} blog covers load and category and series rails lead to real article indexes`, async ({ page }) => {

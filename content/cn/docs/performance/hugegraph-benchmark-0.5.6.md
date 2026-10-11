@@ -87,7 +87,8 @@ sidebar_expanded: true
 ```echarts {height="340px"}
 {
   "tooltip": {
-    "trigger": "axis"
+    "trigger": "axis",
+    "confine": true
   },
   "legend": {
     "data": [

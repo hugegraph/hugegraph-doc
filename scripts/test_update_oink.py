@@ -8,6 +8,7 @@
 from pathlib import Path
 import tempfile
 import unittest
+import zipfile
 import json
 import os
 import shutil
@@ -127,6 +128,71 @@ class UpgradeInventoryTest(unittest.TestCase):
                 with update_oink.isolated_release():
                     published = subprocess.run(argv, cwd=root, text=True, capture_output=True)
                     self.assertEqual(published.returncode, 0, published.stdout + published.stderr)
+
+    @unittest.skipUnless(shutil.which(os.environ.get("HUGO_BIN", "hugo")), "Hugo executable is required")
+    def test_readonly_baseline_rejection_preserves_locks_with_real_hugo_proxy(self):
+        with tempfile.TemporaryDirectory() as directory:
+            base = Path(directory)
+            proxy = base / "proxy/example.com/extra/@v"
+            proxy.mkdir(parents=True)
+            (proxy / "list").write_text("v1.0.0\n")
+            (proxy / "v1.0.0.info").write_text('{"Version":"v1.0.0","Time":"2026-01-01T00:00:00Z"}')
+            module_text = "module example.com/extra\n\ngo 1.20\n"
+            (proxy / "v1.0.0.mod").write_text(module_text)
+            with zipfile.ZipFile(proxy / "v1.0.0.zip", "w") as archive:
+                archive.writestr("example.com/extra@v1.0.0/go.mod", module_text)
+                archive.writestr("example.com/extra@v1.0.0/README.md", "Local regression fixture.\n")
+            root = base / "site"
+            root.mkdir()
+            for name in ("go.mod", "go.sum"):
+                (root / name).write_bytes((update_oink.ROOT / name).read_bytes())
+            (root / "hugo.yaml").write_text("module:\n  imports:\n    - path: " + MODULE +
+                                            "\n    - path: example.com/extra\n")
+            before = {name: (root / name).read_bytes() for name in ("go.mod", "go.sum")}
+            env = update_oink.release_environment()
+            env.update(GOPROXY=(base / "proxy").as_uri(), HUGO_MODULE_PROXY=(base / "proxy").as_uri(), GOSUMDB="off")
+            hugo = env.get("HUGO_BIN", "hugo")
+            # Prove this proxy causes real Hugo to mutate locks when run directly.
+            contaminated = base / "contaminated"
+            shutil.copytree(root, contaminated)
+            direct = subprocess.run([hugo, "mod", "graph"], cwd=contaminated, env=env, text=True, capture_output=True)
+            self.assertEqual(direct.returncode, 0, direct.stdout + direct.stderr)
+            self.assertIn("example.com/extra@v1.0.0", direct.stdout)
+            for name, contents in before.items():
+                self.assertNotEqual((contaminated / name).read_bytes(), contents)
+            scripts = root / "scripts"
+            scripts.mkdir()
+            for name in ("update_oink.py", "oink_module.py", "oink-overrides.json"):
+                shutil.copy2(update_oink.ROOT / "scripts" / name, scripts / name)
+            failed = subprocess.run([sys.executable, scripts / "update_oink.py", "--check-baseline"],
+                                    cwd=root, env=env, text=True, capture_output=True)
+            self.assertEqual(failed.returncode, 1, failed.stdout + failed.stderr)
+            self.assertIn("expected Hugo root", failed.stderr)
+            self.assertIn("example.com/extra@v1.0.0", failed.stderr)
+            for name, contents in before.items():
+                self.assertEqual((root / name).read_bytes(), contents)
+            # Parent-relative local themes must still resolve in the workspace.
+            preview = base / "relative-preview"
+            (preview / "layouts/shortcodes").mkdir(parents=True)
+            (preview / "layouts/shortcodes/unpublished.html").write_text("unpublished")
+            (root / "hugo.yaml").write_text("themesDir: ..\ntheme: relative-preview\n"
+                                            "module:\n  imports:\n    - path: " + MODULE + "\n")
+            relative = subprocess.run([sys.executable, scripts / "update_oink.py", "--check-baseline"],
+                                      cwd=root, env=env, text=True, capture_output=True)
+            self.assertEqual(relative.returncode, 1, relative.stdout + relative.stderr)
+            self.assertIn("expected Hugo root", relative.stderr)
+            self.assertIn(f"{SITE_MODULE} relative-preview", relative.stderr)
+            (root / "layouts").mkdir()
+            (root / "layouts/index.html").write_text("{{ .Content }}")
+            (root / "content").mkdir()
+            (root / "content/_index.md").write_text('---\ntitle: Relative fixture\n---\n{{< unpublished >}}\n')
+            with update_oink.graph_workspace(root) as workspace:
+                rendered = subprocess.run([hugo, "--environment", "production", "--panicOnWarning"],
+                                          cwd=workspace, env=env, text=True, capture_output=True)
+                self.assertEqual(rendered.returncode, 0, rendered.stdout + rendered.stderr)
+                self.assertIn("unpublished", (workspace / "public/index.html").read_text())
+            for name, contents in before.items():
+                self.assertEqual((root / name).read_bytes(), contents)
 
     def test_validation_subprocesses_inherit_isolation_and_absolute_hugo_path(self):
         with tempfile.TemporaryDirectory() as directory:

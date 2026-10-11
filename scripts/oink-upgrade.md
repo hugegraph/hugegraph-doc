@@ -181,6 +181,11 @@ and changed paths. Review those changes, then run
 `scripts/update-oink.sh <pinned-version> --resume --accept-reviewed` to validate
 and record the revised inventory; use the version currently pinned in `go.mod`.
 
+Hugo can fetch imports and rewrite locks even during `hugo mod graph`. The
+diagnostic runs it in a sibling temporary workspace with independent lock copies,
+preserving current configuration and relative paths. The checkout's parent must
+be writable; failure leaves the original `go.mod` and `go.sum` unchanged.
+
 The baseline advances only after manual compatibility review and the full
 automated verification pass.
 

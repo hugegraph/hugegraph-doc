@@ -62,12 +62,34 @@ def isolated_release():
         os.environ.update(original)
 
 
+@contextmanager
+def graph_workspace(root):
+    """Give Hugo disposable locks while preserving relative config/import paths.
+
+    Hugo's graph command can fetch configured imports and rewrite both locks.
+    A sibling workspace keeps parent-relative paths unchanged; link project
+    inputs to their current files and copy the two writable root lock files.
+    """
+    root = Path(root).resolve()
+    with tempfile.TemporaryDirectory(prefix="hugegraph-oink-graph-", dir=root.parent) as directory:
+        workspace = Path(directory)
+        for entry in root.iterdir():
+            destination = workspace / entry.name
+            if entry.name in {"go.mod", "go.sum"}:
+                shutil.copy2(entry, destination)
+            else:
+                destination.symlink_to(entry, target_is_directory=entry.is_dir())
+        yield workspace
+
+
 def verify_hugo_graph(root, version):
     if (root / "_vendor").exists():
         raise ValueError("_vendor is unsupported by this module-only updater; move it aside and rerun, or refresh and review it separately")
     env = release_environment()
-    graph = subprocess.check_output([env.get("HUGO_BIN", "hugo"), "mod", "graph"],
-                                    cwd=root, env=env, text=True)
+    with graph_workspace(root) as workspace:
+        graph = subprocess.check_output([env.get("HUGO_BIN", "hugo"), "mod", "graph"],
+                                        cwd=workspace, env=env, text=True)
+        graph = graph.replace(str(workspace), str(Path(root).resolve()))
     expected = MODULE + "@" + version
     edges = [line.split() for line in graph.splitlines() if line.strip()]
     root_imports = [tokens[1] for tokens in edges if len(tokens) == 2 and tokens[0] == SITE_MODULE]
