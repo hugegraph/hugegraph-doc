@@ -130,7 +130,8 @@ HUGEGRAPH_VERSION=1.7.0 docker compose -f docker-compose.yml up -d --wait
 非默认值会向 Server 容器注入 `HG_SERVER_SERVICE_ID` 或 `HG_SERVER_GRAPHSPACE`。请使用包含这些入口脚本映射的镜像。
 通过 `HG_SERVER_SERVICE_ID`、`SERVICE_ID` 或 `server.serviceId` 传入的非空服务 ID 仅支持可打印 ASCII，包含空格和反斜杠；
 部署校验会拒绝非 ASCII 和控制字符。此限制仅针对这些配置入口，不改变 Core Service 名称协议和已有的手工 properties 配置。
-`server.graphSpace` 接受 `DEFAULT`，或以小写字母开头、最多 48 位的小写字母、数字和下划线组成的已有空间名称：
+`HG_SERVER_GRAPHSPACE`、生效的旧变量 `GRAPH_SPACE` 和 `server.graphSpace` 遵循同一规则：
+接受 `DEFAULT`，或以小写字母开头、最多 48 位的小写字母、数字和下划线组成的已有空间名称：
 
 ```bash
 helm upgrade --install hg ./helm/hugegraph \

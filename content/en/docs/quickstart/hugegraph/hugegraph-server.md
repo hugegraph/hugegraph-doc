@@ -132,8 +132,9 @@ or `HG_SERVER_GRAPHSPACE` into the Server container. Use an image that includes 
 Non-empty service IDs supplied through `HG_SERVER_SERVICE_ID`, `SERVICE_ID`, or `server.serviceId`
 must use printable ASCII; spaces and backslashes are supported, while deployment checks reject
 non-ASCII and control characters. This entrypoint restriction does not change Core Service naming
-or existing manually supplied properties. `server.graphSpace` accepts `DEFAULT` or an existing space
-name of up to 48 lowercase letters, digits, and underscores, starting with a letter:
+or existing manually supplied properties. `HG_SERVER_GRAPHSPACE`, the effective `GRAPH_SPACE` fallback,
+and `server.graphSpace` accept `DEFAULT` or an existing space name of up to 48 lowercase letters, digits,
+and underscores, starting with a letter:
 
 ```bash
 helm upgrade --install hg ./helm/hugegraph \
