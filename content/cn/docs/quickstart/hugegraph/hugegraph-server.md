@@ -132,6 +132,8 @@ Helm chart 和 Server 镜像须来自同一版本，且二者均包含 [Server P
 仅复制这些新 values 到旧 chart 或镜像不会补上该能力；不要将本示例与 1.7.0 或未包含这些变更的 chart/镜像搭配使用。
 通过 `HG_SERVER_SERVICE_ID`、`SERVICE_ID` 或 `server.serviceId` 传入的非空服务 ID 仅支持可打印 ASCII，包含空格和反斜杠；
 部署校验会拒绝非 ASCII 和控制字符。此限制仅针对这些配置入口，不改变 Core Service 名称协议和已有的手工 properties 配置。
+Helm 会将 `server.serviceId` 中的美元符号（包括 `$(POD_IP)`）按字面量保留，不展开 Kubernetes 环境变量引用。
+使用上述 chart values 设置身份；Server 的 `extraEnv` 会保留对应的新旧身份变量名，禁止重复覆盖。
 `HG_SERVER_GRAPHSPACE`、生效的旧变量 `GRAPH_SPACE` 和 `server.graphSpace` 遵循同一规则：
 接受 `DEFAULT`，或以小写字母开头、最多 48 位的小写字母、数字和下划线组成的已有空间名称：
 

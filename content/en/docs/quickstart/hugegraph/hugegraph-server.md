@@ -135,7 +135,10 @@ with 1.7.0 or any chart/image version without these changes.
 Non-empty service IDs supplied through `HG_SERVER_SERVICE_ID`, `SERVICE_ID`, or `server.serviceId`
 must use printable ASCII; spaces and backslashes are supported, while deployment checks reject
 non-ASCII and control characters. This entrypoint restriction does not change Core Service naming
-or existing manually supplied properties. `HG_SERVER_GRAPHSPACE`, the effective `GRAPH_SPACE` fallback,
+or existing manually supplied properties. Helm preserves dollar signs in `server.serviceId` literally,
+including `$(POD_IP)`; this field does not expand Kubernetes environment references.
+Set the identity through these chart values; Server `extraEnv` reserves both the new and legacy identity variable names.
+`HG_SERVER_GRAPHSPACE`, the effective `GRAPH_SPACE` fallback,
 and `server.graphSpace` accept `DEFAULT` or an existing space name of up to 48 lowercase letters, digits,
 and underscores, starting with a letter:
 
