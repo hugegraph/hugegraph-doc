@@ -221,20 +221,7 @@ mvn package -DskipTests -ntp -Drocksdb-only
 
 Server 的 tar 包随包提供 `conf/rest-server.properties`、`conf/gremlin-server.yaml` 和 `conf/graphs/hugegraph.properties`；源码构建包从 `hugegraph-server/hugegraph-dist/src/assembly/static/conf/` 装配这些文件。解压后在 Server 安装目录内编辑配置，无需另行生成。发行包版本之间可能有默认值差异，下面涉及的默认值和启动行为按 `master` 主线说明。
 
-单机 RocksDB 快速上手只需确认 `conf/graphs/hugegraph.properties` 使用 `backend=rocksdb`、`serializer=binary`。正常 Server 初始化会扫描 `conf/graphs/` 并加载本地图配置，无需额外设置
-`graph.load_from_local_config=true`。该选项默认值为 `false`，控制构造阶段的提前加载。通过预检且未启用 PD 时，reload 会重扫启动图配置目录。启用 PD 时，会恢复已成功加载且文件仍存在的本地图；`true` 还会发现新增本地文件。本地配置优先于 PD
-元数据。配置了 `auth.authenticator` 时，reload 会在关闭图之前返回 HTTP 400，需要重启 Server 应用配置变化。重载行为详见[图管理 API](/cn/docs/clients/restful-api/graphs/)。
-
-启用 PD 时，`DEFAULT` 中已成功加载的本地图在配置文件仍存在时会拒绝公开删除，不受该选项影响；其他图空间的同名图不受此保护。
-启用 PD 且设为 `true` 时，保护还覆盖成功扫描到的全部配置名，即使本地加载失败后由 PD 元数据恢复同名图也受保护。
-启用 PD 且设为 `false` 时，从未加载的新增本地文件仍被忽略，也不会建立删除保护。
-移除本地文件后，reload 中的目录扫描成功即在分离图之前解除保护；后续阶段失败、整个请求返回 HTTP 400，也不会回滚该扫描快照。
-旧实例成功关闭并分离后，图可改由 PD 元数据恢复；否则移除运行时注册，保留后端数据。关闭尝试后图仍未关闭时，保留旧注册供显式重试。
-图已标记关闭后捕获到关闭异常时，会记录异常并移除运行时绑定。
-扫描失败会保留现有图和保护状态。未启用 PD 时，公开删除图仍会清空数据并移除本地配置。
-每个图管理器同一时间只执行一个 reload。重叠请求会在扫描配置或关闭图之前返回 HTTP 400；当前请求结束后可重试，无论该请求成功还是失败。
-
-图/Schema 缓存通知 RPC 服务已注册时，reload 也会在关闭任何图之前返回 HTTP 400，应改用重启 Server。服务的安全重绑尚未实现，Linux 高性能机器上的修复与验证要求见图管理 API。
+单机 RocksDB 快速上手只需确认 `conf/graphs/hugegraph.properties` 使用 `backend=rocksdb`、`serializer=binary`。正常 Server 初始化会扫描 `conf/graphs/` 并加载本地图配置，无需额外设置 `graph.load_from_local_config=true`。该选项默认 `false`，控制构造阶段的提前加载。图配置变化通过重启 Server 应用，不使用热重载进行维护。
 
 详细的配置介绍请参考[配置文档](/docs/config/config-guide)及[配置项介绍](/docs/config/config-option)。
 

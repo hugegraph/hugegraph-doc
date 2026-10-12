@@ -88,17 +88,10 @@ GET http://localhost:8080/graphspaces/DEFAULT/graphs/hugegraph/tasks/2
 
 ##### Params
 
-- force: allows deletion of incomplete task information, default is false. For local tasks, it requests cancellation of an incomplete running task;
-  it does not bypass the execution wait below.
+- force: whether to delete the task even when it is still running, default is false
 
-For the local scheduler, a `SUCCESS` status can become visible before the completion callback finishes saving the result.
-Deletion waits up to `task.wait_timeout` seconds for execution and its callback to finish, then checks the stored status before removing the record.
-Timeout or interruption retains the task record and any active execution owner for retry. Even with `force=true`, the record is not removed
-while its execution owner is active. These cancellation, waiting and execution-owner retention rules apply only to local schedulers.
-
-Distributed schedulers coordinate deletion through task locks and persistent state. `force=true` does not bypass a lock held by another Server.
-A successful response can acknowledge a `DELETING` record awaiting cleanup; HTTP 204 does not prove that execution has stopped or the record is gone.
-If a cancellation or deletion request fails during persistence, correct the storage failure before retrying.
+Task-record deletion is separate from graph deletion. For graph maintenance, follow the stop-write and task-drain requirements in the [graph
+API](/docs/clients/restful-api/graphs/).
 
 ##### Method & Url
 

@@ -215,21 +215,17 @@ Create a graph (set `Content-Type: application/json`)
 
 Graph-space management permission (`space`) is required when authentication is enabled.
 
-Stop application writes before deleting a graph and keep it isolated with writes stopped throughout failures and retries.
-Do not recreate a same-named graph in that graph space on any Server until failed deletion cleanup and retries finish.
-If the initial backend clear fails, retry clears it again and may erase new data written by another Server.
-The delete operation does not fence graph write transactions across requests.
-Once scheduler shutdown has closed task admission, a failed deletion does not automatically reopen it.
+Stop writes and tasks on every Server that uses the graph before deletion, and keep them stopped during failures and retries.
+Do not recreate the same graph name until deletion has completed and been confirmed on every Server. Notifications are not a cluster-wide barrier.
 
-With PD, public deletion in `DEFAULT` returns HTTP 400 for successfully loaded local graphs regardless of `graph.load_from_local_config`,
-and, with `true`, for every configuration name from a successful directory scan, including metadata fallback after local loading fails.
-Remove the corresponding local configuration file before either reload or restarting Server.
-On reload, a successful directory scan releases the protection before detachment, even if later phases return HTTP 400.
-Keeping the file allows startup to restore deletion protection. This protection does not apply to a graph with the same name in another graph space.
+On the deleting Server, scheduler shutdown fences new task admission and waits for actual executions, cancellation callbacks and transaction cleanup.
+If the configured task-drain wait times out (`task.wait_timeout`, seconds), deletion is refused before data, configuration or metadata removal; retry after
+the owners exit.
+Closing the scheduler alone retains persistent work that has not started.
 
-When graph removal catches an exception from `close()`, it logs the failure and removes runtime bindings if the graph is already marked closed.
-If the graph is still open, its registration is retained only for cleanup and retry; it does not mean that normal application use can resume.
-Backend data or PD metadata may already have been removed. Deletion is not transactional; retry does not roll back deletion or restore removed data or metadata.
+Deletion is not transactional. A failure after destructive cleanup does not restore removed data or metadata. An uncertain owner or native-resource cleanup
+needs manual inspection; do not force-remove the scheduler or resume writes just because a task Future is done.
+If deletion is refused because the graph uses local configuration, remove its configuration file and restart Server before retrying.
 
 ##### Params
 
@@ -425,68 +421,9 @@ GET http://localhost:8080/graphspaces/DEFAULT/graphs/default
 
 #### 6.1.10 Reload the graphs of the graphspace
 
-Reloads all graphs held by this Server after graph configuration changes. Reload preserves backend data and local configuration files.
-
-Within each graph manager, reload, graph removal, graph-space clearing or removal, and API graph creation
-and cloning share lifecycle coordination. With PD, a graph lookup that misses the cache holds the same
-coordination from reading metadata until registering the local instance. Cached graph reads are outside
-it; this is not a barrier for all HTTP requests or graph transactions.
-Local startup configuration loading waits for an active lifecycle operation without a configured timeout;
-interrupting that wait aborts startup. Overlapping API requests still fail immediately.
-Remote graph-addition and removal notifications use the same lifecycle coordination.
-An overlapping REST request for reload or graph removal returns HTTP 400 before scanning configurations or changing graphs.
-The active operation holds this coordination until it completes, including the full close-and-reopen sequence of reload.
-Retry an overlapping REST request explicitly after the active operation ends, including failure or timeout.
-Remote graph-addition and removal notifications received during an active operation are deferred
-and processed afterward using current PD configuration. For a graph loaded from PD that is not protected
-by a local configuration in `DEFAULT`, the local instance is retained only when its creation details
-and opening configuration still match the current PD record. If they differ, Server closes the old
-instance and reloads the current PD configuration, preserving its graph-space quota while the graph
-remains registered in PD. Graphs protected by local configuration in `DEFAULT` keep the local protection
-rules described below.
-If creation details and opening configuration are identical, including a reused creation time, Server
-cannot reliably distinguish an old instance from a recreated graph with the same name. Keep writes
-stopped during maintenance, then explicitly reload or restart Server and verify the intended graph.
-If replacement loading or startup fails, the graph may temporarily be absent from this Server. Keep writes
-stopped and, after fixing the cause, explicitly reload or restart Server to restore it. The reload
-restrictions below still apply; this process is not a distributed transaction.
-An actual graph-close failure is logged and still requires an explicit retry.
-
-Without PD, a reload that passes preflight rescans all current files in the startup graph configuration directory,
-even when `graph.load_from_local_config=false`. With PD and `false`, reload restores only local graphs previously loaded successfully
-whose configuration files still exist; it ignores new local files. Setting the flag to `true` also discovers new local files.
-Local configurations are loaded first, then PD metadata is used for graphs not already restored locally.
-Newly loaded graphs wait for readiness when RPC is enabled, complete startup and task scheduling initialization,
-then restore their Gremlin graph/traversal bindings.
-
-A successful directory scan updates local-source tracking before graphs are closed; with PD, it also updates local graph deletion protection.
-A scan failure returns HTTP 400 before closing any graph and preserves existing graphs and protection.
-With PD, local graphs successfully loaded in `DEFAULT` reject public deletion while their configuration files remain,
-regardless of `graph.load_from_local_config` and whether deletion requests data clearing. A graph with the same name in another graph space
-is not protected by that local file. With PD and `true`, protection also covers all configuration names from a successful scan, even if local loading fails
-and PD metadata restores a graph with that name. With PD and `false`, a new local file that has never been loaded remains ignored and unprotected.
-Remove the configuration file: a successful directory scan during reload clears its local-source tracking and deletion protection before detachment.
-Later opening or startup failures do not roll back that scan snapshot, even when the whole reload returns HTTP 400.
-After the old instance closes and detaches, PD metadata may restore the graph for public deletion; otherwise its runtime registration is removed
-while backend data remains. If closing leaves the graph open, the old registration is retained for an explicit retry.
-A caught close exception after the graph is marked closed is logged and its runtime bindings are removed.
-This removes the local startup source, so a subsequent restart will not reload it from that deleted file.
-Source tracking follows the registered graph instance: removal of an old instance does not discard a newer local replacement.
-For public deletion in `DEFAULT`, the corresponding local-source tracking is cleared only after deletion completes.
-Without PD, public graph deletion still clears data and removes its local configuration; the PD protection rule does not apply.
-
-A configured `auth.authenticator` causes HTTP 400 before any graph is closed, because authentication services retain graph references.
-Restart Server to apply graph configuration changes in that deployment; the rejected reload leaves the original graphs, data and configuration intact.
-
-Graphs still open after a close attempt remain registered for an explicit retry, including objects not closed during cleanup after a reload startup failure.
-Other recoverable graphs may reload before an opening or startup failure is reported.
-An incomplete reload returns HTTP 400; successful recovery of some graphs does not make the whole reload successful.
-Correct the failure and retry.
-
-Reload also returns HTTP 400 before closing any graph when graph/schema cache-notification RPC services are registered for a managed graph.
-Safe rebinding of those services remains unimplemented, so restart Server to apply changes; this rejection preserves the original graphs, data and
-configuration. Repair and validate that hot-reload lifecycle on a high-performance Linux distributed deployment before relying on it.
-The PD/local-config rules above apply when these preflight restrictions are absent; they do not establish full distributed reload support.
+Apply graph configuration changes by restarting Server. Hot-reload recovery is deferred; do not use this endpoint for configuration maintenance.
+In the current non-PD path, reload invokes graph deletion and can clear backend data. Keep writes and tasks stopped until Server has restarted and the
+intended graphs have been verified. The request and response below document the API shape, not a maintenance or recovery guarantee.
 
 ##### Params
 
@@ -517,10 +454,6 @@ PUT http://localhost:8080/graphspaces/DEFAULT/graphs/manage
 ```javascript
 200
 ```
-
-HTTP 400 indicates a configured authenticator, registered graph/schema cache-notification RPC services,
-an overlapping reload/removal request, a directory scan failure, or an incomplete graph reload.
-HTTP 200 means the permitted graph reload phases reported no failure.
 
 ##### Response Body
 
