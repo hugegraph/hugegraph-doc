@@ -226,7 +226,19 @@ mvn package -DskipTests -ntp -Drocksdb-only
 
 Server archives include `conf/rest-server.properties`, `conf/gremlin-server.yaml`, and `conf/graphs/hugegraph.properties`; source builds assemble them from `hugegraph-server/hugegraph-dist/src/assembly/static/conf/`. Edit them inside the extracted Server directory without a separate generation step. Defaults vary by release; the following defaults and startup behavior describe master.
 
-For standalone RocksDB, confirm `backend=rocksdb` and `serializer=binary` in `conf/graphs/hugegraph.properties`. Normal Server initialization scans `conf/graphs/` and loads local graphs without requiring `graph.load_from_local_config=true`. This option defaults to `false` and controls constructor preloading and rescanning on `reload()`.
+For standalone RocksDB, confirm `backend=rocksdb` and `serializer=binary` in `conf/graphs/hugegraph.properties`. Normal Server initialization scans `conf/graphs/` and loads local graphs without requiring `graph.load_from_local_config=true`. This option defaults to `false` and controls constructor preloading. Without PD, a reload that passes preflight rescans the startup graph directory. With PD, it restores local graphs previously loaded successfully whose files still exist; `true` also discovers new local files. Local configurations take precedence over PD metadata. If `auth.authenticator` is configured, reload returns HTTP 400 before closing graphs; restart Server to apply configuration changes. See the [graph API](/docs/clients/restful-api/graphs/) for reload behavior.
+
+With PD, local graphs successfully loaded in `DEFAULT` reject public deletion while their configuration files remain, regardless of this flag.
+With PD and `true`, protection also covers every name in a successful directory scan, even if local loading fails and PD metadata restores that graph.
+With PD and `false`, never-loaded new files remain ignored and unprotected.
+Other graph spaces are outside this protection. Remove the file; a successful directory scan during reload releases its protection before detachment.
+Later reload failures do not roll back that scan snapshot, even when the request returns HTTP 400.
+After the old instance closes and detaches, PD metadata may restore it; otherwise its runtime registration is removed while backend data remains.
+If closing fails, the old registration is retained for an explicit retry.
+A scan failure preserves existing graphs and protection. Without PD, public graph deletion still clears data and removes its local configuration.
+
+Registered graph/schema cache-notification RPC services also make reload return HTTP 400 before closing any graph; use Server restart.
+Their safe rebinding remains unimplemented; the graph API documents the required repair and validation on a high-performance Linux deployment.
 
 See the [configuration guide](/docs/config/config-guide/) and [option reference](/docs/config/config-option/) for details.
 

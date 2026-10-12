@@ -215,6 +215,11 @@ Create a graph (set `Content-Type: application/json`)
 
 Graph-space management permission (`space`) is required when authentication is enabled.
 
+With PD, public deletion in `DEFAULT` returns HTTP 400 for successfully loaded local graphs regardless of `graph.load_from_local_config`,
+and, with `true`, for every configuration name from a successful directory scan, including metadata fallback after local loading fails.
+Remove the file and run reload: a successful directory scan releases the protection before detachment, even if later reload phases return HTTP 400.
+Restarting Server is another option. This protection does not apply to a graph with the same name in another graph space.
+
 ##### Params
 
 **Path parameters**
@@ -409,7 +414,41 @@ GET http://localhost:8080/graphspaces/DEFAULT/graphs/default
 
 #### 6.1.10 Reload the graphs of the graphspace
 
-Reloads the graphs the server holds, which is useful after the graph configuration has changed outside the server.
+Reloads all graphs held by this Server after graph configuration changes. Reload preserves backend data and local configuration files.
+
+Without PD, a reload that passes preflight rescans all current files in the startup graph configuration directory,
+even when `graph.load_from_local_config=false`. With PD and `false`, reload restores only local graphs previously loaded successfully
+whose configuration files still exist; it ignores new local files. Setting the flag to `true` also discovers new local files.
+Local configurations are loaded first, then PD metadata is used for graphs not already restored locally.
+Newly loaded graphs wait for readiness when RPC is enabled, complete startup and task scheduling initialization,
+then restore their Gremlin graph/traversal bindings.
+
+A successful directory scan updates local-source tracking before graphs are closed; with PD, it also updates local graph deletion protection.
+A scan failure returns HTTP 400 before closing any graph and preserves existing graphs and protection.
+With PD, local graphs successfully loaded in `DEFAULT` reject public deletion while their configuration files remain,
+regardless of `graph.load_from_local_config` and whether deletion requests data clearing. A graph with the same name in another graph space
+is not protected by that local file. With PD and `true`, protection also covers all configuration names from a successful scan, even if local loading fails
+and PD metadata restores a graph with that name. With PD and `false`, a new local file that has never been loaded remains ignored and unprotected.
+Remove the configuration file: a successful directory scan during reload clears its local-source tracking and deletion protection before detachment.
+Later opening or startup failures do not roll back that scan snapshot, even when the whole reload returns HTTP 400.
+After the old instance closes and detaches, PD metadata may restore the graph for public deletion; otherwise its runtime registration is removed
+while backend data remains. If closing fails, the old registration is retained for an explicit retry. This removes the local startup source, so a subsequent restart will not reload it from that deleted file.
+Source tracking follows the registered graph instance: removal of an old instance does not discard a newer local replacement.
+For public deletion in `DEFAULT`, the corresponding local-source tracking is cleared only after deletion completes.
+Without PD, public graph deletion still clears data and removes its local configuration; the PD protection rule does not apply.
+
+A configured `auth.authenticator` causes HTTP 400 before any graph is closed, because authentication services retain graph references.
+Restart Server to apply graph configuration changes in that deployment; the rejected reload leaves the original graphs, data and configuration intact.
+
+Graphs that fail to close remain registered for an explicit retry, including objects whose cleanup fails after a reload startup failure.
+Other recoverable graphs may reload before an opening or startup failure is reported.
+An incomplete reload returns HTTP 400; successful recovery of some graphs does not make the whole reload successful.
+Correct the failure and retry.
+
+Reload also returns HTTP 400 before closing any graph when graph/schema cache-notification RPC services are registered for a managed graph.
+Safe rebinding of those services remains unimplemented, so restart Server to apply changes; this rejection preserves the original graphs, data and
+configuration. Repair and validate that hot-reload lifecycle on a high-performance Linux distributed deployment before relying on it.
+The PD/local-config rules above apply when these preflight restrictions are absent; they do not establish full distributed reload support.
 
 ##### Params
 
@@ -440,6 +479,10 @@ PUT http://localhost:8080/graphspaces/DEFAULT/graphs/manage
 ```javascript
 200
 ```
+
+HTTP 400 indicates a configured authenticator, registered graph/schema cache-notification RPC services, a directory scan failure,
+or an incomplete graph reload.
+HTTP 200 means the permitted graph reload phases reported no failure.
 
 ##### Response Body
 

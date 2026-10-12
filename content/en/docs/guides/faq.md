@@ -34,7 +34,19 @@ weight: 6
 
 - Two graphs are configured, the names are `hugegraph` and `hugegraph1`, and the command to start the service is `start-hugegraph.sh`. Is only the hugegraph graph opened?
 
-  The script name is unrelated to the graph name. Server scans and loads local graph configurations from `conf/graphs` by default; change the directory with `graphs` in `conf/rest-server.properties`. `graph.load_from_local_config` defaults to `false` and controls only constructor preloading and rescanning on `reload()`, not whether startup loads local graphs. Give each local graph its own configuration file. See the [Server configuration guide](/docs/config/config-guide/).
+  The script name is unrelated to the graph name. Server scans and loads local graph configurations from `conf/graphs` by default; change the directory with `graphs` in `conf/rest-server.properties`. `graph.load_from_local_config` defaults to `false` and controls constructor preloading, not whether startup loads local graphs. Without PD, a reload that passes preflight rescans the startup configuration directory. With PD, it restores local graphs previously loaded successfully whose configuration files still exist; setting the flag to `true` also discovers new local files. Local configurations take precedence over PD metadata. A configured `auth.authenticator` rejects reload with HTTP 400 before closing any graph; restart Server to apply configuration changes in that deployment. Give each local graph its own configuration file. See the [Server configuration guide](/docs/config/config-guide/).
+
+  With PD, local graphs successfully loaded in `DEFAULT` reject public deletion while their configuration files remain, regardless of this flag.
+  With PD and `true`, protection also covers every name in a successful directory scan, even if local loading fails and PD metadata restores that graph.
+  With PD and `false`, never-loaded new files remain ignored and unprotected.
+  Other graph spaces are outside this protection. Remove the file; a successful directory scan during reload releases its protection before detachment.
+  Later reload failures do not roll back that scan snapshot, even when the request returns HTTP 400.
+  After the old instance closes and detaches, PD metadata may restore it; otherwise its runtime registration is removed while backend data remains.
+  If closing fails, the old registration is retained for an explicit retry.
+  A scan failure preserves existing graphs and protection. Without PD, public graph deletion still clears data and removes its local configuration.
+
+  Registered graph/schema cache-notification RPC services also cause reload to return HTTP 400 before closing any graph. Restart Server instead;
+  safe service rebinding remains unimplemented. See the [graph API](/docs/clients/restful-api/graphs/) for the Linux repair and validation requirement.
 
 - After the service starts successfully, garbled characters are returned when using `curl` to query all vertices
 

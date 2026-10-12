@@ -25,13 +25,13 @@ HugeGraphServer 内部集成了 GremlinServer 和 RestServer，而 gremlin-serve
 > 本页的认证配置属于 HugeGraph Server。生产环境必须按 [Server 认证与授权配置](/cn/docs/config/config-authentication/)启用 Auth、配置 IP 白名单和最小权限，并保留、保护 Server `audit-*.log`。示例中注释掉的认证配置表示默认未启用。
 
 发行包把默认配置放在安装目录的 `conf/` 下；这些文件来自 Server 仓库的静态发行素材，构建时随包复制。未在配置文件中出现的选项采用代码定义的默认值；配置文件显式写入的值会覆盖该默认值。
-本页的默认文件行为按固定 Server 主线 `2f827d6` 核对；实际使用的发布包应以其自身版本对应的配置文件和入口脚本为准。
+默认发行配置的文件布局和设置按固定 Server 主线 `2f827d6` 核对；实际使用的发布包应以其自身版本对应的配置文件和入口脚本为准。
 
 | 文件 | 来源和用途 | 装载行为 |
 |------|------------|----------|
 | `conf/gremlin-server.yaml` | 随发行包提供；配置 Gremlin Server。 | `start-hugegraph.sh` 将它作为 Server 启动参数传入。 |
 | `conf/rest-server.properties` | 按固定 Server 主线构建时随发行包提供；配置 REST Server、PD、认证等。 | 启动脚本和 Server 进程读取；对应主线构建的容器入口脚本也会在启动前更新其中受支持的选项。 |
-| `conf/graphs/hugegraph.properties` | 随发行包提供的默认图配置，使用 RocksDB。 | `init-store.sh` 和 Server 应用初始化都会扫描该目录；初始化阶段会尝试加载其中的图配置。`graph.load_from_local_config` 默认 `false`，只控制管理器构造阶段预加载及 `reload()` 重扫。 |
+| `conf/graphs/hugegraph.properties` | 随发行包提供的默认图配置，使用 RocksDB。 | `init-store.sh` 和 Server 应用初始化都会扫描该目录；初始化阶段会尝试加载其中的图配置。`graph.load_from_local_config` 默认 `false`，控制管理器构造阶段预加载；通过预检且未启用 PD 时 reload 会本地重扫；启用 PD 时恢复已成功加载且文件仍存在的本地图，`true` 还会发现新增本地文件。 |
 | `conf/graphs/hstore.properties.template` | 随发行包提供的 HStore 模板；其他图配置由用户按需创建。 | HStore 镜像在构建时把模板改名为 `hugegraph.properties`；裸发行包用户可复制模板并修改。 |
 
 完整的默认文件见Server 主线源码：[gremlin-server.yaml](https://github.com/apache/hugegraph/blob/master/hugegraph-server/hugegraph-dist/src/assembly/static/conf/gremlin-server.yaml)、[rest-server.properties](https://github.com/apache/hugegraph/blob/master/hugegraph-server/hugegraph-dist/src/assembly/static/conf/rest-server.properties)、[hugegraph.properties](https://github.com/apache/hugegraph/blob/master/hugegraph-server/hugegraph-dist/src/assembly/static/conf/graphs/hugegraph.properties) 和 [hstore.properties.template](https://github.com/apache/hugegraph/blob/master/hugegraph-server/hugegraph-dist/src/assembly/static/conf/graphs/hstore.properties.template)。
@@ -53,7 +53,7 @@ graphs: {}
 ssl: { enabled: false }
 ```
 
-通常只需关注 `channelizer`、`host` 和 `port`。图不在 Gremlin Server 的 `graphs` 段加载；REST 侧管理器会在 Server 应用初始化时扫描 `graphs` 目录并尝试载入本地图配置。`graph.load_from_local_config` 只控制管理器构造阶段的预加载与 `reload()` 重扫；默认 `false` 不会关闭应用初始化阶段的本地加载。
+通常只需关注 `channelizer`、`host` 和 `port`。图不在 Gremlin Server 的 `graphs` 段加载；REST 侧管理器会在 Server 应用初始化时扫描 `graphs` 目录并尝试载入本地图配置。`graph.load_from_local_config` 控制管理器构造阶段的预加载；默认 `false` 不会关闭应用初始化阶段的本地加载。通过预检且未启用 PD 时，reload 会重扫该目录。启用 PD 时，会恢复已成功加载且文件仍存在的本地图；`true` 还会发现新增本地文件。本地配置先于 PD 元数据加载。
 
 - channelizer：默认的 `WsAndHttpChannelizer` 同时支持 WebSocket 和 HTTP。Gremlin-Console 使用 WebSocket，HugeGraph-Client、Loader 和 Hubble 使用 HTTP；
 
@@ -66,7 +66,7 @@ ssl: { enabled: false }
 
 ### 3 rest-server.properties
 
-下面是可用的 `rest-server.properties` 示例。主线模板未写出 `graph.load_from_local_config`，源码默认值为 `false`。示例中设为 `true` 是可选的：它开启管理器构造阶段预加载和 `reload()` 重扫；Server 应用初始化阶段仍会扫描并尝试加载本地图配置。
+下面是可用的 `rest-server.properties` 示例。主线模板未写出 `graph.load_from_local_config`，源码默认值为 `false`。示例中设为 `true` 是可选的：它开启管理器构造阶段预加载，以及启用 PD 时 reload 对新增本地文件的发现；设为 `false` 时仍会恢复已成功加载且文件仍存在的本地图；通过预检且未启用 PD 时 reload 总会本地重扫，不受该选项限制。Server 应用初始化阶段仍会扫描并尝试加载本地图配置。
 
 ```properties
 # bind url
@@ -110,7 +110,18 @@ memory_monitor.period=2000
 
 - restserver.url：RestServer 提供服务的 url，根据实际环境修改。如果其他 IP 地址无法访问，可以尝试修改为特定的地址；或修改为 `http://0.0.0.0` 来监听来自任何 IP 地址的请求，这种方案较为便捷，但需要留意服务可被访问的网络范围；
 - graphs：图配置文件所在目录，默认值是 `./conf/graphs`。`init-store.sh` 会扫描该目录；Server 应用初始化也会扫描并尝试加载其中的 properties 文件；
-- graph.load_from_local_config：是否在管理器构造阶段预加载本地图配置，以及在 `reload()` 时重新扫描；源码默认值为 `false`。它不会禁止 Server 应用初始化阶段的本地加载，也不是安全隔离开关；
+- graph.load_from_local_config：是否在管理器构造阶段预加载本地图配置，源码默认值为 `false`。通过预检且未启用 PD 时，reload 会重扫启动图配置目录。启用 PD 时，会恢复已成功加载且文件仍存在的本地图；`true` 还会发现新增本地文件。本地配置先于 PD 元数据加载。它不会禁止 Server 应用初始化阶段的本地加载，也不是安全隔离开关；
+
+目录扫描成功后，reload 会更新本地来源记录；启用 PD 时，也会更新本地图删除保护。
+启用 PD 时，`DEFAULT` 中已成功加载的本地图在配置文件仍存在时会拒绝公开删除，不受该选项影响，无论是否清空数据。
+启用 PD 且设为 `true` 时，保护还覆盖成功扫描到的全部配置名，包括本地加载失败后由 PD 元数据恢复的同名图。
+其他图空间的同名图不受此本地文件保护；启用 PD 且设为 `false` 时，从未加载的新增本地文件仍被忽略，不会建立删除保护。
+移除本地文件后，reload 中的目录扫描成功即在分离图之前清除对应来源和保护；后续阶段失败、整个请求返回 HTTP 400，也不会回滚该扫描快照。
+旧实例成功关闭并分离后，图可改由 PD 元数据恢复；否则移除运行时注册，但保留后端数据。关闭失败则保留旧注册，供显式重试。
+扫描失败会保留现有图和保护状态。未启用 PD 时，公开删除图仍会清空数据并移除本地配置。详细行为见下方图管理 API。
+
+配置了 `auth.authenticator` 时，reload 会在关闭任何图之前以 HTTP 400 拒绝请求，需要重启 Server 应用图配置变化。失败与恢复行为详见[图管理 API](/cn/docs/clients/restful-api/graphs/)。
+图/Schema 缓存通知 RPC 服务已注册时，reload 同样会在关闭任何图之前返回 HTTP 400，应改用重启 Server。服务的安全重绑尚未实现，需要在 Linux 高性能机器的分布式部署中修复并验证。
 
 > 当前上游模板中的 Arthas 键仍写作 `arthas.telnet_port`、`arthas.http_port` 和 `arthas.disabled_commands`，但 `ServerOptions` 读取的是下方示例中的 camelCase 名称。自定义配置应使用 `arthas.telnetPort`、`arthas.httpPort` 和 `arthas.disabledCommands`。
 
@@ -145,7 +156,7 @@ store=hugegraph
 
 **[可选]：修改 rest-server.properties**
 
-通过修改 `rest-server.properties` 中的 `graphs` 配置项来设置图的配置文件目录。默认配置为 `graphs=./conf/graphs`；需要其他目录时调整 `graphs`。下面将 `graph.load_from_local_config` 设为 `true`，作为管理器构造阶段预加载和 `reload()` 重扫的可选设置；应用初始化仍会读取该目录中的本地图配置：
+通过修改 `rest-server.properties` 中的 `graphs` 配置项来设置图的配置文件目录。默认配置为 `graphs=./conf/graphs`；需要其他目录时调整 `graphs`。下面将 `graph.load_from_local_config` 设为 `true`，作为管理器构造阶段预加载的可选设置。启用 PD 时，它也会让 reload 发现新增本地文件；`false` 仍会恢复已成功加载且文件仍存在的本地图。通过预检且未启用 PD 时，reload 会重扫该目录。应用初始化仍会读取该目录中的本地图配置：
 
 ```properties
 graphs=./conf/graphs
