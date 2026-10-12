@@ -890,12 +890,15 @@ Copy a mapping mounted from a read-only Kubernetes ConfigMap to a writable volum
 
 Usually, the Loader task takes a long time to execute. If the import interrupt process exits for some reason, and next time you want to continue the import from the interrupted point, this is the scenario of using breakpoint continuation.
 
-The user sets the command line parameter --incremental-mode to true to open the breakpoint resume mode. The key to breakpoint continuation lies in the progress file. When the import process exits, the import progress at the time of exit will be recorded.
-Recorded in the progress file, the progress file is located in the `${struct}` directory, the file name is like `load-progress_${timestamp}`, ${struct} is the prefix of the mapping file, and ${timestamp} is the start of the import
-moment, formatted as `yyyyMMdd-HHmmss`. For example, for an import task started at `2019-10-10 12:30:30`, the mapping file used is `struct-example.json`, then the path of the progress file is the same as struct-example.json
-Sibling `struct-example/load-progress_20191010-123030`. When the directory holds several progress files, the resumed import reads the last one in name order, which is the most recent one.
+Set `--incremental-mode` to `true` to resume from a progress file. Loader records progress when it closes normally after a successful import
+or a normal stop; an unexpected failure may prevent this write.
+The progress file is in `${struct}` and named `load-progress_${timestamp}`, where `${struct}` is the mapping-file prefix and `${timestamp}` is the
+import start time, formatted as `yyyyMMdd-HHmmss`. For example, an import started at `2019-10-10 12:30:30` with mapping file `struct-example.json`
+writes `struct-example/load-progress_20191010-123030`. When the directory holds several progress files, the resumed import reads the last one in name
+order, which is the most recent one.
 
-> Note: Progress files are generated after every import, regardless of `--incremental-mode` or `--print-progress`.
+> Note: A progress file is written after a successful import or a normal stop (including an error limit), regardless of `--incremental-mode`
+> or `--print-progress`. An import aborted by an unexpected failure may not write one.
 
 If the data file formats are all legal and the import task is stopped by the user (CTRL + C or kill, kill -9 is not supported), that is to say, if there is no error record, the next import only needs to be set to 
 Continue for the breakpoint.

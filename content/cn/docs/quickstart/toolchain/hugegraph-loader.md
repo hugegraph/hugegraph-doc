@@ -890,12 +890,13 @@ Loader 必须能够创建并写入以映射文件前缀命名的进度目录。
 
 通常情况下，Loader 任务都需要较长时间执行，如果因为某些原因导致导入中断进程退出，而下次希望能从中断的点继续导，这就是使用断点续导的场景。
 
-用户设置命令行参数 --incremental-mode 为 true 即打开了断点续导模式。断点续导的关键在于进度文件，导入进程退出的时候，会把退出时刻的导入进度
-记录到进度文件中，进度文件位于 `${struct}` 目录下，文件名形如 `load-progress_${timestamp}` ，${struct} 为映射文件的前缀，${timestamp} 为导入开始
+设置 `--incremental-mode` 为 `true` 即可从进度文件续导。Loader 在导入成功或正常停止后关闭时写入进度；意外失败可能阻止该写入。
+进度文件位于 `${struct}` 目录下，文件名形如 `load-progress_${timestamp}` ，${struct} 为映射文件的前缀，${timestamp} 为导入开始
 的时刻，格式为 `yyyyMMdd-HHmmss`。比如：在 `2019-10-10 12:30:30` 开始的一次导入任务，使用的映射文件为 `struct-example.json`，则进度文件的路径为与 struct-example.json 
 同级的 `struct-example/load-progress_20191010-123030`。当目录下存在多个进度文件时，续导会读取按文件名排序的最后一个，也就是最新的那个。
 
-> 注意：每次导入结束都会生成进度文件，与 `--incremental-mode` 或 `--print-progress` 是否打开无关。
+> 注意：导入成功或正常停止（包括达到错误上限）后会写入进度文件，与 `--incremental-mode` 或 `--print-progress` 是否打开无关。
+> 意外失败导致导入中止时，可能不会写入进度文件。
 
 如果数据文件格式都是合法的，是用户自己停止（CTRL + C 或 kill，kill -9 不支持）的导入任务，也就是说没有错误记录的情况下，下一次导入只需要设置为断点续导即可。
 
