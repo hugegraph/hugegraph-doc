@@ -430,6 +430,8 @@ Within each graph manager, reload, graph removal, graph-space clearing or remova
 and cloning share lifecycle coordination. With PD, a graph lookup that misses the cache holds the same
 coordination from reading metadata until registering the local instance. Cached graph reads are outside
 it; this is not a barrier for all HTTP requests or graph transactions.
+Local startup configuration loading waits for an active lifecycle operation without a configured timeout;
+interrupting that wait aborts startup. Overlapping API requests still fail immediately.
 Remote graph-addition and removal notifications use the same lifecycle coordination.
 An overlapping REST request for reload or graph removal returns HTTP 400 before scanning configurations or changing graphs.
 The active operation holds this coordination until it completes, including the full close-and-reopen sequence of reload.
