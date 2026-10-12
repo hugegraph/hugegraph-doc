@@ -303,14 +303,15 @@ HG_PD_RAFT_PEERS_LIST: pd0:8610,pd1:8610,pd2:8610
 ./bin/start-hugegraph-pd.sh
 ```
 
-脚本要求 `PATH` 或 `JAVA_HOME` 中有 11 及以上版本的 JDK；如果发现已有 Java 进程在使用本安装目录的 `conf` 目录，脚本会直接退出，不做任何事。
+当前主线脚本检查 `PATH` 或 `JAVA_HOME` 中的 JDK 主版本最低为 17；
+如果发现已有 Java 进程在使用本安装目录的 `conf` 目录，脚本会直接退出，不做任何事。
 
 支持的参数：
 
 | 参数 | 取值 | 默认值 | 描述 |
 |------|------|--------|------|
 | `-d` | `true`、`false` | `true` | 守护进程模式，详见下文。 |
-| `-g` | `zgc`、`ZGC` | 不设置 | 垃圾回收器。不带该参数即使用默认的 G1GC；填其他值（包括 `g1`）会导致启动中止。 |
+| `-g` | `g1`、`G1`、`zgc`、`ZGC` | 不设置 | 垃圾回收器：不设置时保留调用者/JVM 的选择；显式选择 G1/ZGC，其他值中止启动。 |
 | `-j` | JVM 参数 | 空 | 额外的 JVM 参数，例如 `-j "-Xmx8g -Xms8g"`。 |
 | `-y` | `true`、`false` | `false` | 挂载 OpenTelemetry Java agent。首次使用时会把 agent 下载到 `plugins/` 并校验 MD5，trace 通过 gRPC 上报到 `http://127.0.0.1:4317`。 |
 

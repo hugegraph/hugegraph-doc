@@ -305,14 +305,15 @@ In the PD installation directory, execute:
 ./bin/start-hugegraph-pd.sh
 ```
 
-The script requires a JDK of at least version 11 on `PATH` or in `JAVA_HOME`, and it exits without doing anything if it finds a Java process already using this installation's `conf` directory.
+The current master script checks for a JDK major version of at least 17 on `PATH` or in `JAVA_HOME`.
+It exits without doing anything if it finds a Java process already using this installation's `conf` directory.
 
 Supported flags:
 
 | Flag | Values | Default | Description |
 |------|--------|---------|-------------|
 | `-d` | `true`, `false` | `true` | Daemon mode. See the note below. |
-| `-g` | `zgc`, `ZGC` | not set | Garbage collector. Leave the flag off for the default G1GC. Any other value, `g1` included, aborts the start. |
+| `-g` | `g1`, `G1`, `zgc`, `ZGC` | not set | GC: omit to keep caller/JVM choice; select G1/ZGC explicitly. Other values abort. |
 | `-j` | JVM options | empty | Extra JVM options, for example `-j "-Xmx8g -Xms8g"`. |
 | `-y` | `true`, `false` | `false` | Attach the OpenTelemetry Java agent. The agent is downloaded into `plugins/` on first use, its MD5 is verified, and traces are exported over gRPC to `http://127.0.0.1:4317`. |
 
