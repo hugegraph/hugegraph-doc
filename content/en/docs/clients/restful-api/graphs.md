@@ -215,13 +215,18 @@ Create a graph (set `Content-Type: application/json`)
 
 Graph-space management permission (`space`) is required when authentication is enabled.
 
+Stop application writes before deleting a graph and keep it isolated with writes stopped throughout failures and retries.
+The delete operation does not fence graph write transactions across requests.
+Once scheduler shutdown has closed task admission, a failed deletion does not automatically reopen it.
+
 With PD, public deletion in `DEFAULT` returns HTTP 400 for successfully loaded local graphs regardless of `graph.load_from_local_config`,
 and, with `true`, for every configuration name from a successful directory scan, including metadata fallback after local loading fails.
 Remove the file and run reload: a successful directory scan releases the protection before detachment, even if later reload phases return HTTP 400.
 Restarting Server is another option. This protection does not apply to a graph with the same name in another graph space.
 
 When graph removal catches an exception from `close()`, it logs the failure and removes runtime bindings if the graph is already marked closed.
-If the graph is still open, its registration is retained for retry. Backend data or PD metadata may already have been removed; retry does not restore it.
+If the graph is still open, its registration is retained only for cleanup and retry; it does not mean that normal application use can resume.
+Backend data or PD metadata may already have been removed. Deletion is not transactional; retry does not roll back deletion or restore removed data or metadata.
 
 ##### Params
 
