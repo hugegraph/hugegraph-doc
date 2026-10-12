@@ -223,6 +223,10 @@ curl -o /dev/null -w '%{http_code}\n' -u "admin:${HUGEGRAPH_ADMIN_PASSWORD}" \
 | `PD_AUTH_PASSWORD` | 空 | PD REST Basic 密码；启用 PD REST 鉴权时须与 `HG_PD_AUTH_SECRET_KEY` 相同 |
 | `WAIT_PARTITION_TIMEOUT_S` | `120` | 分区轮询超时；包含下文修复的构建还会限制最终诊断 |
 
+包含[鉴权属性修复](https://github.com/hugegraph/hugegraph/pull/302)的镜像会保留显式签名密钥中的空格、反斜杠和 Unicode，各 Server 副本应使用同一密钥。
+如果旧镜像曾错误读取这类密钥，升级时应重新显式提供原本想使用的 `HG_SERVER_AUTH_TOKEN_SECRET`；仅复用旧配置仍会保留错误读取后的密钥。
+若实际生效的密钥改变，须重新登录获取 token。上文所述 1.7.0 镜像限制仍适用。
+
 > **已弃用的别名**：`BACKEND` → `HG_SERVER_BACKEND`、`PD_PEERS` → `HG_SERVER_PD_PEERS`
 
 `wait-storage.sh` 最多等待 300 秒直到出现状态为 `Up` 的 Store。该时长写死在脚本中，无法通过环境变量调整。

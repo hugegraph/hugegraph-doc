@@ -223,6 +223,11 @@ Unlike PD and Store, Server has no mandatory entrypoint variables: only set valu
 | `PD_AUTH_PASSWORD` | Empty | PD REST Basic password; must match `HG_PD_AUTH_SECRET_KEY` when PD REST authentication is enabled |
 | `WAIT_PARTITION_TIMEOUT_S` | `120` | Partition polling timeout; also bounds the final diagnostic in builds with the fix described below |
 
+Images containing the [auth property fix](https://github.com/hugegraph/hugegraph/pull/302) preserve spaces, backslashes and Unicode in explicit
+signing keys. Use the same key on every Server replica. When upgrading from an image that misread such a key, explicitly supply the intended
+`HG_SERVER_AUTH_TOKEN_SECRET` again; retaining the old configuration also retains its misread key. If the active key changes, sign in again to
+obtain new tokens. The 1.7.0 image limitation above still applies.
+
 > **Deprecated aliases**: `BACKEND` → `HG_SERVER_BACKEND`, `PD_PEERS` → `HG_SERVER_PD_PEERS`.
 
 `wait-storage.sh` waits up to 300 seconds for an `Up` Store. This duration is hardcoded and cannot be changed through environment variables.
