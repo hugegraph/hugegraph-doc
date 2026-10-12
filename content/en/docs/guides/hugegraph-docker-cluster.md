@@ -221,13 +221,17 @@ Unlike PD and Store, Server has no mandatory entrypoint variables: only set valu
 | `HG_SERVER_PD_REST_ENDPOINT` | Derived from `pd.peers` by replacing `:8686` with `:8620` | PD REST address polled by `wait-storage.sh` |
 | `PD_AUTH_USER` | `store` | Basic username for PD REST calls from `wait-storage.sh` |
 | `PD_AUTH_PASSWORD` | Empty | PD REST Basic password; must match `HG_PD_AUTH_SECRET_KEY` when PD REST authentication is enabled |
-| `WAIT_PARTITION_TIMEOUT_S` | `120` | Independent timeout for partition polling and the final partition diagnostic in `wait-partition.sh` |
+| `WAIT_PARTITION_TIMEOUT_S` | `120` | Partition polling timeout; also bounds the final diagnostic in builds with the fix described below |
 
 > **Deprecated aliases**: `BACKEND` → `HG_SERVER_BACKEND`, `PD_PEERS` → `HG_SERVER_PD_PEERS`.
 
 `wait-storage.sh` waits up to 300 seconds for an `Up` Store. This duration is hardcoded and cannot be changed through environment variables.
 
-In HStore startup, partition polling and the final `/v1/partitions` diagnostic each use a separate `WAIT_PARTITION_TIMEOUT_S` budget. With the default value, a stalled final response times out after 120 seconds; setting the value to `0` disables GNU timeout's limit. JVM exit observation may wait until that diagnostic completes or reaches its timeout; signal-triggered shutdown remains interruptible.
+For Server builds containing the [partition-diagnostic fix](https://github.com/apache/hugegraph/pull/3316), HStore startup gives partition polling
+and the final `/v1/partitions` diagnostic separate `WAIT_PARTITION_TIMEOUT_S` budgets. Earlier builds bound polling only; the final diagnostic
+request has no timeout. With the fix and the default value, a stalled final response times out after 120 seconds; setting the value to `0` disables
+GNU timeout's limit. JVM exit observation may wait until that diagnostic completes or reaches its timeout; signal-triggered shutdown remains
+interruptible.
 
 `HG_SERVER_INIT_STORE_ENABLED` accepts only the case-insensitive boolean values recognized by `HugeConfig`: `y`, `t`, `yes`, `on`, `true`, `n`, `f`, `no`, `off`, `false`. Other values, including `0` and `1`, terminate the entrypoint.
 

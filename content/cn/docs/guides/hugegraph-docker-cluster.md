@@ -221,13 +221,16 @@ curl -o /dev/null -w '%{http_code}\n' -u "admin:${HUGEGRAPH_ADMIN_PASSWORD}" \
 | `HG_SERVER_PD_REST_ENDPOINT` | 由 `pd.peers` 把 `:8686` 改写为 `:8620` 得到 | `wait-storage.sh` 轮询的 PD REST 地址 |
 | `PD_AUTH_USER` | `store` | `wait-storage.sh` 访问 PD REST API 的 Basic 用户名 |
 | `PD_AUTH_PASSWORD` | 空 | PD REST Basic 密码；启用 PD REST 鉴权时须与 `HG_PD_AUTH_SECRET_KEY` 相同 |
-| `WAIT_PARTITION_TIMEOUT_S` | `120` | `wait-partition.sh` 分区轮询和最终分区诊断各自的超时预算 |
+| `WAIT_PARTITION_TIMEOUT_S` | `120` | 分区轮询超时；包含下文修复的构建还会限制最终诊断 |
 
 > **已弃用的别名**：`BACKEND` → `HG_SERVER_BACKEND`、`PD_PEERS` → `HG_SERVER_PD_PEERS`
 
 `wait-storage.sh` 最多等待 300 秒直到出现状态为 `Up` 的 Store。该时长写死在脚本中，无法通过环境变量调整。
 
-HStore 启动时，分区轮询和最终 `/v1/partitions` 诊断分别使用独立的 `WAIT_PARTITION_TIMEOUT_S` 预算。默认配置下，最终响应停滞会在 120 秒后超时；设为 `0` 会禁用 GNU timeout 的时限。入口观察到 JVM 退出可能需要等本次诊断完成或超时；信号触发的关闭仍可中断检查。
+对于包含[分区诊断修复](https://github.com/apache/hugegraph/pull/3316)的 Server 构建，HStore 启动时，分区轮询和最终
+`/v1/partitions` 诊断分别使用独立的 `WAIT_PARTITION_TIMEOUT_S` 预算。旧构建仅限制轮询时间，最终诊断请求没有超时。
+包含修复且使用默认配置时，最终响应停滞会在 120 秒后超时；设为 `0` 会禁用 GNU timeout 的时限。
+入口观察到 JVM 退出可能需要等本次诊断完成或超时；信号触发的关闭仍可中断检查。
 
 `HG_SERVER_INIT_STORE_ENABLED` 只接受 `HugeConfig` 能识别的写法（忽略大小写）：`y`、`t`、`yes`、`on`、`true`、`n`、`f`、`no`、`off`、`false`。其他取值（包括 `0` 和 `1`）都会让入口脚本终止。
 
