@@ -707,6 +707,12 @@ stop_services() {
     return "$failed"
 }
 
+client_classpath() {
+    # Match ordinary Loader: its fat JAR relocates okhttp3 and must not mix with the regular SDK.
+    find -L "$1/lib" -name '*.jar' ! -name 'apache-hugegraph-loader-*-shaded.jar' \
+        | sort | paste -sd: -
+}
+
 run_packages() {
     local server=$1 toolchain=$2 label=$3 loader tools hubble classpath
     CURRENT_STEP="$label runtime"
@@ -729,7 +735,7 @@ run_packages() {
         python3 "$SDK_VERIFIER" "$RUN_DIR/m2/toolchain" --mode release --version "$RELEASE_VERSION" \
             --distribution "$distribution" --module "$module"
     done
-    classpath="$loader/lib/*"
+    classpath=$(client_classpath "$loader")
     mkdir -p "$RUN_DIR/client-$label"
     javac -cp "$classpath" -d "$RUN_DIR/client-$label" "$SCRIPT_DIR/ReleaseClientSmoke.java"
     java -cp "$RUN_DIR/client-$label:$classpath" ReleaseClientSmoke
