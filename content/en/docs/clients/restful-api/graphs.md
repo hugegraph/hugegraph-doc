@@ -419,8 +419,10 @@ GET http://localhost:8080/graphspaces/DEFAULT/graphs/default
 
 Reloads all graphs held by this Server after graph configuration changes. Reload preserves backend data and local configuration files.
 
-Only one reload request can run at a time per graph manager. An overlapping request returns HTTP 400 before scanning configurations or closing graphs.
-Retry after the active request finishes, whether it succeeds or fails.
+Reload and graph removal are mutually exclusive within each graph manager, including local deletion and remote removal notifications.
+An overlapping REST request for these operations returns HTTP 400 before scanning configurations or changing graphs.
+The active operation retains this exclusion until reload finishes closing and reopening graphs, or graph removal ends.
+Retry explicitly after it ends, including failure or timeout. Remote removal notifications are not automatically retried.
 
 Without PD, a reload that passes preflight rescans all current files in the startup graph configuration directory,
 even when `graph.load_from_local_config=false`. With PD and `false`, reload restores only local graphs previously loaded successfully
