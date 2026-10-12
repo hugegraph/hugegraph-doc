@@ -259,4 +259,4 @@ Store/Raft location metadata may already have been updated before the check, so 
 migration or ownership repair; a complete 1.7 upgrade and recovery still require deployment-specific validation.
 
 See the [preflight change](https://github.com/hugegraph/hugegraph/pull/301) and the
-[repository upgrade guide](https://github.com/hugegraph/hugegraph/blob/52bc94ce5078f879b9f9ee18f1049e8da7397344/docs/store-graphid-upgrade.md) for details.
+[repository upgrade guide](https://github.com/hugegraph/hugegraph/blob/27731930ce4573481ac2f01092a288b0db239b53/docs/store-graphid-upgrade.md) for details.

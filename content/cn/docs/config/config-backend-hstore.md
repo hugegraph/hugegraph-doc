@@ -219,4 +219,4 @@ curl http://localhost:8080/metrics/backend
 预检不会自动迁移数据或修复归属；完整的 1.7 升级与恢复仍需针对具体部署验证。
 
 详细行为与处置依据见[预检修复](https://github.com/hugegraph/hugegraph/pull/301)和
-[仓库升级指南](https://github.com/hugegraph/hugegraph/blob/52bc94ce5078f879b9f9ee18f1049e8da7397344/docs/store-graphid-upgrade.md)。
+[仓库升级指南](https://github.com/hugegraph/hugegraph/blob/27731930ce4573481ac2f01092a288b0db239b53/docs/store-graphid-upgrade.md)。
