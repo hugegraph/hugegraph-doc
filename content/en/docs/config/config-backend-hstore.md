@@ -246,3 +246,17 @@ curl http://localhost:8080/metrics/backend
 The `nodes` value in the response is the count of active stores PD returns. A `nodes` value of `0` means the
 Server reached PD but PD has no store in state `Up`, which usually means the Store nodes have not registered
 yet, or registered as `Pending` because they are not in PD's `pd.initial-store-list`.
+
+Store builds containing the legacy GraphID preflight check existing graph-data column families before allocating a missing graph ID, first opening a cold
+partition DB during metadata bootstrap, starting its Raft state machine, or activating a staged snapshot. Before pruning, the first cold DB open checks
+all retained valid versions. Reserved `FFFE` legacy rows cause refusal.
+An incomplete selected DB version without `CURRENT` is also rejected when it would hide retained valid versions. This concerns affected old write paths;
+it does not mean that every 1.7 database needs migration, and the persisted ID format is unchanged.
+
+On refusal, preserve the original data DB versions, metadata, WAL and incoming/staged snapshots. Investigate the affected write and upgrade history before
+resuming writes or replay. Do not delete graph-to-ID mappings or assign all reserved-prefix rows to one graph: different graphs may share that prefix.
+Store/Raft location metadata may already have been updated before the check, so the entire bootstrap is not read-only. The check performs no automatic
+migration or ownership repair; a complete 1.7 upgrade and recovery still require deployment-specific validation.
+
+See the [preflight change](https://github.com/hugegraph/hugegraph/pull/301) and the
+[repository upgrade guide](https://github.com/hugegraph/hugegraph/blob/52bc94ce5078f879b9f9ee18f1049e8da7397344/docs/store-graphid-upgrade.md) for details.
