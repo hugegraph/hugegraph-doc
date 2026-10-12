@@ -129,7 +129,7 @@ For a PD-backed Server, the Helm chart exposes `server.serviceId` and `server.gr
 Both default to `DEFAULT`, which preserves the existing `server.service_id` and `server.graphspace`
 values in `conf/rest-server.properties`. A non-default chart value injects `HG_SERVER_SERVICE_ID`
 or `HG_SERVER_GRAPHSPACE` into the Server container. Use a Helm chart and Server image from the same
-version, both including the service identity support in [Server PR #297](https://github.com/hugegraph/hugegraph/pull/297).
+version, both including the service identity support in [Server PR #3322](https://github.com/apache/hugegraph/pull/3322).
 Copying these values into an older chart or image does not add that support; do not use this example
 with 1.7.0 or any chart/image version without these changes.
 Non-empty service IDs supplied through `HG_SERVER_SERVICE_ID`, `SERVICE_ID`, or `server.serviceId`

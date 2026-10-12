@@ -128,7 +128,7 @@ HUGEGRAPH_VERSION=1.7.0 docker compose -f docker-compose.yml up -d --wait
 对于使用 PD 的 Server，Helm chart 提供 `server.serviceId` 和 `server.graphSpace`。
 二者默认为 `DEFAULT`，此时保留 `conf/rest-server.properties` 中已有的 `server.service_id` 和 `server.graphspace`。
 非默认值会向 Server 容器注入 `HG_SERVER_SERVICE_ID` 或 `HG_SERVER_GRAPHSPACE`。
-Helm chart 和 Server 镜像须来自同一版本，且二者均包含 [Server PR #297](https://github.com/hugegraph/hugegraph/pull/297) 中的服务标识支持。
+Helm chart 和 Server 镜像须来自同一版本，且二者均包含 [Server PR #3322](https://github.com/apache/hugegraph/pull/3322) 中的服务标识支持。
 仅复制这些新 values 到旧 chart 或镜像不会补上该能力；不要将本示例与 1.7.0 或未包含这些变更的 chart/镜像搭配使用。
 通过 `HG_SERVER_SERVICE_ID`、`SERVICE_ID` 或 `server.serviceId` 传入的非空服务 ID 仅支持可打印 ASCII，包含空格和反斜杠；
 部署校验会拒绝非 ASCII 和控制字符。此限制仅针对这些配置入口，不改变 Core Service 名称协议和已有的手工 properties 配置。
