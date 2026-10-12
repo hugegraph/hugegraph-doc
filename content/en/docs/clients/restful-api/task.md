@@ -88,7 +88,13 @@ GET http://localhost:8080/graphspaces/DEFAULT/graphs/hugegraph/tasks/2
 
 ##### Params
 
-- force: whether to delete the task even when it is still running, default is false
+- force: allows deletion of incomplete task information, default is false. For local tasks, it requests cancellation of an incomplete running task;
+  it does not bypass the execution wait below.
+
+For the local scheduler, a `SUCCESS` status can become visible before the completion callback finishes saving the result.
+Deletion waits up to `task.wait_timeout` seconds for execution and its callback to finish, then checks the stored status before removing the record.
+Timeout or interruption retains the task record and any active execution owner for retry. Even with `force=true`, the record is not removed
+while its execution owner is active. This waiting behavior applies to local schedulers.
 
 ##### Method & Url
 

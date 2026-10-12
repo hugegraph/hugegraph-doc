@@ -220,6 +220,9 @@ and, with `true`, for every configuration name from a successful directory scan,
 Remove the file and run reload: a successful directory scan releases the protection before detachment, even if later reload phases return HTTP 400.
 Restarting Server is another option. This protection does not apply to a graph with the same name in another graph space.
 
+When graph removal catches an exception from `close()`, it logs the failure and removes runtime bindings if the graph is already marked closed.
+If the graph is still open, its registration is retained for retry. Backend data or PD metadata may already have been removed; retry does not restore it.
+
 ##### Params
 
 **Path parameters**
@@ -416,6 +419,9 @@ GET http://localhost:8080/graphspaces/DEFAULT/graphs/default
 
 Reloads all graphs held by this Server after graph configuration changes. Reload preserves backend data and local configuration files.
 
+Only one reload request can run at a time per graph manager. An overlapping request returns HTTP 400 before scanning configurations or closing graphs.
+Retry after the active request finishes, whether it succeeds or fails.
+
 Without PD, a reload that passes preflight rescans all current files in the startup graph configuration directory,
 even when `graph.load_from_local_config=false`. With PD and `false`, reload restores only local graphs previously loaded successfully
 whose configuration files still exist; it ignores new local files. Setting the flag to `true` also discovers new local files.
@@ -432,8 +438,9 @@ and PD metadata restores a graph with that name. With PD and `false`, a new loca
 Remove the configuration file: a successful directory scan during reload clears its local-source tracking and deletion protection before detachment.
 Later opening or startup failures do not roll back that scan snapshot, even when the whole reload returns HTTP 400.
 After the old instance closes and detaches, PD metadata may restore the graph for public deletion; otherwise its runtime registration is removed
-while backend data remains. If closing fails, the old registration is retained for an explicit retry. This removes the local startup source, so a
-subsequent restart will not reload it from that deleted file.
+while backend data remains. If closing leaves the graph open, the old registration is retained for an explicit retry.
+A caught close exception after the graph is marked closed is logged and its runtime bindings are removed.
+This removes the local startup source, so a subsequent restart will not reload it from that deleted file.
 Source tracking follows the registered graph instance: removal of an old instance does not discard a newer local replacement.
 For public deletion in `DEFAULT`, the corresponding local-source tracking is cleared only after deletion completes.
 Without PD, public graph deletion still clears data and removes its local configuration; the PD protection rule does not apply.
@@ -441,7 +448,7 @@ Without PD, public graph deletion still clears data and removes its local config
 A configured `auth.authenticator` causes HTTP 400 before any graph is closed, because authentication services retain graph references.
 Restart Server to apply graph configuration changes in that deployment; the rejected reload leaves the original graphs, data and configuration intact.
 
-Graphs that fail to close remain registered for an explicit retry, including objects whose cleanup fails after a reload startup failure.
+Graphs still open after a close attempt remain registered for an explicit retry, including objects not closed during cleanup after a reload startup failure.
 Other recoverable graphs may reload before an opening or startup failure is reported.
 An incomplete reload returns HTTP 400; successful recovery of some graphs does not make the whole reload successful.
 Correct the failure and retry.

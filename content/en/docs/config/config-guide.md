@@ -131,9 +131,13 @@ This applies with or without data clearing; a graph with the same name in anothe
 With PD and `false`, a new local file that has never been loaded remains ignored and does not create deletion protection.
 After a local file is removed, a successful directory scan during reload clears that source and protection before detachment.
 Later reload failures do not roll back this snapshot, even if the request returns HTTP 400. After the old instance closes and detaches,
-PD metadata may restore it; otherwise its runtime registration is removed while backend data remains. A close failure retains the old registration
-for an explicit retry. A scan failure preserves existing graphs and protection.
+PD metadata may restore it; otherwise its runtime registration is removed while backend data remains. If closing leaves the graph open, the old
+registration is retained for an explicit retry.
+A caught close exception after the graph is marked closed is logged and its runtime bindings are removed. A scan failure preserves existing graphs and
+protection.
 Without PD, public graph deletion still clears data and removes its local configuration. See the graph API below for details.
+Only one reload runs at a time per graph manager. Overlapping requests return HTTP 400 before scanning configurations or closing graphs;
+retry after the active request finishes, whether it succeeds or fails.
 
 Reload is rejected with HTTP 400 before any graph is closed when `auth.authenticator` is configured. Restart Server to apply graph configuration changes in that
 deployment. See the [graph API](/docs/clients/restful-api/graphs/) for reload failure and recovery behavior.

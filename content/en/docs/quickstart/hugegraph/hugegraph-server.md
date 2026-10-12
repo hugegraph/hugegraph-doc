@@ -239,8 +239,11 @@ With PD and `false`, never-loaded new files remain ignored and unprotected.
 Other graph spaces are outside this protection. Remove the file; a successful directory scan during reload releases its protection before detachment.
 Later reload failures do not roll back that scan snapshot, even when the request returns HTTP 400.
 After the old instance closes and detaches, PD metadata may restore it; otherwise its runtime registration is removed while backend data remains.
-If closing fails, the old registration is retained for an explicit retry.
+If closing leaves the graph open, the old registration is retained for an explicit retry.
+A caught close exception after the graph is marked closed is logged and its runtime bindings are removed.
 A scan failure preserves existing graphs and protection. Without PD, public graph deletion still clears data and removes its local configuration.
+Only one reload runs at a time per graph manager. Overlapping requests return HTTP 400 before scanning configurations or closing graphs;
+retry after the active request finishes, whether it succeeds or fails.
 
 Registered graph/schema cache-notification RPC services also make reload return HTTP 400 before closing any graph; use Server restart.
 Their safe rebinding remains unimplemented; the graph API documents the required repair and validation on a high-performance Linux deployment.

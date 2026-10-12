@@ -88,7 +88,12 @@ GET http://localhost:8080/graphspaces/DEFAULT/graphs/hugegraph/tasks/2
 
 ##### Params
 
-- force: 任务仍在运行时是否强制删除，默认为 false
+- force: 是否允许删除未完成任务的信息，默认为 false。本地任务未完成且仍在运行时会请求取消；该参数不会跳过下述执行等待。
+
+使用本地调度器时，`SUCCESS` 状态可能先于完成回调保存结果结束而可见。
+删除会等待最多 `task.wait_timeout` 秒，直到执行及其回调结束，再检查存储状态并移除记录。
+超时或中断会保留任务记录及仍活跃的执行对象，供重试；即使 `force=true`，执行对象仍活跃时也不会移除记录。
+上述等待行为适用于本地调度器。
 
 ##### Method & Url
 
