@@ -25,8 +25,9 @@ PD 监听三个端口：
 #### 2.1 前置条件
 
 - 操作系统：Linux 或 macOS（Windows 尚未经过完整测试）
-- Java 版本：≥ 11
-- Maven 版本：≥ 3.5.0
+- 当前主线源码构建和 CI 运行环境使用 JDK 17；Maven 编译只接受 Java 17。
+  `bin/start-hugegraph-pd.sh` 检查 Java 主版本最低为 17；通过该检查不代表更高版本的 JDK 已通过兼容验证。
+- Maven 版本：≥ 3.6.3
 
 ### 3 部署
 
