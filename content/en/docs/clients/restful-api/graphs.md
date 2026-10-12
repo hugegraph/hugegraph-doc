@@ -223,8 +223,9 @@ Once scheduler shutdown has closed task admission, a failed deletion does not au
 
 With PD, public deletion in `DEFAULT` returns HTTP 400 for successfully loaded local graphs regardless of `graph.load_from_local_config`,
 and, with `true`, for every configuration name from a successful directory scan, including metadata fallback after local loading fails.
-Remove the file and run reload: a successful directory scan releases the protection before detachment, even if later reload phases return HTTP 400.
-Restarting Server is another option. This protection does not apply to a graph with the same name in another graph space.
+Remove the corresponding local configuration file before either reload or restarting Server.
+On reload, a successful directory scan releases the protection before detachment, even if later phases return HTTP 400.
+Keeping the file allows startup to restore deletion protection. This protection does not apply to a graph with the same name in another graph space.
 
 When graph removal catches an exception from `close()`, it logs the failure and removes runtime bindings if the graph is already marked closed.
 If the graph is still open, its registration is retained only for cleanup and retry; it does not mean that normal application use can resume.
