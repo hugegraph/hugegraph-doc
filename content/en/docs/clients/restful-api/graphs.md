@@ -432,7 +432,8 @@ and PD metadata restores a graph with that name. With PD and `false`, a new loca
 Remove the configuration file: a successful directory scan during reload clears its local-source tracking and deletion protection before detachment.
 Later opening or startup failures do not roll back that scan snapshot, even when the whole reload returns HTTP 400.
 After the old instance closes and detaches, PD metadata may restore the graph for public deletion; otherwise its runtime registration is removed
-while backend data remains. If closing fails, the old registration is retained for an explicit retry. This removes the local startup source, so a subsequent restart will not reload it from that deleted file.
+while backend data remains. If closing fails, the old registration is retained for an explicit retry. This removes the local startup source, so a
+subsequent restart will not reload it from that deleted file.
 Source tracking follows the registered graph instance: removal of an old instance does not discard a newer local replacement.
 For public deletion in `DEFAULT`, the corresponding local-source tracking is cleared only after deletion completes.
 Without PD, public graph deletion still clears data and removes its local configuration; the PD protection rule does not apply.

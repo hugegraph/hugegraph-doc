@@ -25,7 +25,8 @@ The following sections describe these files.
 > The authentication settings on this page apply to HugeGraph Server. In production, enable [authentication and authorization](/docs/config/config-authentication/), maintain an IP allowlist, grant minimum permissions, and retain and protect Server `audit-*.log` files. Commented authentication settings in the examples indicate that authentication is disabled by default.
 
 The distribution copies default files from the Server repository into the installation directory's `conf/` folder. Options absent from these files use source-code defaults; explicit file settings override those defaults.
-The default distribution file layout and settings were checked against Server master commit `2f827d6`. Use the configuration files and entry scripts that correspond to your installed release.
+The default distribution file layout and settings were checked against Server master commit `2f827d6`. Use the configuration files and entry scripts that
+correspond to your installed release.
 
 | File | Source and purpose | Loading behavior |
 |------|------------|----------|
@@ -53,7 +54,11 @@ graphs: {}
 ssl: { enabled: false }
 ```
 
-Usually, focus on `channelizer`, `host`, and `port`. Graphs are not loaded from the Gremlin Server `graphs` section. During application initialization, the REST-side manager scans the `graphs` directory and attempts to load local graph configurations. `graph.load_from_local_config` controls constructor preloading; its default `false` does not disable local loading during application initialization. Without PD, a reload that passes preflight rescans this directory. With PD, it restores local graphs previously loaded successfully whose files still exist; `true` also discovers new local files. Local configurations are loaded before PD metadata.
+Usually, focus on `channelizer`, `host`, and `port`. Graphs are not loaded from the Gremlin Server `graphs` section. During application initialization, the
+REST-side manager scans the `graphs` directory and attempts to load local graph configurations. `graph.load_from_local_config` controls constructor
+preloading; its default `false` does not disable local loading during application initialization. Without PD, a reload that passes preflight rescans this
+directory. With PD, it restores local graphs previously loaded successfully whose files still exist; `true` also discovers new local files. Local
+configurations are loaded before PD metadata.
 
 - `channelizer`: The default `WsAndHttpChannelizer` supports WebSocket and HTTP. Gremlin Console uses WebSocket; HugeGraph Client, Loader, and Hubble use HTTP.
 
@@ -66,7 +71,10 @@ Set the matching `gremlinserver.url=http://host:port` in `rest-server.properties
 
 ### 3 rest-server.properties
 
-The following example lists `rest-server.properties` options. The master template omits `graph.load_from_local_config`, whose source-code default is `false`. Setting it to `true` is optional: it enables constructor preloading and discovery of new local files on reload when PD is enabled. With PD and `false`, reload still restores local graphs previously loaded successfully whose files still exist. A reload that passes preflight without PD always rescans locally, regardless of this flag. Application initialization still scans and attempts to load local graph configurations.
+The following example lists `rest-server.properties` options. The master template omits `graph.load_from_local_config`, whose source-code default is
+`false`. Setting it to `true` is optional: it enables constructor preloading and discovery of new local files on reload when PD is enabled. With PD and
+`false`, reload still restores local graphs previously loaded successfully whose files still exist. A reload that passes preflight without PD always
+rescans locally, regardless of this flag. Application initialization still scans and attempts to load local graph configurations.
 
 ```properties
 # bind url
@@ -110,11 +118,15 @@ memory_monitor.period=2000
 
 - `restserver.url`: The REST listener URL. Use a specific address for remote access, or `http://0.0.0.0` to listen on every interface while restricting the accessible network.
 - `graphs`: The graph configuration directory, defaulting to `./conf/graphs`. Both `init-store.sh` and application initialization scan it; initialization attempts to load its properties files.
-- `graph.load_from_local_config`: Controls constructor preloading, with source-code default `false`. Without PD, a reload that passes preflight rescans the startup graph directory. With PD, it restores local graphs previously loaded successfully whose files still exist; `true` also discovers new local files. Local configurations are loaded before PD metadata. It does not block local loading during application initialization and is not a security isolation switch.
+- `graph.load_from_local_config`: Controls constructor preloading, with source-code default `false`. Without PD, a reload that passes preflight rescans the
+  startup graph directory. With PD, it restores local graphs previously loaded successfully whose files still exist; `true` also discovers new local files.
+  Local configurations are loaded before PD metadata. It does not block local loading during application initialization and is not a security isolation
+  switch.
 
 A successful reload scan updates local-source tracking; with PD, it also updates local graph deletion protection.
 With PD, local graphs successfully loaded in `DEFAULT` reject public deletion while their configuration files remain, regardless of the flag.
-With PD and `true`, protection also covers all configuration names from a successful scan, including a graph restored from PD metadata after local loading fails.
+With PD and `true`, protection also covers all configuration names from a successful scan, including a graph restored from PD metadata after local loading
+fails.
 This applies with or without data clearing; a graph with the same name in another graph space is not protected by the local file.
 With PD and `false`, a new local file that has never been loaded remains ignored and does not create deletion protection.
 After a local file is removed, a successful directory scan during reload clears that source and protection before detachment.
@@ -161,7 +173,10 @@ A Server can load multiple graphs, each with its own properties file. This examp
 
 **[Optional]: Modify rest-server.properties**
 
-Set the graph configuration directory with `graphs` in `rest-server.properties`, defaulting to `graphs=./conf/graphs`. Adjust it for another directory. The example optionally enables constructor preloading with `graph.load_from_local_config=true`. With PD, the flag also enables discovery of new local files on reload; `false` still restores local graphs previously loaded successfully whose files still exist. Without PD, a reload that passes preflight rescans this directory. Application initialization still reads local graph configurations from it:
+Set the graph configuration directory with `graphs` in `rest-server.properties`, defaulting to `graphs=./conf/graphs`. Adjust it for another directory. The
+example optionally enables constructor preloading with `graph.load_from_local_config=true`. With PD, the flag also enables discovery of new local files on
+reload; `false` still restores local graphs previously loaded successfully whose files still exist. Without PD, a reload that passes preflight rescans this
+directory. Application initialization still reads local graph configurations from it:
 
 ```properties
 graphs=./conf/graphs

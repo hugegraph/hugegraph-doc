@@ -53,7 +53,8 @@ graphs: {}
 ssl: { enabled: false }
 ```
 
-通常只需关注 `channelizer`、`host` 和 `port`。图不在 Gremlin Server 的 `graphs` 段加载；REST 侧管理器会在 Server 应用初始化时扫描 `graphs` 目录并尝试载入本地图配置。`graph.load_from_local_config` 控制管理器构造阶段的预加载；默认 `false` 不会关闭应用初始化阶段的本地加载。通过预检且未启用 PD 时，reload 会重扫该目录。启用 PD 时，会恢复已成功加载且文件仍存在的本地图；`true` 还会发现新增本地文件。本地配置先于 PD 元数据加载。
+通常只需关注 `channelizer`、`host` 和 `port`。图不在 Gremlin Server 的 `graphs` 段加载；REST 侧管理器会在 Server 应用初始化时扫描 `graphs` 目录并尝试载入本地图配置。`graph.load_from_local_config`
+控制管理器构造阶段的预加载；默认 `false` 不会关闭应用初始化阶段的本地加载。通过预检且未启用 PD 时，reload 会重扫该目录。启用 PD 时，会恢复已成功加载且文件仍存在的本地图；`true` 还会发现新增本地文件。本地配置先于 PD 元数据加载。
 
 - channelizer：默认的 `WsAndHttpChannelizer` 同时支持 WebSocket 和 HTTP。Gremlin-Console 使用 WebSocket，HugeGraph-Client、Loader 和 Hubble 使用 HTTP；
 
@@ -66,7 +67,8 @@ ssl: { enabled: false }
 
 ### 3 rest-server.properties
 
-下面是可用的 `rest-server.properties` 示例。主线模板未写出 `graph.load_from_local_config`，源码默认值为 `false`。示例中设为 `true` 是可选的：它开启管理器构造阶段预加载，以及启用 PD 时 reload 对新增本地文件的发现；设为 `false` 时仍会恢复已成功加载且文件仍存在的本地图；通过预检且未启用 PD 时 reload 总会本地重扫，不受该选项限制。Server 应用初始化阶段仍会扫描并尝试加载本地图配置。
+下面是可用的 `rest-server.properties` 示例。主线模板未写出 `graph.load_from_local_config`，源码默认值为 `false`。示例中设为 `true` 是可选的：它开启管理器构造阶段预加载，以及启用 PD 时 reload 对新增本地文件的发现；设为
+`false` 时仍会恢复已成功加载且文件仍存在的本地图；通过预检且未启用 PD 时 reload 总会本地重扫，不受该选项限制。Server 应用初始化阶段仍会扫描并尝试加载本地图配置。
 
 ```properties
 # bind url
@@ -110,7 +112,8 @@ memory_monitor.period=2000
 
 - restserver.url：RestServer 提供服务的 url，根据实际环境修改。如果其他 IP 地址无法访问，可以尝试修改为特定的地址；或修改为 `http://0.0.0.0` 来监听来自任何 IP 地址的请求，这种方案较为便捷，但需要留意服务可被访问的网络范围；
 - graphs：图配置文件所在目录，默认值是 `./conf/graphs`。`init-store.sh` 会扫描该目录；Server 应用初始化也会扫描并尝试加载其中的 properties 文件；
-- graph.load_from_local_config：是否在管理器构造阶段预加载本地图配置，源码默认值为 `false`。通过预检且未启用 PD 时，reload 会重扫启动图配置目录。启用 PD 时，会恢复已成功加载且文件仍存在的本地图；`true` 还会发现新增本地文件。本地配置先于 PD 元数据加载。它不会禁止 Server 应用初始化阶段的本地加载，也不是安全隔离开关；
+- graph.load_from_local_config：是否在管理器构造阶段预加载本地图配置，源码默认值为 `false`。通过预检且未启用 PD 时，reload 会重扫启动图配置目录。启用 PD 时，会恢复已成功加载且文件仍存在的本地图；`true` 还会发现新增本地文件。本地配置先于 PD
+  元数据加载。它不会禁止 Server 应用初始化阶段的本地加载，也不是安全隔离开关；
 
 目录扫描成功后，reload 会更新本地来源记录；启用 PD 时，也会更新本地图删除保护。
 启用 PD 时，`DEFAULT` 中已成功加载的本地图在配置文件仍存在时会拒绝公开删除，不受该选项影响，无论是否清空数据。
@@ -156,7 +159,8 @@ store=hugegraph
 
 **[可选]：修改 rest-server.properties**
 
-通过修改 `rest-server.properties` 中的 `graphs` 配置项来设置图的配置文件目录。默认配置为 `graphs=./conf/graphs`；需要其他目录时调整 `graphs`。下面将 `graph.load_from_local_config` 设为 `true`，作为管理器构造阶段预加载的可选设置。启用 PD 时，它也会让 reload 发现新增本地文件；`false` 仍会恢复已成功加载且文件仍存在的本地图。通过预检且未启用 PD 时，reload 会重扫该目录。应用初始化仍会读取该目录中的本地图配置：
+通过修改 `rest-server.properties` 中的 `graphs` 配置项来设置图的配置文件目录。默认配置为 `graphs=./conf/graphs`；需要其他目录时调整 `graphs`。下面将 `graph.load_from_local_config` 设为
+`true`，作为管理器构造阶段预加载的可选设置。启用 PD 时，它也会让 reload 发现新增本地文件；`false` 仍会恢复已成功加载且文件仍存在的本地图。通过预检且未启用 PD 时，reload 会重扫该目录。应用初始化仍会读取该目录中的本地图配置：
 
 ```properties
 graphs=./conf/graphs

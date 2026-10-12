@@ -34,7 +34,13 @@ weight: 6
 
 - Two graphs are configured, the names are `hugegraph` and `hugegraph1`, and the command to start the service is `start-hugegraph.sh`. Is only the hugegraph graph opened?
 
-  The script name is unrelated to the graph name. Server scans and loads local graph configurations from `conf/graphs` by default; change the directory with `graphs` in `conf/rest-server.properties`. `graph.load_from_local_config` defaults to `false` and controls constructor preloading, not whether startup loads local graphs. Without PD, a reload that passes preflight rescans the startup configuration directory. With PD, it restores local graphs previously loaded successfully whose configuration files still exist; setting the flag to `true` also discovers new local files. Local configurations take precedence over PD metadata. A configured `auth.authenticator` rejects reload with HTTP 400 before closing any graph; restart Server to apply configuration changes in that deployment. Give each local graph its own configuration file. See the [Server configuration guide](/docs/config/config-guide/).
+  The script name is unrelated to the graph name. Server scans and loads local graph configurations from `conf/graphs` by default; change the directory
+  with `graphs` in `conf/rest-server.properties`. `graph.load_from_local_config` defaults to `false` and controls constructor preloading, not whether
+  startup loads local graphs. Without PD, a reload that passes preflight rescans the startup configuration directory. With PD, it restores local graphs
+  previously loaded successfully whose configuration files still exist; setting the flag to `true` also discovers new local files. Local configurations
+  take precedence over PD metadata. A configured `auth.authenticator` rejects reload with HTTP 400 before closing any graph; restart Server to apply
+  configuration changes in that deployment. Give each local graph its own configuration file. See the [Server configuration
+  guide](/docs/config/config-guide/).
 
   With PD, local graphs successfully loaded in `DEFAULT` reject public deletion while their configuration files remain, regardless of this flag.
   With PD and `true`, protection also covers every name in a successful directory scan, even if local loading fails and PD metadata restores that graph.

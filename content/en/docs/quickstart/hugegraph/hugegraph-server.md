@@ -226,7 +226,12 @@ mvn package -DskipTests -ntp -Drocksdb-only
 
 Server archives include `conf/rest-server.properties`, `conf/gremlin-server.yaml`, and `conf/graphs/hugegraph.properties`; source builds assemble them from `hugegraph-server/hugegraph-dist/src/assembly/static/conf/`. Edit them inside the extracted Server directory without a separate generation step. Defaults vary by release; the following defaults and startup behavior describe master.
 
-For standalone RocksDB, confirm `backend=rocksdb` and `serializer=binary` in `conf/graphs/hugegraph.properties`. Normal Server initialization scans `conf/graphs/` and loads local graphs without requiring `graph.load_from_local_config=true`. This option defaults to `false` and controls constructor preloading. Without PD, a reload that passes preflight rescans the startup graph directory. With PD, it restores local graphs previously loaded successfully whose files still exist; `true` also discovers new local files. Local configurations take precedence over PD metadata. If `auth.authenticator` is configured, reload returns HTTP 400 before closing graphs; restart Server to apply configuration changes. See the [graph API](/docs/clients/restful-api/graphs/) for reload behavior.
+For standalone RocksDB, confirm `backend=rocksdb` and `serializer=binary` in `conf/graphs/hugegraph.properties`. Normal Server initialization scans
+`conf/graphs/` and loads local graphs without requiring `graph.load_from_local_config=true`. This option defaults to `false` and controls constructor
+preloading. Without PD, a reload that passes preflight rescans the startup graph directory. With PD, it restores local graphs previously loaded
+successfully whose files still exist; `true` also discovers new local files. Local configurations take precedence over PD metadata. If `auth.authenticator`
+is configured, reload returns HTTP 400 before closing graphs; restart Server to apply configuration changes. See the [graph
+API](/docs/clients/restful-api/graphs/) for reload behavior.
 
 With PD, local graphs successfully loaded in `DEFAULT` reject public deletion while their configuration files remain, regardless of this flag.
 With PD and `true`, protection also covers every name in a successful directory scan, even if local loading fails and PD metadata restores that graph.
