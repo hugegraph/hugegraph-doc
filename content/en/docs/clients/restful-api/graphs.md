@@ -422,7 +422,10 @@ Reloads all graphs held by this Server after graph configuration changes. Reload
 Reload and graph removal are mutually exclusive within each graph manager, including local deletion and remote removal notifications.
 An overlapping REST request for these operations returns HTTP 400 before scanning configurations or changing graphs.
 The active operation retains this exclusion until reload finishes closing and reopening graphs, or graph removal ends.
-Retry explicitly after it ends, including failure or timeout. Remote removal notifications are not automatically retried.
+Retry an overlapping REST request explicitly after the active operation ends, including failure or timeout.
+A remote removal notification received during an active operation is deferred and processed after it ends.
+If current PD metadata already contains a recreated graph, that graph is retained.
+An actual graph-close failure is logged and still requires an explicit retry.
 
 Without PD, a reload that passes preflight rescans all current files in the startup graph configuration directory,
 even when `graph.load_from_local_config=false`. With PD and `false`, reload restores only local graphs previously loaded successfully
@@ -490,8 +493,8 @@ PUT http://localhost:8080/graphspaces/DEFAULT/graphs/manage
 200
 ```
 
-HTTP 400 indicates a configured authenticator, registered graph/schema cache-notification RPC services, a directory scan failure,
-or an incomplete graph reload.
+HTTP 400 indicates a configured authenticator, registered graph/schema cache-notification RPC services,
+an overlapping reload/removal request, a directory scan failure, or an incomplete graph reload.
 HTTP 200 means the permitted graph reload phases reported no failure.
 
 ##### Response Body

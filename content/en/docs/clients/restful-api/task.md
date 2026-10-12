@@ -94,7 +94,11 @@ GET http://localhost:8080/graphspaces/DEFAULT/graphs/hugegraph/tasks/2
 For the local scheduler, a `SUCCESS` status can become visible before the completion callback finishes saving the result.
 Deletion waits up to `task.wait_timeout` seconds for execution and its callback to finish, then checks the stored status before removing the record.
 Timeout or interruption retains the task record and any active execution owner for retry. Even with `force=true`, the record is not removed
-while its execution owner is active. This waiting behavior applies to local schedulers.
+while its execution owner is active. These cancellation, waiting and execution-owner retention rules apply only to local schedulers.
+
+Distributed schedulers coordinate deletion through task locks and persistent state. `force=true` does not bypass a lock held by another Server.
+A successful response can acknowledge a `DELETING` record awaiting cleanup; HTTP 204 does not prove that execution has stopped or the record is gone.
+If a cancellation or deletion request fails during persistence, correct the storage failure before retrying.
 
 ##### Method & Url
 
