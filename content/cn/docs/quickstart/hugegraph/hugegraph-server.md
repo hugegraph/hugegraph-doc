@@ -123,6 +123,33 @@ HUGEGRAPH_VERSION=1.7.0 docker compose -f docker-compose.yml up -d --wait
 
 完整的部署指南请参阅 [docker/README.md](https://github.com/apache/hugegraph/blob/master/docker/README.md)。
 
+#### 使用 PD 的 Server 服务标识
+
+对于使用 PD 的 Server，Helm chart 提供 `server.serviceId` 和 `server.graphSpace`。
+二者默认为 `DEFAULT`，此时保留 `conf/rest-server.properties` 中已有的 `server.service_id` 和 `server.graphspace`。
+非默认值会向 Server 容器注入 `HG_SERVER_SERVICE_ID` 或 `HG_SERVER_GRAPHSPACE`。请使用包含这些入口脚本映射的镜像。
+通过 `HG_SERVER_SERVICE_ID`、`SERVICE_ID` 或 `server.serviceId` 传入的非空服务 ID 仅支持可打印 ASCII，包含空格和反斜杠；
+部署校验会拒绝非 ASCII 和控制字符。此限制仅针对这些配置入口，不改变 Core Service 名称协议和已有的手工 properties 配置。
+`server.graphSpace` 接受 `DEFAULT`，或以小写字母开头、最多 48 位的小写字母、数字和下划线组成的已有空间名称：
+
+```bash
+helm upgrade --install hg ./helm/hugegraph \
+  --set-string server.serviceId=analytics \
+  --set-string server.graphSpace=team_a
+```
+
+部署分配到 `team_a` 的 Server 前，先通过现有 `DEFAULT` 空间的 Server，用具有创建图空间权限的账号创建该空间。
+chart 和这些环境变量不会自动创建图空间；同一个 Server Deployment 的所有副本使用相同服务标识。
+
+容器部署中的 `HG_SERVER_SERVICE_ID` 和 `HG_SERVER_GRAPHSPACE` 写入上述两个配置项。
+旧名称 `SERVICE_ID` 和 `GRAPH_SPACE` 仍可使用；非空的新变量优先于对应旧变量。
+同一配置项的新旧变量均未设置或为空时，保留已有值。Compose 不会自动传入宿主机上的这些变量，
+需要在 Compose override 的 Server `environment:` 中显式添加。详见 [Helm chart 指南](https://github.com/apache/hugegraph/blob/master/helm/hugegraph/README.md)。
+
+这些设置选择 Server 在 PD 中的服务元数据，不会搬迁已有图，也不会修改未指定图空间的 REST 路径所用的 `server.path_graphspace`。
+请求使用 `/graphspaces/team_a/...` 路径，并在 Hubble 中选择匹配的图空间和服务；开启鉴权时，显式指定路径仍须获得授权。
+配置渲染和入口脚本检查不能单独证明 Linux 上的非默认服务发现、鉴权或跨图空间隔离已通过验收。
+
 > [!NOTE]
 > 
 > 1. HugeGraph 的 Docker 镜像主要用于便捷地快速启动 HugeGraph，并不是 **ASF 官方发布物料包**。你可以从 [ASF Release Distribution Policy](https://infra.apache.org/release-distribution.html#dockerhub) 中了解更多细节。

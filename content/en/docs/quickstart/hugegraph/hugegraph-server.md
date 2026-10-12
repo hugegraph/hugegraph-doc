@@ -123,6 +123,41 @@ The standalone `docker-compose.yml` example uses `hugegraph/hugegraph:1.7.0`; it
 
 See [docker/README.md](https://github.com/apache/hugegraph/blob/master/docker/README.md) for the full setup guide.
 
+#### Server service identity with PD
+
+For a PD-backed Server, the Helm chart exposes `server.serviceId` and `server.graphSpace`.
+Both default to `DEFAULT`, which preserves the existing `server.service_id` and `server.graphspace`
+values in `conf/rest-server.properties`. A non-default chart value injects `HG_SERVER_SERVICE_ID`
+or `HG_SERVER_GRAPHSPACE` into the Server container. Use an image that includes these entrypoint mappings.
+Non-empty service IDs supplied through `HG_SERVER_SERVICE_ID`, `SERVICE_ID`, or `server.serviceId`
+must use printable ASCII; spaces and backslashes are supported, while deployment checks reject
+non-ASCII and control characters. This entrypoint restriction does not change Core Service naming
+or existing manually supplied properties. `server.graphSpace` accepts `DEFAULT` or an existing space
+name of up to 48 lowercase letters, digits, and underscores, starting with a letter:
+
+```bash
+helm upgrade --install hg ./helm/hugegraph \
+  --set-string server.serviceId=analytics \
+  --set-string server.graphSpace=team_a
+```
+
+Before deploying Servers assigned to `team_a`, create that graph space through an existing Server
+in `DEFAULT`, using an account with permission to create graph spaces. The chart and these environment
+variables do not create graph spaces; all replicas in the Server Deployment use the same identity.
+
+For container deployments, `HG_SERVER_SERVICE_ID` and `HG_SERVER_GRAPHSPACE` write the same two
+properties. The legacy `SERVICE_ID` and `GRAPH_SPACE` names remain accepted: a non-empty new variable
+wins over its legacy counterpart. If both names for a property are unset or empty, its existing value
+is preserved. Compose does not automatically forward these host variables; add explicit Server
+`environment:` entries in a Compose override. See the [Helm chart guide](https://github.com/apache/hugegraph/blob/master/helm/hugegraph/README.md).
+
+These settings select the Server's PD service metadata. They do not move existing graphs or change
+`server.path_graphspace` for REST paths that omit the graph space. Use `/graphspaces/team_a/...` paths
+and select the matching graph space and service in Hubble. When authentication is enabled, explicit paths
+still require authorization.
+Configuration rendering and entrypoint checks alone do not establish non-default Linux discovery,
+authentication, or isolation between graph spaces.
+
 > [!NOTE]
 >
 > 1. HugeGraph Docker images are provided as a convenient way to start HugeGraph quickly, but they are not official ASF distribution artifacts. You can find more details in the [ASF Release Distribution Policy](https://infra.apache.org/release-distribution.html#dockerhub).
