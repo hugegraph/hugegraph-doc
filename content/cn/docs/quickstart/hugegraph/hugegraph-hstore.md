@@ -221,13 +221,13 @@ Store 从 `conf/` 读取两个配置文件。1.7.0 发布标签的源文件见 [
 | `thread.pool.scan.max` | `1000` | 扫描最大线程数。 |
 | `thread.pool.scan.queue` | `0` | 扫描任务队列容量。 |
 
-**RPC 生命周期兼容性：** 合入
-[HugeGraph #3303](https://github.com/apache/hugegraph/pull/3303) 的生命周期修复后，
-Store 仍接受 `thread.pool.grpc.queue` 以保持配置兼容，但 RPC 回调始终使用无界队列。
-有界队列可能拒绝取消或完成回调，导致已接收的请求无法在停机时排空。
-`thread.pool.grpc.core` 和 `max` 配置仍保留；无界队列通常使用核心线程数，
-不会因队列积压而扩展至 `max`。持续过载可能增加回调积压，应在请求准入及扫描 worker 控制业务负载。
-尚未包含此修复的版本仍按配置的 gRPC 队列容量执行。
+**gRPC 回调队列（1.8.0）**
+
+Store 使用无界队列处理 gRPC 回调，避免队列满时丢弃取消或完成通知，导致请求无法正常结束。`thread.pool.grpc.queue` 仍可写在配置中，但不再限制这个队列的容量。
+
+`thread.pool.grpc.core` 和 `thread.pool.grpc.max` 仍用于配置线程池。由于回调可以继续排队，积压通常不会触发线程数从 `core` 增长到 `max`；只增大 `max` 无法提高回调处理能力。
+
+持续过载仍会使队列积压并增加内存占用。应限制客户端并发，并根据节点资源调整扫描和查询工作线程池；不要依赖 `thread.pool.grpc.queue` 限流。1.7.0 仍使用配置的 gRPC 队列容量。
 
 **查询下推**
 
