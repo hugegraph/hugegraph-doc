@@ -216,6 +216,8 @@ Create a graph (set `Content-Type: application/json`)
 Graph-space management permission (`space`) is required when authentication is enabled.
 
 Stop application writes before deleting a graph and keep it isolated with writes stopped throughout failures and retries.
+Do not recreate a same-named graph in that graph space on any Server until failed deletion cleanup and retries finish.
+If the initial backend clear fails, retry clears it again and may erase new data written by another Server.
 The delete operation does not fence graph write transactions across requests.
 Once scheduler shutdown has closed task admission, a failed deletion does not automatically reopen it.
 
@@ -424,12 +426,27 @@ GET http://localhost:8080/graphspaces/DEFAULT/graphs/default
 
 Reloads all graphs held by this Server after graph configuration changes. Reload preserves backend data and local configuration files.
 
-Reload and graph removal are mutually exclusive within each graph manager, including local deletion and remote removal notifications.
-An overlapping REST request for these operations returns HTTP 400 before scanning configurations or changing graphs.
-The active operation retains this exclusion until reload finishes closing and reopening graphs, or graph removal ends.
+Within each graph manager, reload, graph removal, graph-space clearing or removal, and API graph creation
+and cloning share lifecycle coordination. With PD, a graph lookup that misses the cache holds the same
+coordination from reading metadata until registering the local instance. Cached graph reads are outside
+it; this is not a barrier for all HTTP requests or graph transactions.
+Remote graph-addition and removal notifications use the same lifecycle coordination.
+An overlapping REST request for reload or graph removal returns HTTP 400 before scanning configurations or changing graphs.
+The active operation holds this coordination until it completes, including the full close-and-reopen sequence of reload.
 Retry an overlapping REST request explicitly after the active operation ends, including failure or timeout.
-A remote removal notification received during an active operation is deferred and processed after it ends.
-If current PD metadata already contains a recreated graph, that graph is retained.
+Remote graph-addition and removal notifications received during an active operation are deferred
+and processed afterward using current PD configuration. For a graph loaded from PD that is not protected
+by a local configuration in `DEFAULT`, the local instance is retained only when its creation details
+and opening configuration still match the current PD record. If they differ, Server closes the old
+instance and reloads the current PD configuration, preserving its graph-space quota while the graph
+remains registered in PD. Graphs protected by local configuration in `DEFAULT` keep the local protection
+rules described below.
+If creation details and opening configuration are identical, including a reused creation time, Server
+cannot reliably distinguish an old instance from a recreated graph with the same name. Keep writes
+stopped during maintenance, then explicitly reload or restart Server and verify the intended graph.
+If replacement loading or startup fails, the graph may temporarily be absent from this Server. Keep writes
+stopped and, after fixing the cause, explicitly reload or restart Server to restore it. The reload
+restrictions below still apply; this process is not a distributed transaction.
 An actual graph-close failure is logged and still requires an explicit retry.
 
 Without PD, a reload that passes preflight rescans all current files in the startup graph configuration directory,
