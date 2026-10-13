@@ -260,6 +260,17 @@ class ReleaseValidationTest(unittest.TestCase):
                              "groupId=org.apache.hugegraph\nartifactId=hugegraph-client\nversion=1.8.0\n")
         SMOKE.embedded_versions("1.8.0", server, toolchain)
 
+    def test_client_classpath_excludes_loader_fat_jar_and_keeps_sdk_dependencies(self):
+        library = self.root / "lib"
+        library.mkdir()
+        names = ("hugegraph-client-1.8.0.jar", "hugegraph-common-1.8.0.jar",
+                 "hugegraph-loader-1.8.0.jar", "flink-shaded-guava-31.1-jre-17.0.jar")
+        for name in (*names, "apache-hugegraph-loader-1.8.0-shaded.jar"):
+            (library / name).touch()
+        result = self.shell(f"client_classpath {shlex.quote(str(self.root))}")
+        self.assertEqual(result.returncode, 0, result.stdout + result.stderr)
+        self.assertEqual(result.stdout.strip().split(":"), sorted(str(library / name) for name in names))
+
     def test_validator_exports_copyfile_disable_to_child_processes(self):
         result = self.shell("python3 -c 'import os; print(os.environ[\"COPYFILE_DISABLE\"])'")
         self.assertEqual(result.returncode, 0)
