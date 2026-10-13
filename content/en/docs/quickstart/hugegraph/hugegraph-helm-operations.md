@@ -47,7 +47,8 @@ Do not change a persisted PD/Store Raft hostname or port as an ordinary upgrade:
 At first bootstrap, the chart seeds three shard replicas when there are at least three Stores, and one otherwise.
 PD persists the partition settings; changing chart values after initialization does not rewrite that metadata.
 Use the PD configuration API and a coordinated partition patrol for an existing cluster. An explicit shard count must be odd and no greater than Store replicas.
-See the README's partition sharding procedure before changing a live cluster.
+See the [topology constraints](https://github.com/apache/hugegraph/blob/master/helm/hugegraph/docs/operations.md#topology-and-scheduling)
+before changing a live cluster; the chart does not migrate existing shard metadata.
 
 ## 5 NetworkPolicy
 
@@ -84,14 +85,20 @@ networkPolicy:
 Use `store.updateStrategy.type=OnDelete` for a controlled maintenance rollout, as the cluster preset does.
 Delete one Store Pod at a time. Before replacing the next, verify the previous Pod is Ready, has a fresh Store heartbeat and each shard group has its
 full membership and exactly one leader, read from the PD leader. PD's `Up` status alone does not prove completed shard recovery.
-PDBs limit voluntary eviction, not StatefulSet controller disruption. Consult the README's full per-group checks and stop on missing shards or leaders.
+PDBs limit voluntary eviction, not StatefulSet controller disruption. Stop on missing members or leaders.
+The [operations reference](https://github.com/apache/hugegraph/blob/master/helm/hugegraph/docs/operations.md#rolling-store-updates-and-recovery)
+summarizes these rollout conditions;
+it does not provide a complete per-group diagnostic or disk-loss recovery procedure.
 
 ## 7 Disaster recovery
 
 Preserve existing volumes, claim identities and PD membership. Do not delete RocksDB lock files to recover a deployment, or replace persisted membership
-with freshly generated nodes. Loss of one Store disk requires a documented shard replacement/recovery procedure, not merely a new empty PVC.
-Local disks cannot migrate their files automatically when a node fails. Take backups outside these PVs and test recovery separately;
-the chart does not implement backup or automatic recovery. Follow the README's recovery sequence before destructive changes.
+with freshly generated nodes. A new empty PVC does not restore the data from a lost Store disk.
+Local disks cannot migrate their files automatically when a node fails. Take backups outside these PVs and test recovery separately.
+The chart does not implement backup or automatic recovery. The
+[recovery notes](https://github.com/apache/hugegraph/blob/master/helm/hugegraph/docs/operations.md#rolling-store-updates-and-recovery)
+describe constraints, not a complete recovery sequence.
+Before destructive changes, establish and validate a recovery plan for the deployed version and remaining replicas or backups.
 
 ## 8 Scaling
 

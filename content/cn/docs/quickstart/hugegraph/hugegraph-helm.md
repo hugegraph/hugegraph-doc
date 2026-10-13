@@ -64,7 +64,7 @@ NodePort 省略或设为 `0` 时自动分配，固定端口由 Kubernetes 根据
 GitOps 凭据、仅 API 部署以及无域名的 HTTP Ingress。
 
 `global.imageRegistry` 为未指定 registry 的镜像仓库加前缀，组件指定完整 registry 地址时优先采用组件配置。
-默认只需镜像仓库中的 `hugegraph/pd`、`hugegraph/store`、`hugegraph/hugegraph` 和 `hugegraph/hubble` 四个镜像，标签或 digest 按实际配置选取。
+默认只需镜像仓库中的 `hugegraph/pd`、`hugegraph/store`、`hugegraph/server` 和 `hugegraph/hubble` 四个镜像，标签或 digest 按实际配置选取。
 等待 PD 的 init container 复用 Store 镜像，Helm test 复用 Server 镜像。这两个镜像已包含 `curl`，无需额外 curl 镜像或启动时安装软件。
 自定义镜像可以继续使用显式 `store.waitImage` 和 `server.waitImage` 覆盖。
 

@@ -44,7 +44,8 @@ Server 等待存储的默认上限为 300 秒，可以用 `server.storageWaitTim
 
 首次初始化时，Store 至少三个则默认每个分区三副本，否则一副本。
 PD 会持久化分区设置，初始化后修改 chart 值不会覆盖已有元数据，应使用 PD 配置 API 并协调分区巡检。
-显式 shard 数必须为奇数且不超过 Store 数，操作在线集群前参照 README 的完整过程。
+显式 shard 数必须为奇数且不超过 Store 数，操作在线集群前先核对
+[拓扑约束](https://github.com/apache/hugegraph/blob/master/helm/hugegraph/docs/operations.md#topology-and-scheduling)；chart 不负责迁移已有 shard 元数据。
 
 ## 5 NetworkPolicy {#5-networkpolicy}
 
@@ -80,14 +81,17 @@ networkPolicy:
 集群预设使用 `store.updateStrategy.type=OnDelete` 便于维护时控制逐个替换。
 每次只删除一个 Store Pod，下一次删除前确认上一个 Pod Ready、Store 心跳新鲜，并从 PD leader 查询每个 shard group 都有完整成员及唯一 leader。
 PD 的 `Up` 状态本身不证明 shard 恢复完成。PDB 限制主动驱逐，不限制 StatefulSet 控制器更新。
-按 README 完整检查 shard 状态，发现缺副本或无 leader 时停止继续替换。
+发现缺成员或无 leader 时停止继续替换。
+[运维参考](https://github.com/apache/hugegraph/blob/master/helm/hugegraph/docs/operations.md#rolling-store-updates-and-recovery)说明这些升级条件，
+但不提供完整的逐组诊断或丢盘恢复步骤。
 
 ## 7 灾难恢复 {#7-disaster-recovery}
 
 保留原卷、claim 身份和 PD 成员关系，不通过删除 RocksDB lock 文件恢复，也不把持久化成员配置替换为全新的节点。
-Store 丢盘需要按 shard 替换/恢复流程处理，新建空 PVC 并不自动恢复数据。
+Store 丢盘后，新建空 PVC 并不能恢复原有数据。
 local 磁盘不能在节点故障时自动迁移文件。备份应放在这些 PV 之外，并单独验证恢复；chart 不提供自动备份和自动恢复。
-破坏性变更前先按 README 的恢复顺序检查。
+[恢复说明](https://github.com/apache/hugegraph/blob/master/helm/hugegraph/docs/operations.md#rolling-store-updates-and-recovery)列出恢复约束，不是完整的恢复操作顺序。
+破坏性变更前，应结合部署版本、剩余副本或备份制定并验证恢复方案。
 
 ## 8 扩缩容 {#8-scaling}
 

@@ -64,7 +64,7 @@ the chart does not force `30000–32767`. Legacy HTTP acknowledgement fields rem
 GitOps credentials, API-only deployment and a hostless HTTP Ingress.
 
 Set `global.imageRegistry` to prefix unqualified image repositories; an explicit registry in a component repository takes precedence.
-The default mirror inventory is only `hugegraph/pd`, `hugegraph/store`, `hugegraph/hugegraph` and `hugegraph/hubble`, at the configured tags/digests.
+The default mirror inventory is only `hugegraph/pd`, `hugegraph/store`, `hugegraph/server` and `hugegraph/hubble`, at the configured tags/digests.
 Store's PD wait init container and the Helm test reuse Store and Server images respectively, which already contain `curl`.
 No separate curl image or runtime package installation is required. Explicit `store.waitImage` / `server.waitImage` overrides remain supported.
 
