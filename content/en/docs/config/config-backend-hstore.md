@@ -247,7 +247,14 @@ The `nodes` value in the response is the count of active stores PD returns. A `n
 Server reached PD but PD has no store in state `Up`, which usually means the Store nodes have not registered
 yet, or registered as `Pending` because they are not in PD's `pd.initial-store-list`.
 
-Store builds containing the legacy GraphID preflight check existing graph-data column families before allocating a missing graph ID, first opening a cold
+### 9 Legacy GraphID upgrade preflight
+
+The following checks apply only to Store builds containing the implementation proposed in
+[Apache HugeGraph #3330](https://github.com/apache/hugegraph/pull/3330).
+This change is not yet merged into Apache HugeGraph or included in an Apache release. Earlier 1.8 builds do not guarantee this guard; verify that your
+build contains the fix before relying on the refusal behavior below.
+
+These Store builds check existing graph-data column families before allocating a missing graph ID, first opening a cold
 partition DB during metadata bootstrap, starting its Raft state machine, or activating a staged snapshot. Before pruning, the first cold DB open checks
 all retained valid versions. Reserved `FFFE` legacy rows cause refusal.
 An incomplete selected DB version without `CURRENT` is also rejected when it would hide retained valid versions. This concerns affected old write paths;
@@ -258,5 +265,6 @@ resuming writes or replay. Do not delete graph-to-ID mappings or assign all rese
 Store/Raft location metadata may already have been updated before the check, so the entire bootstrap is not read-only. The check performs no automatic
 migration or ownership repair; a complete 1.7 upgrade and recovery still require deployment-specific validation.
 
-See the [preflight change](https://github.com/hugegraph/hugegraph/pull/301) and the
-[repository upgrade guide](https://github.com/hugegraph/hugegraph/blob/27731930ce4573481ac2f01092a288b0db239b53/docs/store-graphid-upgrade.md) for details.
+See the
+[guide for the proposed revision](https://github.com/hugegraph/hugegraph/blob/27731930ce4573481ac2f01092a288b0db239b53/docs/store-graphid-upgrade.md)
+for details.
