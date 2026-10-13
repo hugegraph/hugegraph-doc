@@ -664,7 +664,9 @@ PUT http://localhost:8080/graphspaces/DEFAULT/graphs/hugegraph/graph_read_mode
 
 #### 6.3.5 LOADING ownership {#loading-ownership}
 
-Server builds implementing ownership protocol 1 expose the following endpoints. Support for the `LOADING` enum alone does not imply support for them.
+These proposed, unreleased endpoints require a build containing [Server #3331](https://github.com/apache/hugegraph/pull/3331).
+Loader integration also requires [Client/Loader #815](https://github.com/apache/hugegraph-toolchain/pull/815).
+Released packages, earlier 1.8 builds and current Apache master lack this contract. Support for the `LOADING` enum alone does not imply support for it.
 With authentication enabled, both endpoints use the mode setter's permissions: graph-space management (`space`) or graph ownership, with STATUS write
 authorization. Server binds the handle to the authenticated principal; a token grants no permission. Keep the same identity for acquire, release and retries.
 
@@ -705,6 +707,9 @@ never generate a new tuple to retry an uncertain acquire.
 
 The first owner can acquire only from `NONE`. Further owners can share owner-managed `LOADING`; the last active release restores `NONE`.
 Acquisition rejects manually set `LOADING`, `RESTORING` and `MERGING`. An unknown-handle release leaves such a manual mode unchanged.
+
+Loader graph-source and restore imports check protocol 1, then use the enum API for `RESTORING` without acquiring a `LOADING` owner.
+After a successful mode PUT, their cleanup drains the workers before restoring `NONE`. A failed mode PUT does not trigger that reset.
 
 State is held in memory by one Server graph instance, without cross-Server coordination, data-request fencing or automatic expiry.
 Use a fixed direct Server endpoint. See [Loader ownership and recovery](/docs/quickstart/toolchain/hugegraph-loader/#loading-ownership) for worker shutdown,

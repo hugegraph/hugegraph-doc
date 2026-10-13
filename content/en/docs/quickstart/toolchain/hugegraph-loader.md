@@ -27,9 +27,10 @@ It will be explained in detail below.
 
 > Note: HugeGraph-Loader requires HugeGraph Server service, please refer to [HugeGraph-Server Quick Start](/docs/quickstart/hugegraph/hugegraph-server) to download and start Server
 
-> Normal imports in this guide require Server and Client/Loader builds that implement
-> [loading ownership protocol 1](/docs/clients/restful-api/graphs/#loading-ownership).
-> General Client/Server CRUD compatibility does not satisfy this requirement.
+> **Proposed, unreleased import protection:** [loading ownership protocol 1](/docs/clients/restful-api/graphs/#loading-ownership) requires builds containing
+> both [Server #3331](https://github.com/apache/hugegraph/pull/3331) and [Client/Loader #815](https://github.com/apache/hugegraph-toolchain/pull/815).
+> Released packages, earlier 1.8 builds and current Apache master do not contain this contract; the download and master-build instructions below do not
+> select those PR builds. General Client/Server CRUD compatibility does not satisfy this requirement.
 
 > **Testing Guide**: For running HugeGraph-Loader tests locally, please refer to [HugeGraph Toolchain Local Testing Guide](/docs/guides/toolchain-local-test)
 
@@ -992,10 +993,17 @@ Expected result: two vertices and zero edges imported. This example uses dedicat
 
 #### 3.4.6 Concurrent imports and LOADING ownership {#loading-ownership}
 
-Upgrade both Server and Client/Loader to builds containing `/mode/owners` protocol 1; a version number or Docker `latest` tag alone does not confirm support.
-Server 1.7 recognizes `LOADING` but has no ownership endpoint. Normal imports fail if the capability is absent or invalid, without falling back to enum
-mode PUT or `NONE`. This check precedes `--clear-all-data`, Schema creation and import-data writes; `--create-graph` can create the target graph first.
-Graph-source and restore imports continue to use their separate `RESTORING` path.
+This proposed contract requires matching builds from [Server #3331](https://github.com/apache/hugegraph/pull/3331) and
+[Client/Loader #815](https://github.com/apache/hugegraph-toolchain/pull/815). The reviewed sources are
+[Server](https://github.com/apache/hugegraph/tree/257a6a7ac2867daf4567f0d1a050123a8ff651cb) and
+[Client/Loader](https://github.com/apache/hugegraph-toolchain/tree/de942c5ebe9fd2bbd5b8776a3534b57aed6448bb).
+Released packages, earlier 1.8 builds and current Apache master lack this contract. A version number or Docker `latest` tag alone does not confirm support.
+Server 1.7 recognizes `LOADING` but has no ownership endpoint. Imports fail if the capability is absent or invalid, without falling back to enum mode PUT
+or `NONE`. This check precedes `--clear-all-data`, Schema creation and import-data writes; `--create-graph` can create the target graph first.
+
+Graph-source and restore imports also check protocol 1 before setting `RESTORING` through the enum API. They do not acquire a `LOADING`
+owner. After a successful `RESTORING` PUT, cleanup stops and drains their workers before restoring `NONE`; a failed PUT does not trigger that reset.
+Coordinate these imports separately from concurrent imports; this path does not provide cross-Server locking.
 
 Each load context keeps one `instance`/`epoch`/`token` handle for acquisition, retries and release. The first owner requires `NONE` and enables `LOADING`;
 another owner can join that owned `LOADING` state. Finishing one import preserves `LOADING` while another owner is active; the last release restores `NONE`.

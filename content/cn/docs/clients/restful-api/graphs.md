@@ -659,7 +659,9 @@ PUT http://localhost:8080/graphspaces/DEFAULT/graphs/hugegraph/graph_read_mode
 
 #### 6.3.5 LOADING owner 管理 {#loading-ownership}
 
-实现 owner 协议 1 的 Server 提供以下接口。仅支持 `LOADING` 枚举不能说明支持这些接口。
+以下尚未发布的 owner 协议 1 接口要求使用包含 [Server #3331](https://github.com/apache/hugegraph/pull/3331) 的构建；
+Loader 集成另需配套的 [Client/Loader #815](https://github.com/apache/hugegraph-toolchain/pull/815)。
+已发布包、较早的 1.8 构建与当前 Apache master 不包含该合同；仅支持 `LOADING` 枚举不能说明支持这些接口。
 启用鉴权时，两个接口沿用模式设置接口的权限要求，即图空间管理权限（`space`）或该图所有者权限，并校验 STATUS 写权限。
 Server 将句柄绑定到实际鉴权用户；token 本身不赋予权限。申请、释放和重试必须保持相同身份。
 
@@ -699,6 +701,9 @@ PUT http://localhost:8080/graphspaces/DEFAULT/graphs/hugegraph/mode/owners
 
 首个 owner 只能从 `NONE` 申请；其他 owner 可以共享由 owner 管理的 `LOADING`，最后一个活跃 owner 释放后恢复 `NONE`。
 申请会拒绝手动设置的 `LOADING`、`RESTORING` 和 `MERGING`；释放未知句柄不会改变这些手动模式。
+
+Loader 的图数据源和恢复导入会先检查协议 1，再通过枚举接口设置 `RESTORING`，不申请 `LOADING` owner。
+仅在模式 PUT 成功后，清理才会在 worker 全部退出后恢复 `NONE`；PUT 失败不会触发该重置。
 
 状态保存在单个 Server 图实例的内存中，不提供跨 Server 协调、数据请求隔离或自动过期。请使用固定的 Server 直连地址。
 worker 关闭、释放失败和异常退出的处理参见 [Loader owner 与恢复说明](/cn/docs/quickstart/toolchain/hugegraph-loader/#loading-ownership)。
