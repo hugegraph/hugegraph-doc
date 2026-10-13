@@ -212,7 +212,8 @@ curl http://localhost:8080/metrics/backend
 ### 9 旧 GraphID 升级预检
 
 以下检查仅适用于包含 [Apache HugeGraph #3330](https://github.com/apache/hugegraph/pull/3330) 所提实现的 Store 构建。
-该修复尚未合入 Apache HugeGraph，也未包含在 Apache 发行版中。更早的 1.8 构建不保证具备该保护；依赖下述拒绝行为前，先确认所用构建包含该修复。
+该修复尚未合入。已发布的 1.7.0 Store 和 #3330 合入前的 Apache `master` 构建不包含此预检保护。
+依赖下述拒绝行为前，请使用包含该修复的构建。
 
 这些 Store 构建会在分配缺失的图 ID、元数据启动阶段首次打开尚未缓存的分区 DB、启动该分区的 Raft 状态机，或激活暂存快照前检查已有图数据列族。
 首次打开时会在清理旧版本前检查所有仍保留的有效 DB 版本。发现保留前缀 `FFFE` 的旧数据时会拒绝操作；
@@ -223,4 +224,5 @@ curl http://localhost:8080/metrics/backend
 不要删除图到 ID 的映射，也不要把所有保留前缀行归给同一个图，因为不同图可能共享该前缀。Store/Raft 位置元数据可能已在预检前更新，因此整个启动流程并非只读。
 预检不会自动迁移数据或修复归属；完整的 1.7 升级与恢复仍需针对具体部署验证。
 
-详细行为与处置依据见[所提源码版本的升级指南](https://github.com/hugegraph/hugegraph/blob/27731930ce4573481ac2f01092a288b0db239b53/docs/store-graphid-upgrade.md)。
+详细行为与处置依据见
+[所提源码版本的升级指南](https://github.com/apache/hugegraph/blob/27731930ce4573481ac2f01092a288b0db239b53/docs/store-graphid-upgrade.md)。
