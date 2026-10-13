@@ -28,6 +28,9 @@ HugeGraph-Loader 是 HugeGraph 的数据导入组件，能够将多种数据源�
 > 
 > **测试指南**：如需在本地运行 Loader 测试，请参考 [工具链本地测试指南](/cn/docs/guides/toolchain-local-test)
 
+> 本文中的普通导入要求 Server 与 Client/Loader 都包含 [LOADING owner 协议 1](/cn/docs/clients/restful-api/graphs/#loading-ownership) 实现。
+> Client/Server 的常规 CRUD 兼容性不能替代这一能力要求。
+
 ### 2 获取 HugeGraph-Loader
 
 可以通过以下三种方式获取 HugeGraph-Loader：
@@ -981,6 +984,27 @@ bin/hugegraph-loader.sh \
 ```
 
 本例用独立的 `docs_smoke_person` 标签和 `docs_*` 属性，避免与预置的 `person` 样例数据冲突。成功时统计中应显示顶点写入成功数为 `2`、边写入成功数为 `0`。也可以在 Hubble 的 Gremlin 工作台查询 `g.V().hasLabel('docs_smoke_person').values('docs_name')`，结果应包含 `docs-smoke-alice` 和 `docs-smoke-bob`。
+
+#### 3.4.6 并发导入与 LOADING owner {#loading-ownership}
+
+请同时升级 Server 与 Client/Loader，使用包含 `/mode/owners` 协议 1 实现的版本；仅凭版本号或 Docker `latest` 标签不能确认该能力。
+Server 1.7 支持 `LOADING` 枚举，但没有 owner 接口。普通导入在能力缺失或无效时失败，不会回退到枚举模式 PUT 或 `NONE`。
+检查发生在 `--clear-all-data`、创建 Schema 和写入导入数据之前；`--create-graph` 可能先创建目标图。图数据源和恢复导入仍使用独立的 `RESTORING` 路径。
+
+每个导入上下文固定使用一个 `instance`/`epoch`/`token` 句柄完成申请、重试与释放。首个 owner 只能从 `NONE` 申请并启用 `LOADING`，
+其他 owner 可以加入由 owner 管理的 `LOADING`。一个导入结束时，其他 owner 仍活跃则保持 `LOADING`；最后一个 owner 释放后恢复 `NONE`。
+手动设置的 `LOADING`、`RESTORING` 或 `MERGING` 必须在没有活跃导入时先恢复为 `NONE`，再启动普通导入。
+owner 管理不会隔离多个导入之间的 Schema 修改或 `--clear-all-data`，这些操作需要单独协调。
+
+整个导入过程应直连同一台稳定的 Server。owner 状态仅属于该 Server 上实际运行的图实例，不提供跨 Server 协调，普通数据请求也不按 owner 句柄隔离。
+导入期间不支持负载均衡地址、节点故障切换、图重载或 Server 重启。
+
+清理时，Loader 先停止并等待自己的 worker 全部退出，再释放原句柄；申请可能已经生效但响应丢失时也使用同一句柄取消。
+worker 无法退出时会保留上下文与 owner，供后续再次关闭。嵌入式调用方需要调用 `HugeGraphLoader.shutdown()`。
+释放失败时会报告句柄；确认导入进程及其在途写入都已停止后，使用相同鉴权身份在同一图实例上重试释放。已释放句柄不能用于另一轮导入。
+
+`kill -9` 无法执行清理，可能留下活跃 owner；没有租约或自动过期机制。如果记录的句柄丢失，先停止所有导入及其在途写入，
+再重新打开图或重启 Server 以清除本地 owner 状态。重启不会撤销已经执行的数据或 Schema 清理。
 
 ### 4 完整示例
 

@@ -577,6 +577,8 @@ PUT http://localhost:8080/graphspaces/DEFAULT/graphs/hugegraph/mode
 
 > 合法的图模式包括：NONE，RESTORING，MERGING，LOADING
 
+存在活跃的 loading owner 时，此枚举 PUT 会拒绝所有模式修改，包括 `"LOADING"`。请先停止导入 worker，再释放其 owner。
+
 ##### Response Status
 
 ```javascript
@@ -654,6 +656,52 @@ PUT http://localhost:8080/graphspaces/DEFAULT/graphs/hugegraph/graph_read_mode
     "graph_read_mode": "OLTP_ONLY"
 }
 ```
+
+#### 6.3.5 LOADING owner 管理 {#loading-ownership}
+
+实现 owner 协议 1 的 Server 提供以下接口。仅支持 `LOADING` 枚举不能说明支持这些接口。
+启用鉴权时，两个接口沿用模式设置接口的权限要求，即图空间管理权限（`space`）或该图所有者权限，并校验 STATUS 写权限。
+Server 将句柄绑定到实际鉴权用户；token 本身不赋予权限。申请、释放和重试必须保持相同身份。
+
+```text
+GET http://localhost:8080/graphspaces/DEFAULT/graphs/hugegraph/mode/owners
+```
+
+`200` 能力响应包含图实例 UUID 和当前非负 epoch：
+
+```json
+{
+    "protocol": 1,
+    "instance": "<instance UUID>",
+    "epoch": 0
+}
+```
+
+每轮导入生成一个新的标准 UUID 作为 `token`，保留返回的 `instance` 和 `epoch`，通过以下请求申请，并设置 `Content-Type: application/json`：
+
+```text
+PUT http://localhost:8080/graphspaces/DEFAULT/graphs/hugegraph/mode/owners
+```
+
+```json
+{
+    "action": "acquire",
+    "instance": "<instance UUID>",
+    "epoch": 0,
+    "token": "<import UUID>"
+}
+```
+
+确认申请成功时返回 `200`，回显 `protocol`、`instance`、`epoch` 和 `token`，并返回 `state: "active"` 和 `mode: "LOADING"`。
+释放时只把 `action` 改为 `release`，其他三项保持原值；响应的 `state` 为 `released`，`mode` 为当前实际模式。
+活跃句柄的重复申请与重复释放是幂等的。`200` 响应中的 `state` 若为 `released`，则不能视为申请成功。
+释放未知句柄会取消可能仍在途的申请。已释放句柄不能再次申请；申请结果不确定时，不要生成新句柄重试。
+
+首个 owner 只能从 `NONE` 申请；其他 owner 可以共享由 owner 管理的 `LOADING`，最后一个活跃 owner 释放后恢复 `NONE`。
+申请会拒绝手动设置的 `LOADING`、`RESTORING` 和 `MERGING`；释放未知句柄不会改变这些手动模式。
+
+状态保存在单个 Server 图实例的内存中，不提供跨 Server 协调、数据请求隔离或自动过期。请使用固定的 Server 直连地址。
+worker 关闭、释放失败和异常退出的处理参见 [Loader owner 与恢复说明](/cn/docs/quickstart/toolchain/hugegraph-loader/#loading-ownership)。
 
 ### 6.4 Snapshot
 

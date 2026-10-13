@@ -576,6 +576,8 @@ PUT http://localhost:8080/graphspaces/DEFAULT/graphs/hugegraph/mode
 
 > Allowed graph mode values are: NONE, RESTORING, MERGING, LOADING
 
+While loading owners are active, this enum PUT rejects all mode changes, including `"LOADING"`. Release the owners after their import workers stop.
+
 ##### Response Status
 
 ```javascript
@@ -659,6 +661,54 @@ PUT http://localhost:8080/graphspaces/DEFAULT/graphs/hugegraph/graph_read_mode
     "graph_read_mode": "OLTP_ONLY"
 }
 ```
+
+#### 6.3.5 LOADING ownership {#loading-ownership}
+
+Server builds implementing ownership protocol 1 expose the following endpoints. Support for the `LOADING` enum alone does not imply support for them.
+With authentication enabled, both endpoints use the mode setter's permissions: graph-space management (`space`) or graph ownership, with STATUS write
+authorization. Server binds the handle to the authenticated principal; a token grants no permission. Keep the same identity for acquire, release and retries.
+
+```text
+GET http://localhost:8080/graphspaces/DEFAULT/graphs/hugegraph/mode/owners
+```
+
+The `200` capability response contains the graph-instance UUID and current nonnegative epoch:
+
+```json
+{
+    "protocol": 1,
+    "instance": "<instance UUID>",
+    "epoch": 0
+}
+```
+
+Generate a new canonical UUID `token` for each import, retain the returned `instance` and `epoch`, and acquire with `Content-Type: application/json`:
+
+```text
+PUT http://localhost:8080/graphspaces/DEFAULT/graphs/hugegraph/mode/owners
+```
+
+```json
+{
+    "action": "acquire",
+    "instance": "<instance UUID>",
+    "epoch": 0,
+    "token": "<import UUID>"
+}
+```
+
+A confirmed acquisition returns `200`, echoing `protocol`, `instance`, `epoch` and `token`, with `state: "active"` and `mode: "LOADING"`.
+Release with `action: "release"` and the identical tuple; the response has `state: "released"` and the effective graph mode.
+Repeated acquire for an active handle and repeated release are idempotent. A `200` response with `state: "released"` does not confirm acquisition.
+Releasing an unknown handle cancels a possibly delayed acquire. A released handle cannot acquire again;
+never generate a new tuple to retry an uncertain acquire.
+
+The first owner can acquire only from `NONE`. Further owners can share owner-managed `LOADING`; the last active release restores `NONE`.
+Acquisition rejects manually set `LOADING`, `RESTORING` and `MERGING`. An unknown-handle release leaves such a manual mode unchanged.
+
+State is held in memory by one Server graph instance, without cross-Server coordination, data-request fencing or automatic expiry.
+Use a fixed direct Server endpoint. See [Loader ownership and recovery](/docs/quickstart/toolchain/hugegraph-loader/#loading-ownership) for worker shutdown,
+failed release and abnormal-exit recovery.
 
 ### 6.4 Snapshot
 

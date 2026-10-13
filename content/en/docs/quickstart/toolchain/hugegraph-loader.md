@@ -27,6 +27,10 @@ It will be explained in detail below.
 
 > Note: HugeGraph-Loader requires HugeGraph Server service, please refer to [HugeGraph-Server Quick Start](/docs/quickstart/hugegraph/hugegraph-server) to download and start Server
 
+> Normal imports in this guide require Server and Client/Loader builds that implement
+> [loading ownership protocol 1](/docs/clients/restful-api/graphs/#loading-ownership).
+> General Client/Server CRUD compatibility does not satisfy this requirement.
+
 > **Testing Guide**: For running HugeGraph-Loader tests locally, please refer to [HugeGraph Toolchain Local Testing Guide](/docs/guides/toolchain-local-test)
 
 ### 2 Get HugeGraph-Loader
@@ -985,6 +989,29 @@ bin/hugegraph-loader.sh \
 ```
 
 Expected result: two vertices and zero edges imported. This example uses dedicated schema names to avoid conflicts with a preloaded `person` label. In Hubble, run `g.V().hasLabel('docs_smoke_person').values('docs_name')` to confirm `docs-smoke-alice` and `docs-smoke-bob`.
+
+#### 3.4.6 Concurrent imports and LOADING ownership {#loading-ownership}
+
+Upgrade both Server and Client/Loader to builds containing `/mode/owners` protocol 1; a version number or Docker `latest` tag alone does not confirm support.
+Server 1.7 recognizes `LOADING` but has no ownership endpoint. Normal imports fail if the capability is absent or invalid, without falling back to enum
+mode PUT or `NONE`. This check precedes `--clear-all-data`, Schema creation and import-data writes; `--create-graph` can create the target graph first.
+Graph-source and restore imports continue to use their separate `RESTORING` path.
+
+Each load context keeps one `instance`/`epoch`/`token` handle for acquisition, retries and release. The first owner requires `NONE` and enables `LOADING`;
+another owner can join that owned `LOADING` state. Finishing one import preserves `LOADING` while another owner is active; the last release restores `NONE`.
+Manual `LOADING`, `RESTORING` or `MERGING` must be returned to `NONE` with no active imports before a normal import starts.
+Ownership does not isolate Schema changes or `--clear-all-data` from other imports; coordinate these operations separately.
+
+Use one directly addressed, stable Server for the entire import. Ownership is local to that actual Server graph instance, with no cross-Server coordination
+or owner fencing on ordinary data requests. Load balancers, node failover, graph reload and Server restart during import are unsupported.
+
+Cleanup stops and drains the Loader's workers before releasing its handle, including when acquisition may have succeeded but its response was lost.
+If workers cannot terminate, the context and owner remain for a later shutdown attempt. Embedded callers must call `HugeGraphLoader.shutdown()`.
+A failed release reports the handle; after stopping the importer and its in-flight writes, retry release on the same graph instance with the same
+authenticated identity. Released handles cannot be reused for another import.
+
+`kill -9` can leave an owner active because it cannot run cleanup; there is no lease or automatic expiry. If the recorded handle is lost, stop all imports
+and their in-flight writes before reopening the graph or restarting Server to discard local ownership. Restart does not undo data or Schema cleanup.
 
 ### 4 Complete example
 
