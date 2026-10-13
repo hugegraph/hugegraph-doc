@@ -319,7 +319,7 @@ Supported flags, with GC version limits noted below:
 | `-j` | JVM options | empty | Extra JVM options, for example `-j "-Xmx8g -Xms8g"`. |
 | `-y` | `true`, `false` | `false` | Attach the OpenTelemetry Java agent. The agent is downloaded into `plugins/` on first use, its MD5 is verified, and traces are exported over gRPC to `http://127.0.0.1:4317`. |
 
-Master builds containing [the GC option repair](https://github.com/apache/hugegraph/pull/3305) accept `g1`, `G1`, `zgc` and `ZGC`.
+Master builds accept `g1`, `G1`, `zgc` and `ZGC`.
 The downloaded 1.7.0 launcher accepts only `zgc` or `ZGC` as explicit choices; `-g g1`, `-g G1` and other values abort startup.
 Omit `-g` for the default path. For rejected values, inspect `logs/hugegraph-pd-stdout.log`.
 

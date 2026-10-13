@@ -125,17 +125,13 @@ See [docker/README.md](https://github.com/apache/hugegraph/blob/master/docker/RE
 
 #### Server service identity with PD
 
-**Proposed, unreleased settings:** this section describes [Server PR #3322](https://github.com/apache/hugegraph/pull/3322), which is not yet merged.
-Released charts/images and current Apache master do not support these deployment settings. Use matching PR chart/image builds for validation;
-merge this documentation together with the Server change and recheck it against the merged code.
-
-For a PD-backed Server, that chart exposes `server.serviceId` and `server.graphSpace`.
+For a PD-backed Server, the Helm chart exposes `server.serviceId` and `server.graphSpace`.
 Both default to `DEFAULT`, which preserves the existing `server.service_id` and `server.graphspace`
 values in `conf/rest-server.properties`. A non-default chart value injects `HG_SERVER_SERVICE_ID`
 or `HG_SERVER_GRAPHSPACE` into the Server container. Use a Helm chart and Server image from the same
-version, both including the service identity support in [Server PR #3322](https://github.com/apache/hugegraph/pull/3322).
+version supporting service identity.
 Copying these values into an older chart or image does not add that support; do not use this example
-with 1.7.0 or any chart/image version without these changes.
+with older chart/image versions without these features.
 Non-empty service IDs supplied through `HG_SERVER_SERVICE_ID`, `SERVICE_ID`, or `server.serviceId`
 must use printable ASCII; spaces and backslashes are supported, while deployment checks reject
 non-ASCII and control characters. This entrypoint restriction does not change Core Service naming
@@ -164,7 +160,7 @@ For container deployments, `HG_SERVER_SERVICE_ID` and `HG_SERVER_GRAPHSPACE` wri
 properties. The legacy `SERVICE_ID` and `GRAPH_SPACE` names remain accepted: a non-empty new variable
 wins over its legacy counterpart. If both names for a property are unset or empty, its existing value
 is preserved. Compose does not automatically forward these host variables; add explicit Server
-`environment:` entries in a Compose override. See the [paired Helm chart change](https://github.com/apache/hugegraph/pull/3322).
+`environment:` entries in a Compose override. See the Helm chart documentation for details.
 
 These settings select the Server's PD service metadata. They do not move existing graphs or change
 `server.path_graphspace` for REST paths that omit the graph space. Use `/graphspaces/team_a/...` paths

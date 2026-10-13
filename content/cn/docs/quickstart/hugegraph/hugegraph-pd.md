@@ -317,7 +317,7 @@ HG_PD_RAFT_PEERS_LIST: pd0:8610,pd1:8610,pd2:8610
 | `-j` | JVM 参数 | 空 | 额外的 JVM 参数，例如 `-j "-Xmx8g -Xms8g"`。 |
 | `-y` | `true`、`false` | `false` | 挂载 OpenTelemetry Java agent。首次使用时会把 agent 下载到 `plugins/` 并校验 MD5，trace 通过 gRPC 上报到 `http://127.0.0.1:4317`。 |
 
-包含 [GC 参数修复](https://github.com/apache/hugegraph/pull/3305) 的当前主线构建接受 `g1`、`G1`、`zgc` 和 `ZGC`。
+当前主线构建接受 `g1`、`G1`、`zgc` 和 `ZGC`。
 上文下载的 1.7.0 启动脚本仅接受显式指定 `zgc` 或 `ZGC`；`-g g1`、`-g G1` 和其他参数会中止启动。
 默认路径请省略 `-g`；参数被拒绝时，查看 `logs/hugegraph-pd-stdout.log`。
 

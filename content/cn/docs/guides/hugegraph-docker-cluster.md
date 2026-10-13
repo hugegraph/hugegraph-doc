@@ -223,7 +223,7 @@ curl -o /dev/null -w '%{http_code}\n' -u "admin:${HUGEGRAPH_ADMIN_PASSWORD}" \
 | `PD_AUTH_PASSWORD` | 空 | PD REST Basic 密码；启用 PD REST 鉴权时须与 `HG_PD_AUTH_SECRET_KEY` 相同 |
 | `WAIT_PARTITION_TIMEOUT_S` | `120` | 分区轮询超时；包含下文修复的构建还会限制最终诊断 |
 
-包含[鉴权属性修复](https://github.com/apache/hugegraph/pull/3327)的镜像会保留显式签名密钥中的空格、反斜杠和 Unicode，各 Server 副本应使用同一密钥。
+包含鉴权属性修复的镜像会保留显式签名密钥中的空格、反斜杠和 Unicode，各 Server 副本应使用同一密钥。
 如果旧镜像曾错误读取这类密钥，升级时应重新显式提供原本想使用的 `HG_SERVER_AUTH_TOKEN_SECRET`；仅复用旧配置仍会保留错误读取后的密钥。
 若实际生效的密钥改变，须重新登录获取 token。上文所述 1.7.0 镜像限制仍适用。
 
@@ -234,9 +234,9 @@ curl -o /dev/null -w '%{http_code}\n' -u "admin:${HUGEGRAPH_ADMIN_PASSWORD}" \
 
 `wait-storage.sh` 最多等待 300 秒直到出现状态为 `Up` 的 Store。该时长写死在脚本中，无法通过环境变量调整。
 
-对于包含[分区诊断修复](https://github.com/apache/hugegraph/pull/3316)的 Server 构建，HStore 启动时，分区轮询和最终
+在修复后的 Server 构建中，HStore 启动时，分区轮询和最终
 `/v1/partitions` 诊断分别使用独立的 `WAIT_PARTITION_TIMEOUT_S` 预算。旧构建仅限制轮询时间，最终诊断请求没有超时。
-包含修复且使用默认配置时，最终响应停滞会在 120 秒后超时；设为 `0` 会禁用 GNU timeout 的时限。
+使用默认配置时，最终响应停滞会在 120 秒后超时；设为 `0` 会禁用 GNU timeout 的时限。
 入口观察到 JVM 退出可能需要等本次诊断完成或超时；信号触发的关闭仍可中断检查。
 
 `HG_SERVER_INIT_STORE_ENABLED` 只接受 `HugeConfig` 能识别的写法（忽略大小写）：`y`、`t`、`yes`、`on`、`true`、`n`、`f`、`no`、`off`、`false`。其他取值（包括 `0` 和 `1`）都会让入口脚本终止。

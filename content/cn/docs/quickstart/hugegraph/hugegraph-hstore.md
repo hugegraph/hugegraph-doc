@@ -297,7 +297,7 @@ Store 从 `conf/` 读取两个配置文件。1.7.0 发布标签的源文件见 [
 | `-j` | JVM 参数字符串 | 空 | 附加的 JVM 参数，例如 `-j "-Xmx16g -Xms8g"`。 |
 | `-y` | `true`、`false` | `false` | 挂载 OpenTelemetry Java agent（首次使用时下载到 `plugins/`），并将 trace 导出到 `127.0.0.1:4317`。 |
 
-包含 [GC 参数修复](https://github.com/apache/hugegraph/pull/3305) 的当前主线构建接受 `g1`、`G1`、`zgc` 和 `ZGC`。
+当前主线构建接受 `g1`、`G1`、`zgc` 和 `ZGC`。
 上文下载的 1.7.0 启动脚本仅接受显式指定 `zgc` 或 `ZGC`；`-g g1`、`-g G1` 和其他参数会中止启动。
 默认路径请省略 `-g`；参数被拒绝时，查看 `logs/hugegraph-store-server.log`。
 
@@ -310,8 +310,8 @@ JVM 内存方面，如果没有自行设置 `JAVA_OPTIONS`：`-Xms512m`，`-Xmx`
 
 当 `ulimit -n` 或 `ulimit -u` 低于 1024 时脚本会拒绝启动；在 x86_64 和 arm64 上，如果能成功下载并校验对应的动态库，脚本会预加载 jemalloc。
 
-包含 [下载时限修复](https://github.com/apache/hugegraph/pull/3310) 的当前主线构建中，每次可选 jemalloc 下载的连接时限为 5 秒，总时限为 30 秒。
-1.7.0 的下载 helper 没有连接或总时限。修复后的 helper 超时或校验失败时沿用已有回退路径，不预加载下载库并继续启动。
+主线构建中，每次可选 jemalloc 下载的连接时限为 5 秒，总时限为 30 秒。
+1.7.0 的下载 helper 没有连接或总时限。超时或校验失败时沿用已有回退路径，不预加载下载库并继续启动。
 校验有效的缓存库仍可复用，失败下载的临时文件会被清理。
 
 启动成功后，可以在 `logs/hugegraph-store-server.log` 中看到类似以下的日志：

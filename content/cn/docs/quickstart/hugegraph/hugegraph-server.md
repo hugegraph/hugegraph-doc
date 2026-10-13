@@ -125,15 +125,11 @@ HUGEGRAPH_VERSION=1.7.0 docker compose -f docker-compose.yml up -d --wait
 
 #### 使用 PD 的 Server 服务标识
 
-**尚未发布的配置方案**：本节描述尚未合入的 [Server PR #3322](https://github.com/apache/hugegraph/pull/3322)。
-已发布的 chart/镜像和当前 Apache master 不支持这些部署配置。验证时使用配套的 PR chart/镜像构建；
-本节文档须与 Server 修改配套合入，并按合入后的代码重新核对。
-
-对于使用 PD 的 Server，该 chart 提供 `server.serviceId` 和 `server.graphSpace`。
+对于使用 PD 的 Server，Helm chart 提供 `server.serviceId` 和 `server.graphSpace` 配置项。
 二者默认为 `DEFAULT`，此时保留 `conf/rest-server.properties` 中已有的 `server.service_id` 和 `server.graphspace`。
 非默认值会向 Server 容器注入 `HG_SERVER_SERVICE_ID` 或 `HG_SERVER_GRAPHSPACE`。
-Helm chart 和 Server 镜像须来自同一版本，且二者均包含 [Server PR #3322](https://github.com/apache/hugegraph/pull/3322) 中的服务标识支持。
-仅复制这些新 values 到旧 chart 或镜像不会补上该能力；不要将本示例与 1.7.0 或未包含这些变更的 chart/镜像搭配使用。
+Helm chart 和 Server 镜像须来自同一支持该特性的版本。
+仅复制这些新 values 到旧 chart 或镜像不会生效；不要将本示例与未支持该特性的旧版本搭配使用。
 通过 `HG_SERVER_SERVICE_ID`、`SERVICE_ID` 或 `server.serviceId` 传入的非空服务 ID 仅支持可打印 ASCII，包含空格和反斜杠；
 部署校验会拒绝非 ASCII 和控制字符。此限制仅针对这些配置入口，不改变 Core Service 名称协议和已有的手工 properties 配置。
 Helm 会将 `server.serviceId` 中的美元符号（包括 `$(POD_IP)`）按字面量保留，不展开 Kubernetes 环境变量引用。
@@ -157,7 +153,7 @@ chart 和这些环境变量不会自动创建图空间；同一个 Server Deploy
 容器部署中的 `HG_SERVER_SERVICE_ID` 和 `HG_SERVER_GRAPHSPACE` 写入上述两个配置项。
 旧名称 `SERVICE_ID` 和 `GRAPH_SPACE` 仍可使用；非空的新变量优先于对应旧变量。
 同一配置项的新旧变量均未设置或为空时，保留已有值。Compose 不会自动传入宿主机上的这些变量，
-需要在 Compose override 的 Server `environment:` 中显式添加。详见 [配套 Helm chart 修改](https://github.com/apache/hugegraph/pull/3322)。
+需要在 Compose override 的 Server `environment:` 中显式添加。详见 Helm chart 配置说明。
 
 这些设置选择 Server 在 PD 中的服务元数据，不会搬迁已有图，也不会修改未指定图空间的 REST 路径所用的 `server.path_graphspace`。
 请求使用 `/graphspaces/team_a/...` 路径，并在 Hubble 中选择匹配的图空间和服务；开启鉴权时，显式指定路径仍须获得授权。

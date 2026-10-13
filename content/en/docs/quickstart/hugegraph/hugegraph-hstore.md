@@ -298,7 +298,7 @@ The script accepts four flags, with GC version limits noted below:
 | `-j` | JVM options string | empty | Extra JVM options, for example `-j "-Xmx16g -Xms8g"`. |
 | `-y` | `true`, `false` | `false` | Attach the OpenTelemetry Java agent, downloading it into `plugins/` on first use, and export traces to `127.0.0.1:4317`. |
 
-Master builds containing [the GC option repair](https://github.com/apache/hugegraph/pull/3305) accept `g1`, `G1`, `zgc` and `ZGC`.
+Master builds accept `g1`, `G1`, `zgc` and `ZGC`.
 The downloaded 1.7.0 launcher accepts only `zgc` or `ZGC` as explicit choices; `-g g1`, `-g G1` and other values abort startup.
 Omit `-g` for the default path. For rejected values, inspect `logs/hugegraph-store-server.log`.
 
@@ -311,9 +311,9 @@ JVM memory, unless you set `JAVA_OPTIONS` yourself: `-Xms512m`, and `-Xmx` set t
 
 The script refuses to start if `ulimit -n` or `ulimit -u` is below 1024, and it preloads jemalloc on x86_64 and arm64 when the shared object can be downloaded and verified.
 
-In master builds containing [the download timeout repair](https://github.com/apache/hugegraph/pull/3310), each optional jemalloc download allows
+In master builds, each optional jemalloc download allows
 5 seconds to connect and 30 seconds in total. The 1.7.0 helper has no connection or total timeout.
-A timeout or failed verification in the repaired helper follows the existing fallback:
+A timeout or failed verification follows the existing fallback:
 startup continues without preloading the downloaded library. Verified cached libraries can still be reused; partial downloads are removed.
 
 After successful startup, you can see logs similar to the following in `logs/hugegraph-store-server.log`:
