@@ -36,8 +36,8 @@ weight: 6
 
   The script name is unrelated to the graph name. Server scans and loads local graph configurations from `conf/graphs` by default; change the directory with
   `graphs` in `conf/rest-server.properties`. `graph.load_from_local_config` defaults to `false` and controls constructor preloading, not whether startup loads
-  local graphs. Give each local graph its own configuration file and restart Server after changing it. See the [Server configuration guide](/docs/config/config-
-  guide/).
+  local graphs. Give each local graph its own configuration file and restart Server after changing it. See the
+  [Server configuration guide](/docs/config/config-guide/).
 
 - After the service starts successfully, garbled characters are returned when using `curl` to query all vertices
 
