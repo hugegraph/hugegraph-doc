@@ -28,10 +28,9 @@ HugeGraph-Loader 是 HugeGraph 的数据导入组件，能够将多种数据源�
 > 
 > **测试指南**：如需在本地运行 Loader 测试，请参考 [工具链本地测试指南](/cn/docs/guides/toolchain-local-test)
 
-> **尚未发布的导入保护方案**：[LOADING owner 协议 1](/cn/docs/clients/restful-api/graphs/#loading-ownership) 要求同时使用包含
-> [Server #3331](https://github.com/apache/hugegraph/pull/3331) 与 [Client/Loader #815](https://github.com/apache/hugegraph-toolchain/pull/815) 的构建。
-> 已发布包、较早的 1.8 构建与当前 Apache master 不包含该合同；下文下载和 master 构建命令不会选择这两份 PR 构建。
-> Client/Server 的常规 CRUD 兼容性不能替代这一能力要求。
+> **尚未发布的并发保护方案**：普通导入需要配套的 [Server #3331](https://github.com/apache/hugegraph/pull/3331) 和
+> [Client/Loader #815](https://github.com/apache/hugegraph-toolchain/pull/815) 构建，才能获得同一 Server 上的 owner 保护。
+> 已发布包和当前 Apache master 尚无此保护；旧 Server 保持下文说明的原有导入行为。
 
 ### 2 获取 HugeGraph-Loader
 
@@ -989,32 +988,24 @@ bin/hugegraph-loader.sh \
 
 #### 3.4.6 并发导入与 LOADING owner {#loading-ownership}
 
-此尚未发布的合同要求使用配套的 [Server #3331](https://github.com/apache/hugegraph/pull/3331) 与
-[Client/Loader #815](https://github.com/apache/hugegraph-toolchain/pull/815) 构建。已审查的源码为
-[Server](https://github.com/apache/hugegraph/tree/257a6a7ac2867daf4567f0d1a050123a8ff651cb) 和
-[Client/Loader](https://github.com/apache/hugegraph-toolchain/tree/de942c5ebe9fd2bbd5b8776a3534b57aed6448bb)。
-已发布包、较早的 1.8 构建与当前 Apache master 不包含该合同；仅凭版本号或 Docker `latest` 标签不能确认该能力。
-Server 1.7 支持 `LOADING` 枚举，但没有 owner 接口。导入在能力缺失或无效时失败，不会回退到枚举模式 PUT 或 `NONE`。
-检查发生在 `--clear-all-data`、创建 Schema 和写入导入数据之前；`--create-graph` 可能先创建目标图。
+此拟议功能需要配套的 [Server #3331](https://github.com/apache/hugegraph/pull/3331) 与
+[Client/Loader #815](https://github.com/apache/hugegraph-toolchain/pull/815) 构建。仅凭版本号或 Docker `latest` 标签不能确认支持情况。
 
-图数据源和恢复导入也会先检查协议 1，再通过枚举接口设置 `RESTORING`，不申请 `LOADING` owner。
-仅在 `RESTORING` PUT 成功后，清理才会在停止并等待自己的 worker 全部退出后恢复 `NONE`；PUT 失败不会触发该重置。
-请单独协调这类导入与其他并发导入；此路径不提供跨 Server 锁。
+升级后的 Loader 在普通导入时探测 `/mode/owners`；仅接口路由不受支持的 `404` 会回退到原来的枚举 `LOADING`/`NONE` 流程。
+这会保留 Server 1.7 等旧 Server 的行为，但不提供不同 Loader 进程之间的保护。
+权限、网络、无效响应和申请 owner 的错误不会触发回退。图数据源和恢复导入保留原有 `RESTORING` 流程，
+不探测 owner 能力，也不新增自动恢复 `NONE` 的行为。
 
-每个导入上下文固定使用一个 `instance`/`epoch`/`token` 句柄完成申请、重试与释放。首个 owner 只能从 `NONE` 申请并启用 `LOADING`，
-其他 owner 可以加入由 owner 管理的 `LOADING`。一个导入结束时，其他 owner 仍活跃则保持 `LOADING`；最后一个 owner 释放后恢复 `NONE`。
-手动设置的 `LOADING`、`RESTORING` 或 `MERGING` 必须在没有活跃导入时先恢复为 `NONE`，再启动普通导入。
-owner 管理不会隔离多个导入之间的 Schema 修改或 `--clear-all-data`，这些操作需要单独协调。
+支持该协议的 Server 上，每轮普通导入保留一个 `instance`/`epoch`/`token` 句柄。首个 owner 从 `NONE` 启用 `LOADING`，
+其他 Loader 进程可加入该状态。一个导入结束时，其他 owner 仍活跃则保持 `LOADING`；最后一个 owner 释放后恢复 `NONE`。
+手动设置的 `LOADING`、`RESTORING` 和 `MERGING` 不会被接管；Schema 修改和 `--clear-all-data` 仍须单独协调。
 
-整个导入过程应直连同一台稳定的 Server。owner 状态仅属于该 Server 上实际运行的图实例，不提供跨 Server 协调，普通数据请求也不按 owner 句柄隔离。
-导入期间不支持负载均衡地址、节点故障切换、图重载或 Server 重启。
+申请和释放应使用同一个 Server 直连地址与鉴权身份。owner 属于该 Server 上实际运行的图实例，
+不提供跨 Server 协调或普通数据写入隔离。导入停止后释放其原句柄；嵌入式调用方需要调用 `HugeGraphLoader.shutdown()` 关闭 Loader。
 
-清理时，Loader 先停止并等待自己的 worker 全部退出，再释放原句柄；申请可能已经生效但响应丢失时也使用同一句柄取消。
-worker 无法退出时会保留上下文与 owner，供后续再次关闭。嵌入式调用方需要调用 `HugeGraphLoader.shutdown()`。
-释放失败时会报告句柄；确认导入进程及其在途写入都已停止后，使用相同鉴权身份在同一图实例上重试释放。已释放句柄不能用于另一轮导入。
-
-`kill -9` 无法执行清理，可能留下活跃 owner；没有租约或自动过期机制。如果记录的句柄丢失，先停止所有导入及其在途写入，
-再重新打开图或重启 Server 以清除本地 owner 状态。重启不会撤销已经执行的数据或 Schema 清理。
+释放失败时，停止导入后用同一句柄与鉴权身份重试 REST 释放；shutdown 不保证自动重试。
+owner 不会自动过期。句柄丢失或 `kill -9` 后，先停止所有导入及其在途写入，再重新打开图或重启 Server。
+恢复不会撤销已有写入或 Schema/数据清理。Hubble 任务清理属于独立的 [Hubble #814](https://github.com/apache/hugegraph-toolchain/pull/814) 修改。
 
 ### 4 完整示例
 

@@ -694,19 +694,17 @@ PUT http://localhost:8080/graphspaces/DEFAULT/graphs/hugegraph/mode/owners
 }
 ```
 
-确认申请成功时返回 `200`，回显 `protocol`、`instance`、`epoch` 和 `token`，并返回 `state: "active"` 和 `mode: "LOADING"`。
-释放时只把 `action` 改为 `release`，其他三项保持原值；响应的 `state` 为 `released`，`mode` 为当前实际模式。
-活跃句柄的重复申请与重复释放是幂等的。`200` 响应中的 `state` 若为 `released`，则不能视为申请成功。
-释放未知句柄会取消可能仍在途的申请。已释放句柄不能再次申请；申请结果不确定时，不要生成新句柄重试。
+确认申请成功时返回 `200`，回显 `protocol`、`instance`、`epoch` 和 `token`，并返回 `state: "active"` 与 `mode: "LOADING"`。
+释放时只把 `action` 改为 `release`，句柄保持不变；响应中包含 `state: "released"` 和当前实际模式。
+重试保留同一句柄；Server 校验其鉴权身份、instance 和 epoch。已释放句柄不能再次申请。
 
-首个 owner 只能从 `NONE` 申请；其他 owner 可以共享由 owner 管理的 `LOADING`，最后一个活跃 owner 释放后恢复 `NONE`。
-申请会拒绝手动设置的 `LOADING`、`RESTORING` 和 `MERGING`；释放未知句柄不会改变这些手动模式。
+首个 owner 要求 `NONE`；其他 owner 共享由 owner 管理的 `LOADING`，最后一个释放后恢复 `NONE`。
+手动设置的 `LOADING`、`RESTORING` 和 `MERGING` 不会被接管；owner 活跃时，旧枚举 PUT 会拒绝模式修改。
 
-Loader 的图数据源和恢复导入会先检查协议 1，再通过枚举接口设置 `RESTORING`，不申请 `LOADING` owner。
-仅在模式 PUT 成功后，清理才会在 worker 全部退出后恢复 `NONE`；PUT 失败不会触发该重置。
-
-状态保存在单个 Server 图实例的内存中，不提供跨 Server 协调、数据请求隔离或自动过期。请使用固定的 Server 直连地址。
-worker 关闭、释放失败和异常退出的处理参见 [Loader owner 与恢复说明](/cn/docs/quickstart/toolchain/hugegraph-loader/#loading-ownership)。
+该协议保护同一 Server 上实际运行的图实例中的普通导入，句柄绑定到实际鉴权身份、instance 和 epoch。
+它不提供跨 Server 协调、数据写入隔离或自动过期。请使用固定的 Server 直连地址，在导入停止后释放。
+升级后的 Loader 仅在 owner 探测返回接口路由不受支持的 `404` 时回退到旧行为；其他错误仍失败。
+图数据源和恢复导入保留原有枚举模式行为，参见 [Loader 兼容与恢复说明](/cn/docs/quickstart/toolchain/hugegraph-loader/#loading-ownership)。
 
 ### 6.4 Snapshot
 

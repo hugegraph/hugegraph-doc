@@ -700,20 +700,17 @@ PUT http://localhost:8080/graphspaces/DEFAULT/graphs/hugegraph/mode/owners
 ```
 
 A confirmed acquisition returns `200`, echoing `protocol`, `instance`, `epoch` and `token`, with `state: "active"` and `mode: "LOADING"`.
-Release with `action: "release"` and the identical tuple; the response has `state: "released"` and the effective graph mode.
-Repeated acquire for an active handle and repeated release are idempotent. A `200` response with `state: "released"` does not confirm acquisition.
-Releasing an unknown handle cancels a possibly delayed acquire. A released handle cannot acquire again;
-never generate a new tuple to retry an uncertain acquire.
+Release with `action: "release"` and the same handle; its response has `state: "released"` and the effective graph mode.
+Keep one handle for retries; Server checks its principal, instance and epoch. A released handle cannot acquire again.
 
-The first owner can acquire only from `NONE`. Further owners can share owner-managed `LOADING`; the last active release restores `NONE`.
-Acquisition rejects manually set `LOADING`, `RESTORING` and `MERGING`. An unknown-handle release leaves such a manual mode unchanged.
+The first owner requires `NONE`. Other owners share owner-managed `LOADING`; the last release restores `NONE`.
+Manually set `LOADING`, `RESTORING` and `MERGING` are not adopted. While owners are active, the legacy enum PUT rejects mode changes.
 
-Loader graph-source and restore imports check protocol 1, then use the enum API for `RESTORING` without acquiring a `LOADING` owner.
-After a successful mode PUT, their cleanup drains the workers before restoring `NONE`. A failed mode PUT does not trigger that reset.
-
-State is held in memory by one Server graph instance, without cross-Server coordination, data-request fencing or automatic expiry.
-Use a fixed direct Server endpoint. See [Loader ownership and recovery](/docs/quickstart/toolchain/hugegraph-loader/#loading-ownership) for worker shutdown,
-failed release and abnormal-exit recovery.
+This protects ordinary imports on one live Server graph instance, with the handle bound to its authenticated principal, instance and epoch.
+It provides no cross-Server coordination, data-write isolation or automatic expiry. Use a fixed direct Server endpoint and release after the import stops.
+The upgraded Loader falls back to old behavior only for an unsupported-route `404` from its ownership probe; other errors remain failures.
+Graph-source and restore imports retain their original enum-mode behavior. See
+[Loader compatibility and recovery](/docs/quickstart/toolchain/hugegraph-loader/#loading-ownership).
 
 ### 6.4 Snapshot
 
