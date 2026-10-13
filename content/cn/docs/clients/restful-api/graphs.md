@@ -251,7 +251,8 @@ POST http://localhost:8080/graphspaces/DEFAULT/graphs/hugegraph-xx
 
 删图不是事务操作，破坏性清理后的失败不会恢复已移除的数据或元数据。执行对象或原生资源的清理结果不确定时需要人工检查，
 不能强制移除调度器，也不能仅凭任务 Future 已完成就恢复写入。
-若因本地配置保护而拒绝删除，先移除对应配置文件并重启 Server，再重试。
+在启用 PD 且 `graph.load_from_local_config=true` 的部署中，若因使用本地配置而拒绝删除，
+移除对应配置文件并重启 Server 仅会阻止 Server 继续加载该图，其后端存储数据仍会保留。
 
 ##### Params
 

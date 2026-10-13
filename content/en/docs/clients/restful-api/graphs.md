@@ -226,7 +226,8 @@ Closing the scheduler alone retains persistent work that has not started.
 
 Deletion is not transactional. A failure after destructive cleanup does not restore removed data or metadata. An uncertain owner or native-resource cleanup
 needs manual inspection; do not force-remove the scheduler or resume writes just because a task Future is done.
-If deletion is refused because the graph uses local configuration, remove its configuration file and restart Server before retrying.
+In PD deployments with `graph.load_from_local_config=true`, if deletion is refused because the graph uses local configuration,
+removing its configuration file and restarting Server stops Server from loading the graph, but leaves its backend data in place.
 
 ##### Params
 
