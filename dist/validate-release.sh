@@ -827,7 +827,8 @@ main() {
     CURRENT_PACKAGE='Toolchain'
     (cd "$toolchain_source" && mvn clean "${MAVEN_ARGS[@]}" -Dmaven.repo.local="$RUN_DIR/m2/toolchain" && \
         mvn install "${MAVEN_ARGS[@]}" -Dmaven.repo.local="$RUN_DIR/m2/toolchain")
-    SDK_VERIFIER="$toolchain_source/.github/scripts/verify_candidate_image_sdk.py"
+    SDK_VERIFIER="$toolchain_source/tools/verify_candidate_image_sdk.py"
+    [[ -f "$SDK_VERIFIER" ]] || SDK_VERIFIER="$toolchain_source/.github/scripts/verify_candidate_image_sdk.py"
     [[ -f "$SDK_VERIFIER" ]] || { info 'Toolchain source archive is missing the release SDK verifier'; return 1; }
     if [[ -z "$SDK_REPOSITORY" ]]; then
         python3 "$SCRIPT_DIR/release-smoke.py" staging-origin "$RUN_DIR/m2/toolchain" "$RELEASE_VERSION" \
