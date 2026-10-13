@@ -141,6 +141,7 @@ must use printable ASCII; spaces and backslashes are supported, while deployment
 non-ASCII and control characters. This entrypoint restriction does not change Core Service naming
 or existing manually supplied properties. Helm preserves dollar signs in `server.serviceId` literally,
 including `$(POD_IP)`; this field does not expand Kubernetes environment references.
+The full service ID, including `/` and `-`, is retained when service metadata is reloaded or its graph space is cleared.
 Set the identity through these chart values; Server `extraEnv` reserves both the new and legacy identity variable names.
 `HG_SERVER_GRAPHSPACE`, the effective `GRAPH_SPACE` fallback,
 and `server.graphSpace` accept `DEFAULT` or an existing space name of up to 48 lowercase letters, digits,
@@ -174,6 +175,7 @@ still require authorization.
 it does not derive the alias from `server.graphSpace`. A local binding may exist independently of the Server's assigned PD graph space,
 so a successful default hook does not validate graphs in `team_a`. If `Could not rebind` appears, first check that the requested graph exists
 and that its alias is correct. A Pod restart cannot create a missing graph or correct an alias.
+Match the binding's case: a local `Demo.properties` can bind `DEFAULT-Demo`, while REST-created graph names are lowercase.
 
 Configuration rendering and entrypoint checks alone do not establish non-default Linux discovery,
 authentication, or isolation between graph spaces.

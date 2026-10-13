@@ -137,6 +137,7 @@ Helm chart 和 Server 镜像须来自同一版本，且二者均包含 [Server P
 通过 `HG_SERVER_SERVICE_ID`、`SERVICE_ID` 或 `server.serviceId` 传入的非空服务 ID 仅支持可打印 ASCII，包含空格和反斜杠；
 部署校验会拒绝非 ASCII 和控制字符。此限制仅针对这些配置入口，不改变 Core Service 名称协议和已有的手工 properties 配置。
 Helm 会将 `server.serviceId` 中的美元符号（包括 `$(POD_IP)`）按字面量保留，不展开 Kubernetes 环境变量引用。
+重读服务元数据或清理图空间时，会保留完整的服务 ID，包括其中的 `/` 和 `-`。
 使用上述 chart values 设置身份；Server 的 `extraEnv` 会保留对应的新旧身份变量名，禁止重复覆盖。
 `HG_SERVER_GRAPHSPACE`、生效的旧变量 `GRAPH_SPACE` 和 `server.graphSpace` 遵循同一规则：
 接受 `DEFAULT`，或以小写字母开头、最多 48 位的小写字母、数字和下划线组成的已有空间名称：
@@ -162,6 +163,7 @@ chart 和这些环境变量不会自动创建图空间；同一个 Server Deploy
 请求使用 `/graphspaces/team_a/...` 路径，并在 Hubble 中选择匹配的图空间和服务；开启鉴权时，显式指定路径仍须获得授权。
 
 `server.testGraphAlias` 默认为 `DEFAULT-hugegraph`。hook 会逐个 Server Pod 检查这一已有本地图绑定，不会从 `server.graphSpace` 自动派生别名。
+别名的大小写须与实际绑定一致：本地 `Demo.properties` 可以绑定为 `DEFAULT-Demo`；通过 REST 创建的图使用小写名称。
 本地图绑定可以独立于 Server 在 PD 中分配的图空间存在，因此默认 hook 成功不能证明 `team_a` 中的图可查询。
 出现 `Could not rebind` 时，先确认目标图存在且别名正确；重启 Pod 不能创建缺失的图或纠正别名。
 
