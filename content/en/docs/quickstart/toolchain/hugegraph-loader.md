@@ -27,9 +27,8 @@ It will be explained in detail below.
 
 > Note: HugeGraph-Loader requires HugeGraph Server service, please refer to [HugeGraph-Server Quick Start](/docs/quickstart/hugegraph/hugegraph-server) to download and start Server
 
-> **Proposed, unreleased concurrency protection:** ordinary imports gain same-Server ownership protection with matching
-> [Server #3331](https://github.com/apache/hugegraph/pull/3331) and [Client/Loader #815](https://github.com/apache/hugegraph-toolchain/pull/815) builds.
-> Released packages and current Apache master lack this protection. Older Servers retain the legacy import behavior described below.
+> **Concurrency protection:** starting with HugeGraph 1.8.0, ordinary imports acquire same-Server ownership protection.
+> Older Servers retain the legacy import behavior described below.
 
 > **Testing Guide**: For running HugeGraph-Loader tests locally, please refer to [HugeGraph Toolchain Local Testing Guide](/docs/guides/toolchain-local-test)
 
@@ -992,8 +991,7 @@ Expected result: two vertices and zero edges imported. This example uses dedicat
 
 #### 3.4.6 Concurrent imports and LOADING ownership {#loading-ownership}
 
-This proposed feature requires matching [Server #3331](https://github.com/apache/hugegraph/pull/3331) and
-[Client/Loader #815](https://github.com/apache/hugegraph-toolchain/pull/815) builds. A version label or Docker `latest` tag does not confirm support.
+Starting with HugeGraph 1.8.0, Loader supports the concurrent import LOADING ownership protocol.
 
 For ordinary imports, the upgraded Loader probes `/mode/owners`. Only a route-level unsupported `404` selects the original enum `LOADING`/`NONE` flow.
 That fallback preserves old-Server behavior, including Server 1.7, but provides no protection between separate Loader processes.
@@ -1008,10 +1006,11 @@ Use the same direct Server endpoint and authenticated identity for acquisition a
 it does not coordinate across Servers or isolate ordinary data writes. Release the retained handle after its import has stopped.
 Embedded callers must close their Loader with `HugeGraphLoader.shutdown()`.
 
-If release fails, stop the import and retry the REST release with the same handle and authenticated identity; shutdown does not promise automatic retry.
+If release fails, the failure message outputs the handle (`instance/epoch/token`, e.g., `Failed to release LOADING owner <instance>/<epoch>/<token>`).
+Stop the importer and retry the release manually via the [RESTful API release endpoint](/docs/clients/restful-api/graphs/#loading-ownership) with the
+same handle and authenticated identity; shutdown does not promise automatic retry.
 Owners have no automatic expiry. If the handle is lost or after `kill -9`, stop all imports and their in-flight writes before reopening the graph or
-restarting Server. Recovery does not undo writes or Schema/data cleanup. Hubble's task cleanup is a separate change in
-[Hubble #814](https://github.com/apache/hugegraph-toolchain/pull/814).
+restarting Server. Recovery does not undo writes or Schema/data cleanup. Hubble task cleanup is maintained independently in subsequent releases.
 
 ### 4 Complete example
 

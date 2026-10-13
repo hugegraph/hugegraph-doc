@@ -659,9 +659,8 @@ PUT http://localhost:8080/graphspaces/DEFAULT/graphs/hugegraph/graph_read_mode
 
 #### 6.3.5 LOADING owner 管理 {#loading-ownership}
 
-以下尚未发布的 owner 协议 1 接口要求使用包含 [Server #3331](https://github.com/apache/hugegraph/pull/3331) 的构建；
-Loader 集成另需配套的 [Client/Loader #815](https://github.com/apache/hugegraph-toolchain/pull/815)。
-已发布包、较早的 1.8 构建与当前 Apache master 不包含该合同；仅支持 `LOADING` 枚举不能说明支持这些接口。
+自 HugeGraph 1.8.0 起提供 owner 协议 1 接口；Loader 需使用配套的 1.8.0 及以上版本客户端。
+旧版本发行包不包含该协议；仅支持 `LOADING` 枚举不能说明支持这些接口。
 启用鉴权时，两个接口沿用模式设置接口的权限要求，即图空间管理权限（`space`）或该图所有者权限，并校验 STATUS 写权限。
 Server 将句柄绑定到实际鉴权用户；token 本身不赋予权限。申请、释放和重试必须保持相同身份。
 
@@ -679,7 +678,7 @@ GET http://localhost:8080/graphspaces/DEFAULT/graphs/hugegraph/mode/owners
 }
 ```
 
-每轮导入生成一个新的标准 UUID 作为 `token`，保留返回的 `instance` 和 `epoch`，通过以下请求申请，并设置 `Content-Type: application/json`：
+每轮导入生成一个新的小写连字符 UUID（lowercase hyphenated UUID）作为 `token`，保留返回的 `instance` 和 `epoch`，通过以下请求申请，并设置 `Content-Type: application/json`：
 
 ```text
 PUT http://localhost:8080/graphspaces/DEFAULT/graphs/hugegraph/mode/owners
@@ -694,8 +693,9 @@ PUT http://localhost:8080/graphspaces/DEFAULT/graphs/hugegraph/mode/owners
 }
 ```
 
-确认申请成功时返回 `200`，回显 `protocol`、`instance`、`epoch` 和 `token`，并返回 `state: "active"` 与 `mode: "LOADING"`。
-释放时只把 `action` 改为 `release`，句柄保持不变；响应中包含 `state: "released"` 和当前实际模式。
+只有响应中包含 `state: "active"` 时才表示申请成功；此时返回 `200` 并回显 `protocol`、`instance`、`epoch`、`token` 以及 `mode: "LOADING"`。
+若返回 `200` 但 `state: "released"`，说明该句柄已失效或已被提前取消，此时并未获得 owner 保护，必须重新通过 GET 获取新的 `instance` 和 `epoch` 并生成全新 token 重新申请。
+释放时将 `action` 设置为 `release`，句柄保持不变；响应中包含 `state: "released"` 和当前实际模式。未申请前直接调用释放会被记录，并导致后续使用该句柄的申请直接返回 `released`。
 重试保留同一句柄；Server 校验其鉴权身份、instance 和 epoch。已释放句柄不能再次申请。
 
 首个 owner 要求 `NONE`；其他 owner 共享由 owner 管理的 `LOADING`，最后一个释放后恢复 `NONE`。

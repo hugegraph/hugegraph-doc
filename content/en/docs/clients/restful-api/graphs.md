@@ -664,9 +664,9 @@ PUT http://localhost:8080/graphspaces/DEFAULT/graphs/hugegraph/graph_read_mode
 
 #### 6.3.5 LOADING ownership {#loading-ownership}
 
-These proposed, unreleased endpoints require a build containing [Server #3331](https://github.com/apache/hugegraph/pull/3331).
-Loader integration also requires [Client/Loader #815](https://github.com/apache/hugegraph-toolchain/pull/815).
-Released packages, earlier 1.8 builds and current Apache master lack this contract. Support for the `LOADING` enum alone does not imply support for it.
+Starting with HugeGraph 1.8.0, the Server provides the protocol 1 endpoints for LOADING ownership;
+Loader integration requires a matching 1.8.0 or newer client.
+Released packages and earlier 1.8 builds lack this protocol. Support for the `LOADING` enum alone does not imply support for it.
 With authentication enabled, both endpoints use the mode setter's permissions: graph-space management (`space`) or graph ownership, with STATUS write
 authorization. Server binds the handle to the authenticated principal; a token grants no permission. Keep the same identity for acquire, release and retries.
 
@@ -684,7 +684,8 @@ The `200` capability response contains the graph-instance UUID and current nonne
 }
 ```
 
-Generate a new canonical UUID `token` for each import, retain the returned `instance` and `epoch`, and acquire with `Content-Type: application/json`:
+Generate a new lowercase hyphenated UUID `token` for each import, retain the returned `instance` and `epoch`,
+and acquire with `Content-Type: application/json`:
 
 ```text
 PUT http://localhost:8080/graphspaces/DEFAULT/graphs/hugegraph/mode/owners
@@ -699,8 +700,11 @@ PUT http://localhost:8080/graphspaces/DEFAULT/graphs/hugegraph/mode/owners
 }
 ```
 
-A confirmed acquisition returns `200`, echoing `protocol`, `instance`, `epoch` and `token`, with `state: "active"` and `mode: "LOADING"`.
-Release with `action: "release"` and the same handle; its response has `state: "released"` and the effective graph mode.
+An acquire succeeded only when the response returns `200` with `state: "active"`, echoing `protocol`, `instance`, `epoch`, `token`, and `mode: "LOADING"`.
+A `200` response with `state: "released"` means the handle is finished or was preemptively released; it does not grant ownership. In that case, start again
+with a fresh GET for `instance` and `epoch` and generate a new token.
+Release with `action: "release"` and the same handle; its response has `state: "released"` and the effective graph mode. Calling release before acquire is
+recorded and causes a subsequent acquire with that handle to return `released`.
 Keep one handle for retries; Server checks its principal, instance and epoch. A released handle cannot acquire again.
 
 The first owner requires `NONE`. Other owners share owner-managed `LOADING`; the last release restores `NONE`.

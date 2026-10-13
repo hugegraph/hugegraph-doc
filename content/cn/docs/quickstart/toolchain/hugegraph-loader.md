@@ -28,9 +28,8 @@ HugeGraph-Loader 是 HugeGraph 的数据导入组件，能够将多种数据源�
 > 
 > **测试指南**：如需在本地运行 Loader 测试，请参考 [工具链本地测试指南](/cn/docs/guides/toolchain-local-test)
 
-> **尚未发布的并发保护方案**：普通导入需要配套的 [Server #3331](https://github.com/apache/hugegraph/pull/3331) 和
-> [Client/Loader #815](https://github.com/apache/hugegraph-toolchain/pull/815) 构建，才能获得同一 Server 上的 owner 保护。
-> 已发布包和当前 Apache master 尚无此保护；旧 Server 保持下文说明的原有导入行为。
+> **并发导入保护方案**：自 1.8.0 起，普通导入支持在同一 Server 实例上获取 owner 保护。
+> 旧版 Server 保持下文说明的原有导入行为。
 
 ### 2 获取 HugeGraph-Loader
 
@@ -988,8 +987,7 @@ bin/hugegraph-loader.sh \
 
 #### 3.4.6 并发导入与 LOADING owner {#loading-ownership}
 
-此拟议功能需要配套的 [Server #3331](https://github.com/apache/hugegraph/pull/3331) 与
-[Client/Loader #815](https://github.com/apache/hugegraph-toolchain/pull/815) 构建。仅凭版本号或 Docker `latest` 标签不能确认支持情况。
+自 1.8.0 版本起，Loader 支持并发导入模式所有权保护协议。
 
 升级后的 Loader 在普通导入时探测 `/mode/owners`；仅接口路由不受支持的 `404` 会回退到原来的枚举 `LOADING`/`NONE` 流程。
 这会保留 Server 1.7 等旧 Server 的行为，但不提供不同 Loader 进程之间的保护。
@@ -1003,9 +1001,10 @@ bin/hugegraph-loader.sh \
 申请和释放应使用同一个 Server 直连地址与鉴权身份。owner 属于该 Server 上实际运行的图实例，
 不提供跨 Server 协调或普通数据写入隔离。导入停止后释放其原句柄；嵌入式调用方需要调用 `HugeGraphLoader.shutdown()` 关闭 Loader。
 
-释放失败时，停止导入后用同一句柄与鉴权身份重试 REST 释放；shutdown 不保证自动重试。
+释放失败时，错误信息会打印对应句柄（格式为 `instance/epoch/token`，如 `Failed to release LOADING owner <instance>/<epoch>/<token>`）。
+停止导入后，可通过相同鉴权身份调用 [RESTful API 释放接口](/cn/docs/clients/restful-api/graphs/#loading-ownership) 手动释放；shutdown 不保证自动重试。
 owner 不会自动过期。句柄丢失或 `kill -9` 后，先停止所有导入及其在途写入，再重新打开图或重启 Server。
-恢复不会撤销已有写入或 Schema/数据清理。Hubble 任务清理属于独立的 [Hubble #814](https://github.com/apache/hugegraph-toolchain/pull/814) 修改。
+恢复不会撤销已有写入或 Schema/数据清理。Hubble 任务清理在后续版本中独立维护。
 
 ### 4 完整示例
 
