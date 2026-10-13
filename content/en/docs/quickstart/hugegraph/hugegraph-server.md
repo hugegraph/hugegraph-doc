@@ -125,7 +125,11 @@ See [docker/README.md](https://github.com/apache/hugegraph/blob/master/docker/RE
 
 #### Server service identity with PD
 
-For a PD-backed Server, the Helm chart exposes `server.serviceId` and `server.graphSpace`.
+**Proposed, unreleased settings:** this section describes [Server PR #3322](https://github.com/apache/hugegraph/pull/3322), which is not yet merged.
+Released charts/images and current Apache master do not support these deployment settings. Use matching PR chart/image builds for validation;
+merge this documentation together with the Server change and recheck it against the merged code.
+
+For a PD-backed Server, that chart exposes `server.serviceId` and `server.graphSpace`.
 Both default to `DEFAULT`, which preserves the existing `server.service_id` and `server.graphspace`
 values in `conf/rest-server.properties`. A non-default chart value injects `HG_SERVER_SERVICE_ID`
 or `HG_SERVER_GRAPHSPACE` into the Server container. Use a Helm chart and Server image from the same
@@ -152,16 +156,25 @@ Before deploying Servers assigned to `team_a`, create that graph space through a
 in `DEFAULT`, using an account with permission to create graph spaces. The chart and these environment
 variables do not create graph spaces; all replicas in the Server Deployment use the same identity.
 
+To check a graph in that space with `helm test`, first create the target graph and set
+`--set-string server.testGraphAlias=team_a-demo` to its actual Gremlin binding. Creating the graph space does not create a `hugegraph` graph.
+
 For container deployments, `HG_SERVER_SERVICE_ID` and `HG_SERVER_GRAPHSPACE` write the same two
 properties. The legacy `SERVICE_ID` and `GRAPH_SPACE` names remain accepted: a non-empty new variable
 wins over its legacy counterpart. If both names for a property are unset or empty, its existing value
 is preserved. Compose does not automatically forward these host variables; add explicit Server
-`environment:` entries in a Compose override. See the [Helm chart guide](https://github.com/apache/hugegraph/blob/master/helm/hugegraph/README.md).
+`environment:` entries in a Compose override. See the [paired Helm chart change](https://github.com/apache/hugegraph/pull/3322).
 
 These settings select the Server's PD service metadata. They do not move existing graphs or change
 `server.path_graphspace` for REST paths that omit the graph space. Use `/graphspaces/team_a/...` paths
 and select the matching graph space and service in Hubble. When authentication is enabled, explicit paths
 still require authorization.
+
+`server.testGraphAlias` defaults to `DEFAULT-hugegraph`. The hook checks this existing local binding on every Server Pod;
+it does not derive the alias from `server.graphSpace`. A local binding may exist independently of the Server's assigned PD graph space,
+so a successful default hook does not validate graphs in `team_a`. If `Could not rebind` appears, first check that the requested graph exists
+and that its alias is correct. A Pod restart cannot create a missing graph or correct an alias.
+
 Configuration rendering and entrypoint checks alone do not establish non-default Linux discovery,
 authentication, or isolation between graph spaces.
 

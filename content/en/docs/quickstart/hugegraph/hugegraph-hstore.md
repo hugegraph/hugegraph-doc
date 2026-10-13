@@ -23,7 +23,8 @@ Each Store node keeps graph data in RocksDB and replicates it with Raft (JRaft):
 
 - Operating System: Linux or macOS (Windows has not been fully tested)
 - Current source builds and the configured CI runtime use JDK 17; Maven accepts Java 17 only.
-  `bin/start-hugegraph-store.sh` checks a minimum major version of 17; passing it does not qualify newer JDKs.
+  The master `bin/start-hugegraph-store.sh` checks a minimum major version of 17; the 1.7.0 launcher declares a minimum of 11.
+  Passing a launcher check does not qualify newer JDKs.
 - Maven version: ≥ 3.6.3
 - Deploy HugeGraph-PD first for multi-node deployment
 
@@ -40,7 +41,7 @@ Apache downloads currently provide the complete 1.7.0 binary bundle containing P
 
 ```bash
 # Historical release 1.7.0 retains incubating in filenames and directories
-wget https://downloads.apache.org/hugegraph/1.7.0/apache-hugegraph-incubating-1.7.0.tar.gz
+curl -fLO --connect-timeout 10 --max-time 1800 https://downloads.apache.org/hugegraph/1.7.0/apache-hugegraph-incubating-1.7.0.tar.gz
 tar zxf apache-hugegraph-incubating-1.7.0.tar.gz
 cd apache-hugegraph-incubating-1.7.0/apache-hugegraph-store-incubating-1.7.0
 ```
@@ -287,14 +288,19 @@ Ensure that the PD service is already started, then in the Store installation di
 ./bin/start-hugegraph-store.sh
 ```
 
-The script accepts four flags:
+The lifecycle and timeout details below describe current master builds. The downloaded 1.7.0 launcher does not include those repairs.
+The script accepts four flags, with GC version limits noted below:
 
 | Flag | Values | Default | Description |
 |------|--------|---------|-------------|
 | `-d` | `true`, `false` | `true` | Daemon mode. See below. |
-| `-g` | `g1`, `G1`, `zgc`, `ZGC` | not set | Unset preserves caller/JVM GC; supplied values select G1 or ZGC (Java 17+). |
+| `-g` | See version limits below | not set | Select the garbage collector. Unsupported values abort startup. |
 | `-j` | JVM options string | empty | Extra JVM options, for example `-j "-Xmx16g -Xms8g"`. |
 | `-y` | `true`, `false` | `false` | Attach the OpenTelemetry Java agent, downloading it into `plugins/` on first use, and export traces to `127.0.0.1:4317`. |
+
+Master builds containing [the GC option repair](https://github.com/apache/hugegraph/pull/3305) accept `g1`, `G1`, `zgc` and `ZGC`.
+The downloaded 1.7.0 launcher accepts only `zgc` or `ZGC` as explicit choices; `-g g1`, `-g G1` and other values abort startup.
+Omit `-g` for the default path. For rejected values, inspect `logs/hugegraph-store-server.log`.
 
 Daemon mode:
 
@@ -305,7 +311,9 @@ JVM memory, unless you set `JAVA_OPTIONS` yourself: `-Xms512m`, and `-Xmx` set t
 
 The script refuses to start if `ulimit -n` or `ulimit -u` is below 1024, and it preloads jemalloc on x86_64 and arm64 when the shared object can be downloaded and verified.
 
-Each optional jemalloc download allows 5 seconds to connect and 30 seconds in total. A timeout or failed verification follows the existing fallback:
+In master builds containing [the download timeout repair](https://github.com/apache/hugegraph/pull/3310), each optional jemalloc download allows
+5 seconds to connect and 30 seconds in total. The 1.7.0 helper has no connection or total timeout.
+A timeout or failed verification in the repaired helper follows the existing fallback:
 startup continues without preloading the downloaded library. Verified cached libraries can still be reused; partial downloads are removed.
 
 After successful startup, you can see logs similar to the following in `logs/hugegraph-store-server.log`:

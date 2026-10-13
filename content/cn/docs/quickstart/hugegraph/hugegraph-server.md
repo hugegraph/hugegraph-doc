@@ -125,7 +125,11 @@ HUGEGRAPH_VERSION=1.7.0 docker compose -f docker-compose.yml up -d --wait
 
 #### 使用 PD 的 Server 服务标识
 
-对于使用 PD 的 Server，Helm chart 提供 `server.serviceId` 和 `server.graphSpace`。
+**尚未发布的配置方案**：本节描述尚未合入的 [Server PR #3322](https://github.com/apache/hugegraph/pull/3322)。
+已发布的 chart/镜像和当前 Apache master 不支持这些部署配置。验证时使用配套的 PR chart/镜像构建；
+本节文档须与 Server 修改配套合入，并按合入后的代码重新核对。
+
+对于使用 PD 的 Server，该 chart 提供 `server.serviceId` 和 `server.graphSpace`。
 二者默认为 `DEFAULT`，此时保留 `conf/rest-server.properties` 中已有的 `server.service_id` 和 `server.graphspace`。
 非默认值会向 Server 容器注入 `HG_SERVER_SERVICE_ID` 或 `HG_SERVER_GRAPHSPACE`。
 Helm chart 和 Server 镜像须来自同一版本，且二者均包含 [Server PR #3322](https://github.com/apache/hugegraph/pull/3322) 中的服务标识支持。
@@ -146,13 +150,21 @@ helm upgrade --install hg ./helm/hugegraph \
 部署分配到 `team_a` 的 Server 前，先通过现有 `DEFAULT` 空间的 Server，用具有创建图空间权限的账号创建该空间。
 chart 和这些环境变量不会自动创建图空间；同一个 Server Deployment 的所有副本使用相同服务标识。
 
+用 `helm test` 检查该空间中的图前，先创建目标图，再将 `--set-string server.testGraphAlias=team_a-demo` 设置为它实际的 Gremlin 绑定。
+创建图空间不会自动创建 `hugegraph` 图。
+
 容器部署中的 `HG_SERVER_SERVICE_ID` 和 `HG_SERVER_GRAPHSPACE` 写入上述两个配置项。
 旧名称 `SERVICE_ID` 和 `GRAPH_SPACE` 仍可使用；非空的新变量优先于对应旧变量。
 同一配置项的新旧变量均未设置或为空时，保留已有值。Compose 不会自动传入宿主机上的这些变量，
-需要在 Compose override 的 Server `environment:` 中显式添加。详见 [Helm chart 指南](https://github.com/apache/hugegraph/blob/master/helm/hugegraph/README.md)。
+需要在 Compose override 的 Server `environment:` 中显式添加。详见 [配套 Helm chart 修改](https://github.com/apache/hugegraph/pull/3322)。
 
 这些设置选择 Server 在 PD 中的服务元数据，不会搬迁已有图，也不会修改未指定图空间的 REST 路径所用的 `server.path_graphspace`。
 请求使用 `/graphspaces/team_a/...` 路径，并在 Hubble 中选择匹配的图空间和服务；开启鉴权时，显式指定路径仍须获得授权。
+
+`server.testGraphAlias` 默认为 `DEFAULT-hugegraph`。hook 会逐个 Server Pod 检查这一已有本地图绑定，不会从 `server.graphSpace` 自动派生别名。
+本地图绑定可以独立于 Server 在 PD 中分配的图空间存在，因此默认 hook 成功不能证明 `team_a` 中的图可查询。
+出现 `Could not rebind` 时，先确认目标图存在且别名正确；重启 Pod 不能创建缺失的图或纠正别名。
+
 配置渲染和入口脚本检查不能单独证明 Linux 上的非默认服务发现、鉴权或跨图空间隔离已通过验收。
 
 > [!NOTE]
