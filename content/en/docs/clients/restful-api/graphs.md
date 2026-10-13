@@ -220,7 +220,8 @@ Do not recreate the same graph name until deletion has completed and been confir
 
 On the deleting Server, scheduler shutdown fences new task admission and waits for actual executions, cancellation callbacks and transaction cleanup.
 If the configured task-drain wait times out (`task.wait_timeout`, seconds), deletion is refused before data, configuration or metadata removal; retry after
-the owners exit.
+the owners exit. Task admission stays closed after this refusal. To resume ordinary graph use before destructive cleanup, keep writes and task producers stopped;
+wait for all admitted tasks and cancellation cleanup to finish, then restart Server. A restart does not restore data or metadata already removed.
 Closing the scheduler alone retains persistent work that has not started.
 
 Deletion is not transactional. A failure after destructive cleanup does not restore removed data or metadata. An uncertain owner or native-resource cleanup
