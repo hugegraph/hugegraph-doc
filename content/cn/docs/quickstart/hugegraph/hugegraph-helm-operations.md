@@ -49,6 +49,10 @@ curl --user "hg:${PD_SECRET}" "http://<pd-rest-address>:8620/v1/stores"
 ```
 
 使用 `pd.auth.existingSecret` 或自定义 `pd.auth.key` 时读取实际 Secret 和 key，不使用 Server 管理员密码。
+变量式示例避免将密码字面值写入 shell 历史，但展开后的凭据可能短暂出现在进程参数中。
+共享终端可选用 `curl --user hg` 提示输入密码，或权限为 `600` 的私有 curl 配置文件；
+[凭据操作说明](https://github.com/apache/hugegraph/blob/master/helm/hugegraph/docs/operations.md#credentials)
+也包含改密请求体的处理方式。不要记录或提交凭据文件。
 
 ## 3 调度 {#3-scheduling}
 

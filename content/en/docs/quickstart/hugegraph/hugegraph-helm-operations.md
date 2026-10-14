@@ -51,6 +51,10 @@ curl --user "hg:${PD_SECRET}" "http://<pd-rest-address>:8620/v1/stores"
 ```
 
 With `pd.auth.existingSecret` or a custom `pd.auth.key`, read the actual Secret and key. Do not use the Server admin password.
+Variables avoid literal passwords in shell history, but expanded credentials can briefly appear in process arguments.
+On shared terminals, use `curl --user hg` to prompt for the password or a private curl config with permissions `600`;
+the [credentials guide](https://github.com/apache/hugegraph/blob/master/helm/hugegraph/docs/operations.md#credentials)
+also covers password-update payloads. Keep credential files out of logs and version control.
 
 ## 3 Scheduling
 
