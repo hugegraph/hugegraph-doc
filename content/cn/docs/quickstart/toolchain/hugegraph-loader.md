@@ -989,23 +989,27 @@ bin/hugegraph-loader.sh \
 
 自 1.8.0 版本起，Loader 支持并发导入模式所有权保护协议。
 
-升级后的 Loader 在普通导入时探测 `/mode/owners`；仅接口路由不受支持的 `404` 会回退到原来的枚举 `LOADING`/`NONE` 流程。
-这会保留 Server 1.7 等旧 Server 的行为，但不提供不同 Loader 进程之间的保护。
-权限、网络、无效响应和申请 owner 的错误不会触发回退。图数据源和恢复导入保留原有 `RESTORING` 流程，
-不探测 owner 能力，也不新增自动恢复 `NONE` 的行为。恢复导入完成且所有恢复写入停止后，
-执行下一次普通导入前必须先手动将图模式设置为 `NONE`，因为首个 owner 获取要求图模式为 `NONE`。
+```mermaid
+graph TD
+    A["图模式 NONE"] -->|首个 Loader 申请所有权| B["进入 LOADING 模式 (分配 token)"]
+    B -->|其他并发 Loader 加入| B
+    B -->|部分 Loader 导入完成释放| B
+    B -->|最后一个 Loader 释放| C["自动恢复 NONE 模式"]
+    B -.->|异常/进程中断 (Token 残留)| D["手动调 API 释放 / 重启图实例"]
+    D -.-> A
+```
 
-支持该协议的 Server 上，每轮普通导入保留一个 `instance`/`epoch`/`token` 句柄。首个 owner 从 `NONE` 启用 `LOADING`，
-其他 Loader 进程可加入该状态。一个导入结束时，其他 owner 仍活跃则保持 `LOADING`；最后一个 owner 释放后恢复 `NONE`。
-手动设置的 `LOADING`、`RESTORING` 和 `MERGING` 不会被接管；Schema 修改和 `--clear-all-data` 仍须单独协调。
+1. **探测与获取**：Loader 启动后探测 `/mode/owners`。首个 Loader 获取所有权句柄（`instance/epoch/token`），图模式由 `NONE` 转为 `LOADING`；并发 Loader 可申请加入该模式。
+2. **数据导入**：持有有效句柄的 Loader 并行执行数据导入。
+3. **安全释放**：导入完成后停止 worker 并释放对应句柄。当最后一个 owner 释放时，图模式自动恢复为 `NONE`。
+4. **异常恢复**：若因异常中断（如 `kill -9`）导致句柄残留，可通过 [RESTful API 释放接口](/cn/docs/clients/restful-api/graphs/#loading-ownership) 手动释放，或重启 Server 恢复。
+{.steps}
 
-申请和释放应使用同一个 Server 直连地址与鉴权身份。owner 属于该 Server 上实际运行的图实例，
-不提供跨 Server 协调或普通数据写入隔离。导入停止后释放其原句柄；嵌入式调用方需要调用 `HugeGraphLoader.shutdown()` 关闭 Loader。
-
-释放失败时，错误信息会打印对应句柄（格式为 `instance/epoch/token`，如 `Failed to release LOADING owner <instance>/<epoch>/<token>`）。
-停止导入后，可通过相同鉴权身份调用 [RESTful API 释放接口](/cn/docs/clients/restful-api/graphs/#loading-ownership) 手动释放；shutdown 不保证自动重试。
-owner 不会自动过期。句柄丢失或 `kill -9` 后，先停止所有导入及其在途写入，再重新打开图或重启 Server。
-恢复不会撤销已有写入或 Schema/数据清理。Hubble 任务清理在后续版本中独立维护。
+> [!NOTE]
+> **兼容性与运维说明**
+> - **旧版本兼容**：普通导入时仅在接口返回 `404` 时回退至旧版 `LOADING`/`NONE` 枚举流程（支持 1.7 等旧版 Server，但不提供并发隔离）。权限、网络或无效响应错误不会触发回退。
+> - **恢复与图源导入**：保留 `RESTORING` 模式，不探测 owner 且不自动重置。恢复导入完成后须手动将图模式设回 `NONE`，否则后续普通导入无法获取首个所有权。
+> - **作用范围与生命周期**：所有权属于直连 Server 实例，不跨节点同步；owner 无自动租期过期机制。若需提前终止，使用 `HugeGraphLoader.shutdown()` 安全退出。
 
 ### 4 完整示例
 

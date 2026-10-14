@@ -991,27 +991,35 @@ Expected result: two vertices and zero edges imported. This example uses dedicat
 
 #### 3.4.6 Concurrent imports and LOADING ownership {#loading-ownership}
 
-Starting with HugeGraph 1.8.0, Loader supports the concurrent import LOADING ownership protocol.
+Starting with HugeGraph 1.8.0, Loader supports concurrent import protection via the LOADING ownership protocol.
 
-For ordinary imports, the upgraded Loader probes `/mode/owners`. Only a route-level unsupported `404` selects the original enum `LOADING`/`NONE` flow.
-That fallback preserves old-Server behavior, including Server 1.7, but provides no protection between separate Loader processes.
-Permission, network, invalid-response and acquisition errors do not trigger fallback. Graph-source and restore imports keep their existing `RESTORING`
-flow, without the ownership probe or a new automatic reset to `NONE`. After a restore import completes and all restore writes stop,
-manually set the graph mode to `NONE` before the next ordinary import, as the first owner acquisition requires `NONE`.
+```mermaid
+graph TD
+    A["Graph Mode: NONE"] -->|First Loader acquires owner| B["LOADING Mode (Acquires Token)"]
+    B -->|Concurrent Loaders join| B
+    B -->|Loader finishes & releases| B
+    B -->|Last Loader releases| C["Restores to NONE"]
+    B -.->|Abnormal exit / kill -9| D["Manual REST API Release / Restart"]
+    D -.-> A
+```
 
-On a supporting Server, each ordinary import retains one `instance`/`epoch`/`token` handle. The first owner requires `NONE` and enables `LOADING`;
-other Loader processes can join that owned state. One import finishing leaves `LOADING` while another owner remains; the last release restores `NONE`.
-Manual `LOADING`, `RESTORING` and `MERGING` are not adopted. Schema changes and `--clear-all-data` still need separate coordination.
+1. **Probe and Acquire**: Loader probes `/mode/owners`. The first Loader obtains an ownership handle (`instance/epoch/token`),
+   transitioning graph mode from `NONE` to `LOADING`; concurrent Loaders can join.
+2. **Data Import**: Loaders holding valid handles execute concurrent imports safely.
+3. **Graceful Release**: When an import completes, Loader drains its workers and releases its handle. When the last owner releases,
+   graph mode automatically returns to `NONE`.
+4. **Failure Recovery**: If abnormal exit (e.g. `kill -9`) leaves an orphaned owner, release it manually via the
+   [RESTful API release endpoint](/docs/clients/restful-api/graphs/#loading-ownership) or reopen/restart the graph.
+{.steps}
 
-Use the same direct Server endpoint and authenticated identity for acquisition and release. Ownership belongs to that live graph instance;
-it does not coordinate across Servers or isolate ordinary data writes. Release the retained handle after its import has stopped.
-Embedded callers must close their Loader with `HugeGraphLoader.shutdown()`.
-
-If release fails, the failure message outputs the handle (`instance/epoch/token`, e.g., `Failed to release LOADING owner <instance>/<epoch>/<token>`).
-Stop the importer and retry the release manually via the [RESTful API release endpoint](/docs/clients/restful-api/graphs/#loading-ownership) with the
-same handle and authenticated identity; shutdown does not promise automatic retry.
-Owners have no automatic expiry. If the handle is lost or after `kill -9`, stop all imports and their in-flight writes before reopening the graph or
-restarting Server. Recovery does not undo writes or Schema/data cleanup. Hubble task cleanup is maintained independently in subsequent releases.
+> [!NOTE]
+> **Compatibility and Operational Notes**
+> - **Legacy Compatibility**: During ordinary imports, only a `404` status on `/mode/owners` falls back to the legacy enum `LOADING`/`NONE` flow
+>   (maintains compatibility with Server 1.7, without multi-loader protection). Network or permission errors do not trigger fallback.
+> - **Restore and Graph Source Imports**: Retain the `RESTORING` flow without ownership probes or automatic resets. After a restore import completes,
+>   manually reset graph mode to `NONE` before starting ordinary imports.
+> - **Scope & Lifecycle**: Ownership is bound to the target Server instance without cross-node synchronization or automatic lease expiry.
+>   For programmatic integrations, invoke `HugeGraphLoader.shutdown()` to ensure proper cleanup.
 
 ### 4 Complete example
 
