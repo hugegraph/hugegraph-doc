@@ -12,9 +12,11 @@ search_keywords: [HugeGraph Helm, Kubernetes, NodePort, Hubble, 内网部署]
 
 ## 1 安装
 
-默认部署 **3 PD + 3 Store + 3 Server 和 Hubble**，开启鉴权和持久化。
-需要默认动态 StorageClass 或匹配的静态 PV，共七个卷，分别为 3 个 10 GiB 的 PD 卷、3 个 50 GiB 的 Store 卷、1 个 1 GiB 的 Hubble 卷。
-chart 创建 PVC，不创建存储 provisioner 或宿主机目录。
+> [!NOTE]
+> **默认部署规格与存储要求**
+> - **拓扑组成**：默认部署 **3 PD + 3 Store + 3 Server 与 1 Hubble**，默认开启鉴权与持久化存储。
+> - **存储依赖**：需要集群具备默认动态 StorageClass 或预先匹配的静态 local PV，共需 7 个持久卷（3 个 10 GiB PD 卷、3 个 50 GiB Store 卷、1 个 1 GiB Hubble 卷）。
+> - **内存考量**：保留镜像内 JVM 内存自动推导；按需调整 resource requests/limits，确保宿主机给 9 个图服务 JVM 与 Hubble 提供足够内存。
 
 ```bash
 git clone https://github.com/apache/hugegraph.git
@@ -25,8 +27,6 @@ kubectl get storageclass
 helm install hugegraph ./helm/hugegraph -n hugegraph \
   --create-namespace --wait --timeout 15m
 ```
-
-默认保留镜像的 JVM 内存计算方式。按容量要求配置 requests/limits，并为九个图服务 JVM 和 Hubble 提供足够内存。
 
 ## 2 模式和访问入口
 

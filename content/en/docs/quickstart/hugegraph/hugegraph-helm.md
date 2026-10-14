@@ -12,9 +12,13 @@ Advanced lifecycle procedures are in the [operations reference](https://github.c
 
 ## 1 Install
 
-Defaults deploy **3 PD + 3 Store + 3 Server and Hubble**, with authentication and persistent storage enabled.
-Provide a default dynamic StorageClass, or matching static PVs: three PD volumes of 10 GiB, three Store volumes of 50 GiB and one Hubble volume of 1 GiB.
-The chart creates claims; it does not create a storage provisioner or host directories.
+> [!NOTE]
+> **Default Topology & Storage Prerequisites**
+> - **Components**: Deploys **3 PD + 3 Store + 3 Server and Hubble** by default, with authentication and persistent storage enabled.
+> - **Volume Requirements**: Requires a default dynamic StorageClass or matching pre-created static PVs, totaling 7 persistent volumes
+>   (3 × 10 GiB PD volumes, 3 × 50 GiB Store volumes, and 1 × 1 GiB Hubble volume).
+> - **Memory Sizing**: Retains container JVM memory auto-calculation; configure resource requests/limits to allocate sufficient physical memory
+>   for the 9 JVMs and Hubble.
 
 ```bash
 git clone https://github.com/apache/hugegraph.git
@@ -25,8 +29,6 @@ kubectl get storageclass
 helm install hugegraph ./helm/hugegraph -n hugegraph \
   --create-namespace --wait --timeout 15m
 ```
-
-Default resources preserve image JVM sizing. Set requests/limits for your capacity requirements; nine graph JVMs plus Hubble need sufficient memory.
 
 ## 2 Modes and entry points
 
