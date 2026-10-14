@@ -34,6 +34,22 @@ PD `/v1/ready` 需要 Raft leader，`/v1/health` 只说明监听器已启动，S
 Server 等待存储的默认上限为 300 秒，可以用 `server.storageWaitTimeoutSeconds` 调整。
 本地模板渲染不能验证集群连通性、卷挂载或 JVM 运行容量。
 
+Server API 根据 `Accept-Encoding` 协商响应压缩。支持 gzip 的客户端可请求 `gzip` 或使用 `curl --compressed`；
+`identity` 或未请求压缩时返回未压缩内容。需从更新后的源码重新构建 Server 镜像才能包含该行为，仅更新 chart 不会改变现有镜像。
+
+### PD REST 鉴权 {#pd-rest-authentication}
+
+PD REST 使用 HTTP Basic 鉴权，`hg`、`store`、`hubble` 和 `vermeer` 共用 PD REST Secret 密码。
+Server 的 `admin` 不是 PD REST 账户，使用它会返回 401。默认 release/Secret 的查询示例，地址应为可达的 PD REST 地址：
+
+```bash
+PD_SECRET=$(kubectl -n hugegraph get secret hugegraph-pd-auth \
+  -o jsonpath='{.data.secret-key}' | base64 --decode)
+curl --user "hg:${PD_SECRET}" "http://<pd-rest-address>:8620/v1/stores"
+```
+
+使用 `pd.auth.existingSecret` 或自定义 `pd.auth.key` 时读取实际 Secret 和 key，不使用 Server 管理员密码。
+
 ## 3 调度 {#3-scheduling}
 
 默认 `preferred` 反亲和允许节点少于副本数时调度；`values-cluster.yaml` 对 PD/Store 设置 required 反亲和，因此需要至少三个可调度节点。
@@ -84,6 +100,20 @@ PD 的 `Up` 状态本身不证明 shard 恢复完成。PDB 限制主动驱逐，
 发现缺成员或无 leader 时停止继续替换。
 [运维参考](https://github.com/apache/hugegraph/blob/master/helm/hugegraph/docs/operations.md#rolling-store-updates-and-recovery)说明这些升级条件，
 但不提供完整的逐组诊断或丢盘恢复步骤。
+
+即使副本完整，替换单个 Store 时，Raft leader 和客户端路由收敛期间仍可能出现请求失败或超时，不保证零错误。
+继续维护前同时观察应用错误和 shard 恢复状态，不要盲目重试写请求。
+
+### PD 巡检和 leader 均衡 {#pd-patrol-and-leader-balance}
+
+分区巡检修复 shard 成员关系；leader 均衡是单独的手动任务，不会自动定时执行。
+执行前通过鉴权的 `/v1/members` 查询 `data.pdLeader.restUrl`，并确认该 PD 的 `/v1/ready` 返回 `isLeader: true`。
+GET 任务 `/v1/task/patrolPartitions` 和 `/v1/task/balanceLeaders` 会改变集群状态，应携带 PD REST 凭据请求已确认的 leader。
+成员恢复和 split/move 任务完成后才能执行 leader 均衡；Store 心跳需新鲜，各组成员需完整、健康。
+忙碌任务返回 body `status: 1001`。follower 可能返回空成功，leader 转移是异步的，HTTP 200 或转移计划不代表执行完成。
+继续维护前重新检查 `/v1/partitions`、`/v1/stores` 和应用错误。
+[任务操作步骤](https://github.com/apache/hugegraph/blob/master/helm/hugegraph/docs/operations.md#pd-patrol-and-leader-balance)
+说明巡检和均衡的独立操作；维护忙碌时不要循环请求任务。
 
 ## 7 灾难恢复 {#7-disaster-recovery}
 

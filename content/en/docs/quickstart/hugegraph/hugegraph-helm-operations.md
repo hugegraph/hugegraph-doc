@@ -35,6 +35,23 @@ PD `/v1/ready` requires a Raft leader; `/v1/health` only confirms the listener. 
 Server waits up to `server.storageWaitTimeoutSeconds` (default 300) before its application startup; adjust it for slow storage bootstrap.
 No local Helm rendering verifies live cluster reachability, volumes or JVM capacity.
 
+Server API responses negotiate compression through `Accept-Encoding`. Gzip-capable clients can request `gzip` or use `curl --compressed`;
+`identity` or no compression request keeps the response uncompressed. Build a new Server image from the updated source to include this behavior;
+updating the chart alone does not update an existing image.
+
+### PD REST authentication
+
+PD REST uses HTTP Basic auth: `hg`, `store`, `hubble` and `vermeer` share the PD REST Secret password.
+Server's `admin` account is not a PD REST account and receives 401. For the default release/Secret and a reachable PD REST address:
+
+```bash
+PD_SECRET=$(kubectl -n hugegraph get secret hugegraph-pd-auth \
+  -o jsonpath='{.data.secret-key}' | base64 --decode)
+curl --user "hg:${PD_SECRET}" "http://<pd-rest-address>:8620/v1/stores"
+```
+
+With `pd.auth.existingSecret` or a custom `pd.auth.key`, read the actual Secret and key. Do not use the Server admin password.
+
 ## 3 Scheduling
 
 The default `preferred` anti-affinity permits scheduling with fewer nodes than replicas. `values-cluster.yaml` sets required PD/Store anti-affinity,
@@ -89,6 +106,20 @@ PDBs limit voluntary eviction, not StatefulSet controller disruption. Stop on mi
 The [operations reference](https://github.com/apache/hugegraph/blob/master/helm/hugegraph/docs/operations.md#rolling-store-updates-and-recovery)
 summarizes these rollout conditions;
 it does not provide a complete per-group diagnostic or disk-loss recovery procedure.
+
+A single Store replacement can cause request errors or timeouts while Raft leadership and client routes converge, even with full replicas.
+There is no zero-error guarantee. Observe application errors as well as shard recovery before continuing; do not blindly retry writes.
+
+### PD patrol and leader balance
+
+Partition patrol repairs shard membership; leader balance is a separate manual task and is not scheduled automatically.
+Before either task, identify the PD leader through authenticated `/v1/members` (`data.pdLeader.restUrl`) and confirm its `/v1/ready` reports `isLeader: true`.
+The GET tasks `/v1/task/patrolPartitions` and `/v1/task/balanceLeaders` change cluster state; target that confirmed leader with PD REST credentials.
+Wait for membership recovery and split/move tasks to finish before balancing leaders; Stores must have fresh heartbeats and groups full, healthy membership.
+A busy task returns body `status: 1001`. A follower may return empty success, and leader transfers are asynchronous:
+HTTP 200 or a transfer plan does not prove completion. Recheck `/v1/partitions`, `/v1/stores` and application errors before further maintenance.
+Follow the [task procedure](https://github.com/apache/hugegraph/blob/master/helm/hugegraph/docs/operations.md#pd-patrol-and-leader-balance)
+for the separate patrol and balance steps; do not loop task requests while maintenance is busy.
 
 ## 7 Disaster recovery
 
