@@ -221,7 +221,7 @@ mvn package -DskipTests -ntp -Drocksdb-only
 
 Server 的 tar 包随包提供 `conf/rest-server.properties`、`conf/gremlin-server.yaml` 和 `conf/graphs/hugegraph.properties`；源码构建包从 `hugegraph-server/hugegraph-dist/src/assembly/static/conf/` 装配这些文件。解压后在 Server 安装目录内编辑配置，无需另行生成。发行包版本之间可能有默认值差异，下面涉及的默认值和启动行为按 `master` 主线说明。
 
-单机 RocksDB 快速上手只需确认 `conf/graphs/hugegraph.properties` 使用 `backend=rocksdb`、`serializer=binary`。正常 Server 初始化会扫描 `conf/graphs/` 并加载本地图配置，无需额外设置 `graph.load_from_local_config=true`。该选项默认值为 `false`，控制构造阶段的提前加载和 `reload()` 时是否重新扫描本地配置。
+单机 RocksDB 快速上手只需确认 `conf/graphs/hugegraph.properties` 使用 `backend=rocksdb`、`serializer=binary`。正常 Server 初始化会扫描 `conf/graphs/` 并加载本地图配置，无需额外设置 `graph.load_from_local_config=true`。该选项默认 `false`，控制构造阶段的提前加载。图配置变化通过重启 Server 应用，不使用热重载进行维护。
 
 详细的配置介绍请参考[配置文档](/docs/config/config-guide)及[配置项介绍](/docs/config/config-option)。
 

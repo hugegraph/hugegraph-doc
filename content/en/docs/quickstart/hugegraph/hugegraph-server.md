@@ -226,7 +226,7 @@ mvn package -DskipTests -ntp -Drocksdb-only
 
 Server archives include `conf/rest-server.properties`, `conf/gremlin-server.yaml`, and `conf/graphs/hugegraph.properties`; source builds assemble them from `hugegraph-server/hugegraph-dist/src/assembly/static/conf/`. Edit them inside the extracted Server directory without a separate generation step. Defaults vary by release; the following defaults and startup behavior describe master.
 
-For standalone RocksDB, confirm `backend=rocksdb` and `serializer=binary` in `conf/graphs/hugegraph.properties`. Normal Server initialization scans `conf/graphs/` and loads local graphs without requiring `graph.load_from_local_config=true`. This option defaults to `false` and controls constructor preloading and rescanning on `reload()`.
+For standalone RocksDB, confirm `backend=rocksdb` and `serializer=binary` in `conf/graphs/hugegraph.properties`. Normal Server initialization scans `conf/graphs/` and loads local graphs without requiring `graph.load_from_local_config=true`. This option defaults to `false` and controls constructor preloading. Restart Server to apply graph configuration changes; do not use hot reload for maintenance.
 
 See the [configuration guide](/docs/config/config-guide/) and [option reference](/docs/config/config-option/) for details.
 
