@@ -996,7 +996,8 @@ Starting with HugeGraph 1.8.0, Loader supports the concurrent import LOADING own
 For ordinary imports, the upgraded Loader probes `/mode/owners`. Only a route-level unsupported `404` selects the original enum `LOADING`/`NONE` flow.
 That fallback preserves old-Server behavior, including Server 1.7, but provides no protection between separate Loader processes.
 Permission, network, invalid-response and acquisition errors do not trigger fallback. Graph-source and restore imports keep their existing `RESTORING`
-flow, without the ownership probe or a new automatic reset to `NONE`.
+flow, without the ownership probe or a new automatic reset to `NONE`. After a restore import completes and all restore writes stop,
+manually set the graph mode to `NONE` before the next ordinary import, as the first owner acquisition requires `NONE`.
 
 On a supporting Server, each ordinary import retains one `instance`/`epoch`/`token` handle. The first owner requires `NONE` and enables `LOADING`;
 other Loader processes can join that owned state. One import finishing leaves `LOADING` while another owner remains; the last release restores `NONE`.

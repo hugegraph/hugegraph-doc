@@ -992,7 +992,8 @@ bin/hugegraph-loader.sh \
 升级后的 Loader 在普通导入时探测 `/mode/owners`；仅接口路由不受支持的 `404` 会回退到原来的枚举 `LOADING`/`NONE` 流程。
 这会保留 Server 1.7 等旧 Server 的行为，但不提供不同 Loader 进程之间的保护。
 权限、网络、无效响应和申请 owner 的错误不会触发回退。图数据源和恢复导入保留原有 `RESTORING` 流程，
-不探测 owner 能力，也不新增自动恢复 `NONE` 的行为。
+不探测 owner 能力，也不新增自动恢复 `NONE` 的行为。恢复导入完成且所有恢复写入停止后，
+执行下一次普通导入前必须先手动将图模式设置为 `NONE`，因为首个 owner 获取要求图模式为 `NONE`。
 
 支持该协议的 Server 上，每轮普通导入保留一个 `instance`/`epoch`/`token` 句柄。首个 owner 从 `NONE` 启用 `LOADING`，
 其他 Loader 进程可加入该状态。一个导入结束时，其他 owner 仍活跃则保持 `LOADING`；最后一个 owner 释放后恢复 `NONE`。
