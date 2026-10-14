@@ -34,6 +34,16 @@ PD `/v1/ready` 需要 Raft leader，`/v1/health` 只说明监听器已启动，S
 Server 等待存储的默认上限为 300 秒，可以用 `server.storageWaitTimeoutSeconds` 调整。
 本地模板渲染不能验证集群连通性、卷挂载或 JVM 运行容量。
 
+### Helm test 检查范围 {#helm-test-coverage}
+
+`helm test` 逐 Server Pod 检查 `DEFAULT-hugegraph` 绑定，并拒绝当前可见关联索引的 `INVALID` 状态。
+它按 ID 读取索引，不刷新全量索引缓存；不证明索引查询结果或完整 schema 一致性。
+对已有数据，可在 Helm 升级时用 `--set-file server.testGremlin=assertions.groovy` 添加逐 Pod 的只读业务断言。
+脚本必须用 `assert` 或抛异常表示结果不符，仅返回 `false` 不会让请求失败。
+[业务查询断言](https://github.com/apache/hugegraph/blob/master/helm/hugegraph/docs/operations.md#business-query-assertions)
+给出了示例与检查边界。未配置脚本时明确显示业务断言已跳过，默认 hook 不创建 schema 或数据。
+自定义脚本使用 hook 的 Server 凭据执行（开启鉴权时为 `admin`），不强制只读；请提供可信的只读断言。
+
 Server API 根据 `Accept-Encoding` 协商响应压缩。支持 gzip 的客户端可请求 `gzip` 或使用 `curl --compressed`；
 `identity` 或未请求压缩时返回未压缩内容。需从更新后的源码重新构建 Server 镜像才能包含该行为，仅更新 chart 不会改变现有镜像。
 

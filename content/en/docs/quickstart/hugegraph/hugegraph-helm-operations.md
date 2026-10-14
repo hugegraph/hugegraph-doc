@@ -35,6 +35,17 @@ PD `/v1/ready` requires a Raft leader; `/v1/health` only confirms the listener. 
 Server waits up to `server.storageWaitTimeoutSeconds` (default 300) before its application startup; adjust it for slow storage bootstrap.
 No local Helm rendering verifies live cluster reachability, volumes or JVM capacity.
 
+### Helm test coverage
+
+`helm test` checks `DEFAULT-hugegraph` binding and rejects visible associated indexes in `INVALID` state on each Server Pod.
+It reads indexes by ID without refreshing the full index cache; it does not prove index query results or complete schema consistency.
+For existing data, use `--set-file server.testGremlin=assertions.groovy` during Helm upgrade to add read-only business assertions on every Pod.
+The script must use `assert` or throw on unexpected results; returning `false` alone does not fail the request.
+See [business query assertions](https://github.com/apache/hugegraph/blob/master/helm/hugegraph/docs/operations.md#business-query-assertions)
+for an example and coverage limits. Without a script, business assertions are reported as skipped.
+The default hook creates no schema or data. Custom scripts use the hook's Server credential (`admin` with auth enabled);
+read-only execution is not enforced, so supply trusted, read-only assertions.
+
 Server API responses negotiate compression through `Accept-Encoding`. Gzip-capable clients can request `gzip` or use `curl --compressed`;
 `identity` or no compression request keeps the response uncompressed. Build a new Server image from the updated source to include this behavior;
 updating the chart alone does not update an existing image.
