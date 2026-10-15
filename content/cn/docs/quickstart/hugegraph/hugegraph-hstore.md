@@ -22,10 +22,8 @@ HugeGraph-Store 是 HugeGraph 分布式版本的存储节点组件，负责实�
 #### 2.1 前置条件
 
 - 操作系统：Linux 或 macOS（Windows 尚未经过完整测试）
-- 当前主线源码构建和 CI 运行环境使用 JDK 17；Maven 编译只接受 Java 17。
-  当前主线的 `bin/start-hugegraph-store.sh` 检查 Java 主版本最低为 17；1.7.0 启动脚本声明的最低版本为 11。
-  通过启动脚本检查不代表更高版本的 JDK 已通过兼容验证。
-- Maven 版本：≥ 3.6.3
+- Java 版本：HugeGraph 1.8.0+ 使用 Java 17（Maven 源码构建仅接受 JDK 17；启动脚本拒绝低于 17 的运行时；1.7.0 是最后一个支持 Java 11 的版本）
+- Maven 版本：≥ 3.6.3（从源码编译时）
 - 如需进行多节点部署，请先部署 HugeGraph-PD
 
 ### 3 部署
@@ -222,6 +220,14 @@ Store 从 `conf/` 读取两个配置文件。1.7.0 发布标签的源文件见 [
 | `thread.pool.scan.core` | `128` | 处理扫描的核心线程数。设为 `0` 时取 CPU 核数的 4 倍。 |
 | `thread.pool.scan.max` | `1000` | 扫描最大线程数。 |
 | `thread.pool.scan.queue` | `0` | 扫描任务队列容量。 |
+
+**gRPC 回调队列（1.8.0）**
+
+Store 使用无界队列处理 gRPC 回调，避免队列满时丢弃取消或完成通知，导致请求无法正常结束。`thread.pool.grpc.queue` 仍可写在配置中，但不再限制这个队列的容量。
+
+`thread.pool.grpc.core` 和 `thread.pool.grpc.max` 仍用于配置线程池。由于回调可以继续排队，积压通常不会触发线程数从 `core` 增长到 `max`；只增大 `max` 无法提高回调处理能力。
+
+持续过载仍会使队列积压并增加内存占用。应限制客户端并发，并根据节点资源调整扫描和查询工作线程池；不要依赖 `thread.pool.grpc.queue` 限流。1.7.0 仍使用配置的 gRPC 队列容量。
 
 **查询下推**
 

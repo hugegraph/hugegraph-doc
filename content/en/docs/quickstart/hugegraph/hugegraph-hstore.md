@@ -22,10 +22,9 @@ Each Store node keeps graph data in RocksDB and replicates it with Raft (JRaft):
 #### 2.1 Requirements
 
 - Operating System: Linux or macOS (Windows has not been fully tested)
-- Current source builds and the configured CI runtime use JDK 17; Maven accepts Java 17 only.
-  The master `bin/start-hugegraph-store.sh` checks a minimum major version of 17; the 1.7.0 launcher declares a minimum of 11.
-  Passing a launcher check does not qualify newer JDKs.
-- Maven version: ≥ 3.6.3
+- Java version: Java 17 for HugeGraph 1.8.0+ (the Maven build accepts only JDK 17;
+  the start script rejects older runtimes; 1.7.0 is the last release supporting Java 11)
+- Maven version: ≥ 3.6.3 (for building from source)
 - Deploy HugeGraph-PD first for multi-node deployment
 
 ### 3 Deployment
@@ -223,6 +222,17 @@ Any other option defined in `org/apache/hugegraph/rocksdb/access/RocksDBOptions.
 | `thread.pool.scan.core` | `128` | Core threads serving scans. `0` means 4 times the CPU count. |
 | `thread.pool.scan.max` | `1000` | Maximum scan threads. |
 | `thread.pool.scan.queue` | `0` | Scan task queue capacity. |
+
+**gRPC callback queue (1.8.0)**
+
+Store uses an unbounded queue for gRPC callbacks so that a full queue does not discard cancellation or completion notifications and leave requests unfinished.
+You can keep `thread.pool.grpc.queue` in the configuration, but it no longer limits this queue.
+
+`thread.pool.grpc.core` and `thread.pool.grpc.max` still configure the thread pool. Because callbacks can continue to queue, a backlog normally does not grow
+the pool from `core` to `max`; increasing `max` alone does not increase callback processing capacity.
+
+Sustained overload can still grow the queue and increase memory usage. Limit client concurrency and size the scan and query worker pools for the node's
+resources; do not rely on `thread.pool.grpc.queue` for load control. Version 1.7.0 still uses the configured gRPC queue capacity.
 
 **Query pushdown**
 
