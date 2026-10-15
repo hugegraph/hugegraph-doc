@@ -38,8 +38,11 @@ No local Helm rendering verifies live cluster reachability, volumes or JVM capac
 ### Helm test coverage
 
 `helm test` checks `DEFAULT-hugegraph` binding and requires visible associated indexes to be in `CREATED` state on each Server Pod.
-Run it after index jobs finish; the hook retries temporary construction states within its 150-second internal window.
-Helm's `--timeout` does not change this internal window.
+Run it after index creation/rebuild jobs finish, with no schema changes during the test.
+On HStore, reading an unfinished index can cache its temporary status on other Pods; retries do not refresh that state.
+Indexed queries on those Pods may keep failing after the job succeeds; replace affected Server Pods only after the jobs finish.
+The hook does not fix cross-Server schema cache consistency. Its 150-second internal retry window allows transient elections to settle;
+Helm's `--timeout` does not change that window.
 It reads indexes by ID without refreshing the full index cache; it does not prove index query results or complete schema consistency.
 For existing data, use `--set-file server.testGremlin=assertions.groovy` during Helm upgrade to add read-only business assertions on every Pod.
 The script must use `assert` or throw on unexpected results; returning `false` alone does not fail the request.
