@@ -36,7 +36,7 @@ Server 等待存储的默认上限为 300 秒，可以用 `server.storageWaitTim
 
 ### Helm test 检查范围 {#helm-test-coverage}
 
-`helm test` 逐 Server Pod 检查 `DEFAULT-hugegraph` 绑定，并要求当前可见关联索引处于 `CREATED` 状态。
+`helm test` 逐 Server Pod 检查图绑定（默认检查 `DEFAULT-hugegraph`，可通过 `server.testGraphAlias` 指定图别名），并要求当前可见关联索引处于 `CREATED` 状态。
 请在索引创建／重建任务结束后执行，检查期间不要并发修改 schema。
 在 HStore 上，读取尚未完成的索引可能将临时状态缓存到其他 Pod；重试不会刷新该状态。
 即使任务随后成功，这些 Pod 的索引查询也可能继续失败；应在任务结束后再替换受影响的 Server Pod。

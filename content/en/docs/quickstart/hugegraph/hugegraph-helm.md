@@ -26,11 +26,35 @@ cd hugegraph
 kubectl config current-context
 kubectl get nodes
 kubectl get storageclass
+# Standard cluster deployment (3 PD + 3 Store + 3 Server + 1 Hubble; requires 7 PVs):
 helm install hugegraph ./helm/hugegraph -n hugegraph \
   --create-namespace --wait --timeout 15m
+
+# Local testing or single-node environments (Minikube, Kind; 1 replica and no anti-affinity):
+# helm install hugegraph ./helm/hugegraph -n hugegraph \
+#   -f ./helm/hugegraph/values-single.yaml \
+#   --create-namespace --wait --timeout 10m
 ```
 
 ## 2 Modes and entry points
+
+```filetree {.hg-filetree-notes title="HugeGraph Helm Chart Layout"}
+helm/hugegraph/
+  Chart.yaml            # Chart metadata and version definitions
+  values.yaml           # Default values (easy mode: 3 PD + 3 Store + 3 Server + 1 Hubble, NodePort)
+  values-single.yaml    # Single-node preset (local Minikube/Kind testing with 1 replica and no anti-affinity)
+  values-cluster.yaml   # Multi-node cluster preset (required anti-affinity, Store OnDelete rollout)
+  values-strict.yaml    # Hardened security preset (strict mode: ClusterIP only, strict NetworkPolicies)
+  values.schema.json    # Schema validation for values configuration
+  templates/            # Kubernetes workload templates
+    pd-statefulset.yaml   # PD StatefulSet (metadata and scheduling)
+    store-statefulset.yaml # Store StatefulSet (storage engine)
+    server-deployment.yaml # Server Deployment (injects serviceId and graphSpace)
+    hubble-deployment.yaml # Hubble UI Deployment
+    tests/              # Smoke validation hook (helm test, supports custom testGraphAlias)
+  examples/             # Seven complete production scenario examples (local PVs, GitOps secrets, Ingress)
+  docs/operations.md    # Lifecycle operations and recovery guide
+```
 
 `mode: easy` is the default. Server and Hubble use automatic NodePorts; PD stays ClusterIP. HTTP works without a domain, certificate or acknowledgement.
 `mode: strict` defaults Server/Hubble to ClusterIP and enables NetworkPolicy. Both modes keep authentication and persistence.
@@ -59,6 +83,20 @@ Each client Service supports `externalTrafficPolicy`, `loadBalancerClass`, `load
 and `allocateLoadBalancerNodePorts`, subject to the cluster/controller's capabilities. Use LoadBalancer fields with that Service type.
 NodePort omission or `0` means automatic allocation. Fixed ports are validated against the cluster's configured range by Kubernetes;
 the chart does not force `30000–32767`. Legacy HTTP acknowledgement fields remain accepted but no longer gate rendering.
+
+### Server service identity and graph space
+
+Both `server.serviceId` and `server.graphSpace` default to `DEFAULT`. To register the Server with a specific service name or graph space in PD:
+
+```bash
+helm upgrade --install hugegraph ./helm/hugegraph -n hugegraph \
+  --set-string server.serviceId=analytics \
+  --set-string server.graphSpace=team_a \
+  --set-string server.testGraphAlias=team_a-demo
+```
+
+A non-default graph space must be created through the PD API before starting its assigned Server. `server.testGraphAlias` specifies the Gremlin binding checked
+by `helm test` (case-sensitive) and does not auto-infer from `graphSpace`. Do not re-declare service ID or graph space in `server.extraEnv`.
 
 ## 3 Internal images and storage
 

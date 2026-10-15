@@ -24,11 +24,35 @@ cd hugegraph
 kubectl config current-context
 kubectl get nodes
 kubectl get storageclass
+# 默认标准集群安装（3 PD + 3 Store + 3 Server + 1 Hubble，需 7 个 PV）：
 helm install hugegraph ./helm/hugegraph -n hugegraph \
   --create-namespace --wait --timeout 15m
+
+# 本地测试 / 单节点轻量环境（Minikube、Kind 等，仅各 1 副本且关闭反亲和）：
+# helm install hugegraph ./helm/hugegraph -n hugegraph \
+#   -f ./helm/hugegraph/values-single.yaml \
+#   --create-namespace --wait --timeout 10m
 ```
 
 ## 2 模式和访问入口
+
+```filetree {.hg-filetree-notes title="HugeGraph Helm 核心文件与结构"}
+helm/hugegraph/
+  Chart.yaml            # Chart 元数据与版本定义
+  values.yaml           # 默认配置（easy 模式：3 PD + 3 Store + 3 Server + 1 Hubble，NodePort 入口）
+  values-single.yaml    # 单节点预设（本地 Minikube/Kind 测试，1 副本且关闭反亲和与 PDB）
+  values-cluster.yaml   # 生产集群预设（跨节点反亲和调度，Store 采用 OnDelete 逐个滚动升级）
+  values-strict.yaml    # 安全加固预设（strict 模式：全部 ClusterIP，强制启用 NetworkPolicy 隔离）
+  values.schema.json    # values 配置参数校验规范
+  templates/            # Kubernetes 资源编排模板
+    pd-statefulset.yaml   # PD 服务有状态副本集（元数据与调度中心）
+    store-statefulset.yaml # Store 存储节点有状态副本集（分布式存储引擎）
+    server-deployment.yaml # Server 引擎无状态 Deployment（注入 serviceId / graphSpace）
+    hubble-deployment.yaml # 可视化控制台 Deployment
+    tests/              # 冒烟验证测试钩子（helm test，支持自定义 testGraphAlias）
+  examples/             # 7 种生产场景完整示例（含 local PV、GitOps 凭据、Ingress 等）
+  docs/operations.md    # 生命周期进阶运维与故障恢复手册
+```
 
 默认 `mode: easy`，Server 和 Hubble 自动分配 NodePort，PD 保持 ClusterIP。可以直接使用 HTTP，无需域名、证书或额外确认参数。
 `mode: strict` 默认将 Server/Hubble 设为 ClusterIP，并开启 NetworkPolicy。两个模式都保留鉴权和持久化。
@@ -57,6 +81,20 @@ kubectl -n hugegraph get secret hugegraph-admin \
 和 `allocateLoadBalancerNodePorts`，具体行为取决于集群及负载均衡实现。LoadBalancer 专用字段应配合对应类型使用。
 NodePort 省略或设为 `0` 时自动分配，固定端口由 Kubernetes 根据集群配置的范围校验，chart 不再强制 `30000–32767`。
 原 HTTP 暴露确认参数保留兼容，但不再阻止渲染。
+
+### 服务身份与图空间
+
+默认 `server.serviceId` 与 `server.graphSpace` 均为 `DEFAULT`。如需将 Server 注册到指定的业务服务名或图空间，可通过 values 指定：
+
+```bash
+helm upgrade --install hugegraph ./helm/hugegraph -n hugegraph \
+  --set-string server.serviceId=analytics \
+  --set-string server.graphSpace=team_a \
+  --set-string server.testGraphAlias=team_a-demo
+```
+
+注意：非默认图空间必须在启动 Server 前先调用 PD API 创建；`server.testGraphAlias` 用于指定 `helm test` 验证的 Gremlin 图别名（区分大小写），
+不会从 `graphSpace` 自动推导。请勿在 `server.extraEnv` 中重复声明服务 ID 或图空间。
 
 ## 3 内网镜像和存储
 

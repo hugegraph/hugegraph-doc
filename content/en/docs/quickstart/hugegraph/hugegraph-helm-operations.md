@@ -37,7 +37,8 @@ No local Helm rendering verifies live cluster reachability, volumes or JVM capac
 
 ### Helm test coverage
 
-`helm test` checks `DEFAULT-hugegraph` binding and requires visible associated indexes to be in `CREATED` state on each Server Pod.
+`helm test` validates graph binding on every Server Pod (`DEFAULT-hugegraph` by default, or configured via `server.testGraphAlias`), and requires
+currently visible associated indexes to be in `CREATED` state.
 Run it after index creation/rebuild jobs finish, with no schema changes during the test.
 On HStore, reading an unfinished index can cache its temporary status on other Pods; retries do not refresh that state.
 Indexed queries on those Pods may keep failing after the job succeeds; replace affected Server Pods only after the jobs finish.
