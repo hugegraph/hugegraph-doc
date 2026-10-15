@@ -223,7 +223,7 @@ curl -o /dev/null -w '%{http_code}\n' -u "admin:${HUGEGRAPH_ADMIN_PASSWORD}" \
 | `PD_AUTH_PASSWORD` | 空 | PD REST Basic 密码；启用 PD REST 鉴权时须与 `HG_PD_AUTH_SECRET_KEY` 相同 |
 | `WAIT_PARTITION_TIMEOUT_S` | `120` | 分区轮询超时；包含下文修复的构建还会限制最终诊断 |
 
-包含 apache/hugegraph#3327 与 #3316 鉴权属性修复的 master 镜像会保留显式签名密钥中的空格、反斜杠和 Unicode，各 Server 副本应使用同一密钥。
+包含鉴权属性修复的 master 镜像会保留显式签名密钥中的空格、反斜杠和 Unicode，各 Server 副本应使用同一密钥。
 如果旧镜像曾错误读取这类密钥，升级时应重新显式提供原本想使用的 `HG_SERVER_AUTH_TOKEN_SECRET`；仅复用旧配置仍会保留错误读取后的密钥。
 若实际生效的密钥改变，须重新登录获取 token。上文所述 1.7.0 镜像限制仍适用。
 
@@ -234,7 +234,7 @@ curl -o /dev/null -w '%{http_code}\n' -u "admin:${HUGEGRAPH_ADMIN_PASSWORD}" \
 
 `wait-storage.sh` 最多等待 300 秒直到出现状态为 `Up` 的 Store。该时长写死在脚本中，无法通过环境变量调整。
 
-在包含 apache/hugegraph#3327 的 master Server 构建中，HStore 启动时，分区轮询和最终
+在当前 master Server 构建中，HStore 启动时，分区轮询和最终
 `/v1/partitions` 诊断分别使用独立的 `WAIT_PARTITION_TIMEOUT_S` 预算。旧构建仅限制轮询时间，最终诊断请求没有超时。
 使用默认配置时，最终响应停滞会在 120 秒后超时；设为 `0` 会禁用 GNU timeout 的时限。
 入口脚本在等待 Java 进程前会先等待 `wait-partition.sh`。若 Java 进程在分区轮询阶段提前退出，轮询仍可能消耗完整超时预算后入口脚本才感知到退出；
@@ -322,8 +322,7 @@ HugeGraph JVM 都已退出后可以删除旧目录，但不要动正在运行的
 Compose 中 Server 服务的 `environment:` 里添加，自带的 Compose 文件没有设置它，或在 Kubernetes 中使用 `env`；只在宿主机 shell 中导出不会生效），这样会保留镜像默认的 `JAVA_OPTS`；把该参数加到 `JAVA_OPTS` 中只对 Server
 自身的 JVM 生效，而且会替换镜像默认值（`-XX:+UseContainerSupport -XX:MaxRAMPercentage=50 ...`），需要把这些参数一并写上。
 
-> **版本范围**：上文描述的是基于当前 master 构建的镜像（PD、Store 和单机 Server 见 [apache/hugegraph#2980](https://github.com/apache/hugegraph/pull/2980)，HStore Server 见
-> [apache/hugegraph#3258](https://github.com/apache/hugegraph/pull/3258)）。1.7.0 及更早的镜像都没有设置 `STDOUT_MODE`，包括上文使用的单机镜像 `hugegraph/hugegraph:1.7.0`：`docker logs`
+> **版本范围**：上文描述的是基于当前 master 构建的镜像。1.7.0 及更早的镜像都没有设置 `STDOUT_MODE`，包括上文使用的单机镜像 `hugegraph/hugegraph:1.7.0`：`docker logs`
 > 只能看到入口脚本的输出，服务日志仍在容器内的 `logs/` 中（Server 为 `logs/hugegraph-server.log`）。
 
 ## 容器监控与健康检查

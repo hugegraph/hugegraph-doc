@@ -223,7 +223,7 @@ Unlike PD and Store, Server has no mandatory entrypoint variables: only set valu
 | `PD_AUTH_PASSWORD` | Empty | PD REST Basic password; must match `HG_PD_AUTH_SECRET_KEY` when PD REST authentication is enabled |
 | `WAIT_PARTITION_TIMEOUT_S` | `120` | Partition polling timeout; also bounds the final diagnostic in builds with the fix described below |
 
-Master builds that include apache/hugegraph#3327 and #3316 preserve spaces, backslashes and Unicode in explicit
+Master builds that include authentication property fixes preserve spaces, backslashes and Unicode in explicit
 signing keys. Use the same key on every Server replica. When upgrading from an image that misread such a key, explicitly supply the intended
 `HG_SERVER_AUTH_TOKEN_SECRET` again; retaining the old configuration also retains its misread key. If the active key changes, sign in again to
 obtain new tokens. The 1.7.0 image limitation above still applies.
@@ -237,7 +237,7 @@ existing data and arrange account recovery before upgrading.
 
 `wait-storage.sh` waits up to 300 seconds for an `Up` Store. This duration is hardcoded and cannot be changed through environment variables.
 
-In master builds including apache/hugegraph#3327, HStore startup gives partition polling
+In master builds, HStore startup gives partition polling
 and the final `/v1/partitions` diagnostic separate `WAIT_PARTITION_TIMEOUT_S` budgets. Earlier builds bound polling only; the final diagnostic
 request has no timeout. With the default value, a stalled final response times out after 120 seconds; setting the value to `0` disables
 GNU timeout's limit.
@@ -336,8 +336,7 @@ which the shipped Compose files do not set, or `env` in Kubernetes; exporting it
 putting the flag in `JAVA_OPTS` affects the Server JVM only and replaces that default (`-XX:+UseContainerSupport -XX:MaxRAMPercentage=50 ...`), so repeat those
 flags.
 
-> **Version scope**: the paragraph above describes current master images ([apache/hugegraph#2980](https://github.com/apache/hugegraph/pull/2980) for PD, Store
-> and the standalone Server, [apache/hugegraph#3258](https://github.com/apache/hugegraph/pull/3258) for the HStore Server). No 1.7.0 or older image sets
+> **Version scope**: the paragraph above describes current master images. No 1.7.0 or older image sets
 > `STDOUT_MODE`, including the standalone `hugegraph/hugegraph:1.7.0` used above: `docker logs` shows only entrypoint output, and service logs stay in `logs/`
 > inside the container (`logs/hugegraph-server.log` for the Server).
 

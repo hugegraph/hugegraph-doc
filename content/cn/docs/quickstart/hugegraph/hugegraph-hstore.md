@@ -293,7 +293,7 @@ Store 使用无界队列处理 gRPC 回调，避免队列满时丢弃取消或�
 ./bin/start-hugegraph-store.sh
 ```
 
-下文的生命周期与下载时限说明适用于包含 apache/hugegraph#3305 与 #3310 的 master 构建；上文下载的 1.7.0 启动脚本不包含这些修复。
+下文的生命周期与下载时限说明适用于包含启动脚本修复的 master 构建；上文下载的 1.7.0 启动脚本不包含这些修复。
 启动脚本支持四个参数，GC 的版本限制见下文：
 
 | 参数 | 取值 | 默认值 | 说明 |
@@ -303,7 +303,7 @@ Store 使用无界队列处理 gRPC 回调，避免队列满时丢弃取消或�
 | `-j` | JVM 参数字符串 | 空 | 附加的 JVM 参数，例如 `-j "-Xmx16g -Xms8g"`。 |
 | `-y` | `true`、`false` | `false` | 挂载 OpenTelemetry Java agent（首次使用时下载到 `plugins/`），并将 trace 导出到 `127.0.0.1:4317`。 |
 
-包含 apache/hugegraph#3305 的 master 构建接受 `g1`、`G1`、`zgc` 和 `ZGC`。
+master 构建接受 `g1`、`G1`、`zgc` 和 `ZGC`。
 上文下载的 1.7.0 启动脚本仅接受显式指定 `zgc` 或 `ZGC`；`-g g1`、`-g G1` 和其他参数会中止启动。
 默认路径请省略 `-g`；参数被拒绝时，查看 `logs/hugegraph-store-server.log`。
 

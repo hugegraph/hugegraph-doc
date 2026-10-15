@@ -163,8 +163,8 @@ Both default to `DEFAULT`, which preserves the existing `server.service_id` and 
 values in `conf/rest-server.properties`. A non-default chart value injects `HG_SERVER_SERVICE_ID`
 or `HG_SERVER_GRAPHSPACE` into the Server container.
 These service identity chart settings (`server.serviceId`, `server.graphSpace`, and `server.testGraphAlias`)
-require Helm chart and Server image support introduced in apache/hugegraph#3322; no released chart or image
-supports these settings yet. Do not use this example with older chart or image versions lacking these features.
+apply to development 1.8.0+ builds and charts; older versions such as 1.7.0 do not support these options.
+Do not use this example with older chart or image versions lacking these features.
 Non-empty service IDs supplied through `HG_SERVER_SERVICE_ID`, `SERVICE_ID`, or `server.serviceId`
 must use printable ASCII; spaces and backslashes are supported, while deployment checks reject
 non-ASCII and control characters. This entrypoint restriction does not change Core Service naming
@@ -660,7 +660,7 @@ it failed and dumps fell back to `logs/`. If the logs path contains a double quo
 per-launch directory and no crash log default; the `JAVA_TOOL_OPTIONS` opt-out still applies. A path with both quote characters gets no heap dump default at
 all. Because of the defaults, the JVM prints `Picked up JAVA_TOOL_OPTIONS: ...` on stderr at startup.
 
-> **Version scope**: this applies to current master ([apache/hugegraph#3258](https://github.com/apache/hugegraph/pull/3258)). In 1.7.0 the heap dump flags are
+> **Version scope**: this applies to current development/master builds. In 1.7.0 the heap dump flags are
 > added only when `JAVA_OPTIONS` is unset, heap dumps go directly to `logs/java_pid<pid>.hprof`, and JVM crash logs go to the install directory.
 
 ### 5.2 Use Docker to startup

@@ -298,7 +298,7 @@ Ensure that the PD service is already started, then in the Store installation di
 ./bin/start-hugegraph-store.sh
 ```
 
-The lifecycle and timeout details below describe master builds that include apache/hugegraph#3305 and #3310.
+The lifecycle and timeout details below describe master builds that include launcher script repairs.
 The downloaded 1.7.0 launcher does not include those repairs.
 The script accepts four flags, with GC version limits noted below:
 
@@ -309,7 +309,7 @@ The script accepts four flags, with GC version limits noted below:
 | `-j` | JVM options string | empty | Extra JVM options, for example `-j "-Xmx16g -Xms8g"`. |
 | `-y` | `true`, `false` | `false` | Attach the OpenTelemetry Java agent, downloading it into `plugins/` on first use, and export traces to `127.0.0.1:4317`. |
 
-Master builds including apache/hugegraph#3305 accept `g1`, `G1`, `zgc` and `ZGC`.
+Master builds accept `g1`, `G1`, `zgc` and `ZGC`.
 The downloaded 1.7.0 launcher accepts only `zgc` or `ZGC` as explicit choices; `-g g1`, `-g G1` and other values abort startup.
 Omit `-g` for the default path. For rejected values, inspect `logs/hugegraph-store-server.log`.
 
