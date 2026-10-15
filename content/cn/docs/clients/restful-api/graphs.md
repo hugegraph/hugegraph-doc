@@ -659,8 +659,8 @@ PUT http://localhost:8080/graphspaces/DEFAULT/graphs/hugegraph/graph_read_mode
 
 #### 6.3.5 LOADING owner 管理 {#loading-ownership}
 
-自 HugeGraph 1.8.0 起提供 owner 协议 1 接口；Loader 需使用配套的 1.8.0 及以上版本客户端。
-旧版本发行包不包含该协议；仅支持 `LOADING` 枚举不能说明支持这些接口。
+自 HugeGraph 1.8.0 起提供 owner 协议 1 接口（需配合尚未合并至 `master` 的 Server PR #3331 与 Toolchain PR #815）；
+Loader 需使用配套的 1.8.0 及以上版本客户端。旧版本发行包不包含该协议；仅支持 `LOADING` 枚举不能说明支持这些接口。
 启用鉴权时，两个接口沿用模式设置接口的权限要求，即图空间管理权限（`space`）或该图所有者权限，并校验 STATUS 写权限。
 Server 将句柄绑定到实际鉴权用户；token 本身不赋予权限。申请、释放和重试必须保持相同身份。
 
@@ -668,13 +668,14 @@ Server 将句柄绑定到实际鉴权用户；token 本身不赋予权限。申�
 GET http://localhost:8080/graphspaces/DEFAULT/graphs/hugegraph/mode/owners
 ```
 
-`200` 能力响应包含图实例 UUID 和当前非负 epoch：
+`200` 能力响应包含图实例 UUID、当前非负 epoch 及状态 revision：
 
 ```json
 {
     "protocol": 1,
     "instance": "<instance UUID>",
-    "epoch": 0
+    "epoch": 0,
+    "revision": 0
 }
 ```
 
@@ -697,6 +698,27 @@ PUT http://localhost:8080/graphspaces/DEFAULT/graphs/hugegraph/mode/owners
 若返回 `200` 但 `state: "released"`，说明该句柄已失效或已被提前取消，此时并未获得 owner 保护，必须重新通过 GET 获取新的 `instance` 和 `epoch` 并生成全新 token 重新申请。
 释放时将 `action` 设置为 `release`，句柄保持不变；响应中包含 `state: "released"` 和当前实际模式。未申请前直接调用释放会被记录，并导致后续使用该句柄的申请直接返回 `released`。
 重试保留同一句柄；Server 校验其鉴权身份、instance 和 epoch。已释放句柄不能再次申请。
+
+当异常中断（如 `kill -9`）导致句柄残留时，管理员可发起强制恢复请求：
+
+```text
+PUT http://localhost:8080/graphspaces/DEFAULT/graphs/hugegraph/mode/owners
+```
+
+```json
+{
+    "action": "recover",
+    "instance": "<instance UUID>",
+    "epoch": 0,
+    "revision": 0,
+    "confirm": "I'm sure all imports have stopped"
+}
+```
+
+管理员恢复需要全局管理员权限（`admin`）。调用方必须传入从 `GET /mode/owners` 获取的当前 `revision`、`instance` 和 `epoch`，
+以及确认文案 `confirm: "I'm sure all imports have stopped"`。
+若传入的 `revision` 与服务端当前状态不一致，请求将被拒绝并返回 HTTP `409 Conflict`。
+恢复成功后服务端清除所有残留 owner，将图模式重置为 `NONE` 并递增 epoch，返回 HTTP `200`（含 `state: "recovered"` 和 `mode: "NONE"`）。
 
 首个 owner 要求 `NONE`；其他 owner 共享由 owner 管理的 `LOADING`，最后一个释放后恢复 `NONE`。
 手动设置的 `LOADING`、`RESTORING` 和 `MERGING` 不会被接管；owner 活跃时，旧枚举 PUT 会拒绝模式修改。

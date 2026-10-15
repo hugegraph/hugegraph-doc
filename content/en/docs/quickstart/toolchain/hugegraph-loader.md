@@ -27,7 +27,8 @@ It will be explained in detail below.
 
 > Note: HugeGraph-Loader requires HugeGraph Server service, please refer to [HugeGraph-Server Quick Start](/docs/quickstart/hugegraph/hugegraph-server) to download and start Server
 
-> **Concurrency protection:** starting with HugeGraph 1.8.0, ordinary imports acquire same-Server ownership protection.
+> **Concurrency protection:** starting with HugeGraph 1.8.0, ordinary imports acquire same-Server ownership protection
+> (requires unreleased Server PR #3331 and Client/Loader PR #815, which are not merged into `master` yet).
 > Older Servers retain the legacy import behavior described below.
 
 > **Testing Guide**: For running HugeGraph-Loader tests locally, please refer to [HugeGraph Toolchain Local Testing Guide](/docs/guides/toolchain-local-test)
@@ -991,7 +992,8 @@ Expected result: two vertices and zero edges imported. This example uses dedicat
 
 #### 3.4.6 Concurrent imports and LOADING ownership {#loading-ownership}
 
-Starting with HugeGraph 1.8.0, Loader supports concurrent import protection via the LOADING ownership protocol.
+Starting with HugeGraph 1.8.0, Loader supports concurrent import protection via the LOADING ownership protocol
+(requires unreleased Server PR #3331 and Client/Loader PR #815, which are not merged into `master` yet).
 
 ```mermaid
 graph TD
@@ -999,8 +1001,9 @@ graph TD
     B -->|Concurrent Loaders join| B
     B -->|Loader finishes & releases| B
     B -->|Last Loader releases| C["Restores to NONE"]
-    B -.->|Abnormal exit / kill -9| D["Manual REST API Release / Restart"]
-    D -.-> A
+    B -.->|Abnormal exit / kill -9| D["Manual Recovery / Restart"]
+    D -.->|"Last owner released, or recover/restart"| A
+    D -.->|"Other owners still active"| B
 ```
 
 1. **Probe and Acquire**: Loader probes `/mode/owners`. The first Loader obtains an ownership handle (`instance/epoch/token`),
@@ -1008,8 +1011,9 @@ graph TD
 2. **Data Import**: Loaders holding valid handles execute concurrent imports safely.
 3. **Graceful Release**: When an import completes, Loader drains its workers and releases its handle. When the last owner releases,
    graph mode automatically returns to `NONE`.
-4. **Failure Recovery**: If abnormal exit (e.g. `kill -9`) leaves an orphaned owner, release it manually via the
-   [RESTful API release endpoint](/docs/clients/restful-api/graphs/#loading-ownership) or reopen/restart the graph.
+4. **Failure Recovery**: If abnormal exit (e.g. `kill -9`) leaves an orphaned owner, stop and drain all related imports and graph writes,
+   then perform administrator recovery via the [RESTful API recovery endpoint](/docs/clients/restful-api/graphs/#loading-ownership) or
+   restart the Server. Manual `release` applies only when the caller still holds its token (e.g. a direct REST client).
 {.steps}
 
 > [!NOTE]
@@ -1019,7 +1023,8 @@ graph TD
 > - **Restore and Graph Source Imports**: Retain the `RESTORING` flow without ownership probes or automatic resets. After a restore import completes,
 >   manually reset graph mode to `NONE` before starting ordinary imports.
 > - **Scope & Lifecycle**: Ownership is bound to the target Server instance without cross-node synchronization or automatic lease expiry.
->   For programmatic integrations, invoke `HugeGraphLoader.shutdown()` to ensure proper cleanup.
+>   For embedded programmatic integrations, callers must invoke `HugeGraphLoader.shutdown()` to attempt a single graceful release. If release
+>   fails, the handle is not retried, the owner remains active on the Server, and the administrator recovery step above is required.
 
 ### 4 Complete example
 

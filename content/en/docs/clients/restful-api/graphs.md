@@ -664,7 +664,8 @@ PUT http://localhost:8080/graphspaces/DEFAULT/graphs/hugegraph/graph_read_mode
 
 #### 6.3.5 LOADING ownership {#loading-ownership}
 
-Starting with HugeGraph 1.8.0, the Server provides the protocol 1 endpoints for LOADING ownership;
+Starting with HugeGraph 1.8.0, the Server provides the protocol 1 endpoints for LOADING ownership
+(requires unreleased Server PR #3331 and Client/Loader PR #815, which are not merged into `master` yet);
 Loader integration requires a matching 1.8.0 or newer client.
 Released packages and earlier 1.8 builds lack this protocol. Support for the `LOADING` enum alone does not imply support for it.
 With authentication enabled, both endpoints use the mode setter's permissions: graph-space management (`space`) or graph ownership, with STATUS write
@@ -674,13 +675,14 @@ authorization. Server binds the handle to the authenticated principal; a token g
 GET http://localhost:8080/graphspaces/DEFAULT/graphs/hugegraph/mode/owners
 ```
 
-The `200` capability response contains the graph-instance UUID and current nonnegative epoch:
+The `200` capability response contains the graph-instance UUID, current nonnegative epoch, and state revision:
 
 ```json
 {
     "protocol": 1,
     "instance": "<instance UUID>",
-    "epoch": 0
+    "epoch": 0,
+    "revision": 0
 }
 ```
 
@@ -706,6 +708,28 @@ with a fresh GET for `instance` and `epoch` and generate a new token.
 Release with `action: "release"` and the same handle; its response has `state: "released"` and the effective graph mode. Calling release before acquire is
 recorded and causes a subsequent acquire with that handle to return `released`.
 Keep one handle for retries; Server checks its principal, instance and epoch. A released handle cannot acquire again.
+
+To clear orphaned handles after an abnormal exit (e.g. `kill -9`), an administrator can execute an explicit recovery request:
+
+```text
+PUT http://localhost:8080/graphspaces/DEFAULT/graphs/hugegraph/mode/owners
+```
+
+```json
+{
+    "action": "recover",
+    "instance": "<instance UUID>",
+    "epoch": 0,
+    "revision": 0,
+    "confirm": "I'm sure all imports have stopped"
+}
+```
+
+Administrator recovery requires the global administrator role (`admin`). Callers must supply the current `revision`, `instance`, and `epoch`
+obtained from `GET /mode/owners`, plus the confirmation string `confirm: "I'm sure all imports have stopped"`.
+If the provided `revision` does not match the Server's current state, the request is rejected with HTTP `409 Conflict`.
+On success, the Server clears all active owners, resets graph mode to `NONE`, and increments the epoch, returning HTTP `200` with
+`state: "recovered"` and `mode: "NONE"`.
 
 The first owner requires `NONE`. Other owners share owner-managed `LOADING`; the last release restores `NONE`.
 Manually set `LOADING`, `RESTORING` and `MERGING` are not adopted. While owners are active, the legacy enum PUT rejects mode changes.
