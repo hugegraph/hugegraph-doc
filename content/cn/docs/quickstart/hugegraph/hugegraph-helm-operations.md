@@ -37,7 +37,8 @@ Server 等待存储的默认上限为 300 秒，可以用 `server.storageWaitTim
 ### Helm test 检查范围 {#helm-test-coverage}
 
 `helm test` 逐 Server Pod 检查 `DEFAULT-hugegraph` 绑定，并要求当前可见关联索引处于 `CREATED` 状态。
-请在索引任务结束后执行；测试会在 `server.testTimeoutSeconds` 内重试短暂的构建状态。
+请在索引任务结束后执行；hook 会在内部的 150 秒窗口内重试短暂的构建状态。
+Helm 的 `--timeout` 不会修改这个内部窗口。
 它按 ID 读取索引，不刷新全量索引缓存；不证明索引查询结果或完整 schema 一致性。
 对已有数据，可在 Helm 升级时用 `--set-file server.testGremlin=assertions.groovy` 添加逐 Pod 的只读业务断言。
 脚本必须用 `assert` 或抛异常表示结果不符，仅返回 `false` 不会让请求失败。
@@ -58,6 +59,9 @@ PD_SECRET=$(kubectl -n hugegraph get secret hugegraph-pd-auth \
   -o jsonpath='{.data.secret-key}' | base64 --decode)
 curl --user "hg:${PD_SECRET}" "http://<pd-rest-address>:8620/v1/stores"
 ```
+
+以上 HTTP 示例适用于可信内网。其他访问路径可使用 HTTPS 网关，或按需执行
+`kubectl -n hugegraph port-forward service/hugegraph-pd-client 8620:8620`，再访问 `http://127.0.0.1:8620`。
 
 使用 `pd.auth.existingSecret` 或自定义 `pd.auth.key` 时读取实际 Secret 和 key，不使用 Server 管理员密码。
 变量式示例避免将密码字面值写入 shell 历史，但展开后的凭据可能短暂出现在进程参数中。

@@ -38,7 +38,8 @@ No local Helm rendering verifies live cluster reachability, volumes or JVM capac
 ### Helm test coverage
 
 `helm test` checks `DEFAULT-hugegraph` binding and requires visible associated indexes to be in `CREATED` state on each Server Pod.
-Run it after index jobs finish; the test retries temporary construction states within `server.testTimeoutSeconds`.
+Run it after index jobs finish; the hook retries temporary construction states within its 150-second internal window.
+Helm's `--timeout` does not change this internal window.
 It reads indexes by ID without refreshing the full index cache; it does not prove index query results or complete schema consistency.
 For existing data, use `--set-file server.testGremlin=assertions.groovy` during Helm upgrade to add read-only business assertions on every Pod.
 The script must use `assert` or throw on unexpected results; returning `false` alone does not fail the request.
@@ -61,6 +62,9 @@ PD_SECRET=$(kubectl -n hugegraph get secret hugegraph-pd-auth \
   -o jsonpath='{.data.secret-key}' | base64 --decode)
 curl --user "hg:${PD_SECRET}" "http://<pd-rest-address>:8620/v1/stores"
 ```
+
+The HTTP example assumes a trusted internal network. For other access paths, use an HTTPS gateway or optionally forward the PD Service:
+`kubectl -n hugegraph port-forward service/hugegraph-pd-client 8620:8620`, then query `http://127.0.0.1:8620`.
 
 With `pd.auth.existingSecret` or a custom `pd.auth.key`, read the actual Secret and key. Do not use the Server admin password.
 Variables avoid literal passwords in shell history, but expanded credentials can briefly appear in process arguments.
