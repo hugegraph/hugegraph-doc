@@ -161,10 +161,10 @@ See [docker/README.md](https://github.com/apache/hugegraph/blob/master/docker/RE
 For a PD-backed Server, the Helm chart exposes `server.serviceId` and `server.graphSpace`.
 Both default to `DEFAULT`, which preserves the existing `server.service_id` and `server.graphspace`
 values in `conf/rest-server.properties`. A non-default chart value injects `HG_SERVER_SERVICE_ID`
-or `HG_SERVER_GRAPHSPACE` into the Server container. Use a Helm chart and Server image from the same
-version supporting service identity.
-Copying these values into an older chart or image does not add that support; do not use this example
-with older chart/image versions without these features.
+or `HG_SERVER_GRAPHSPACE` into the Server container.
+These service identity chart settings (`server.serviceId`, `server.graphSpace`, and `server.testGraphAlias`)
+require Helm chart and Server image support introduced in apache/hugegraph#3322; no released chart or image
+supports these settings yet. Do not use this example with older chart or image versions lacking these features.
 Non-empty service IDs supplied through `HG_SERVER_SERVICE_ID`, `SERVICE_ID`, or `server.serviceId`
 must use printable ASCII; spaces and backslashes are supported, while deployment checks reject
 non-ASCII and control characters. This entrypoint restriction does not change Core Service naming

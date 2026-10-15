@@ -223,7 +223,7 @@ Unlike PD and Store, Server has no mandatory entrypoint variables: only set valu
 | `PD_AUTH_PASSWORD` | Empty | PD REST Basic password; must match `HG_PD_AUTH_SECRET_KEY` when PD REST authentication is enabled |
 | `WAIT_PARTITION_TIMEOUT_S` | `120` | Partition polling timeout; also bounds the final diagnostic in builds with the fix described below |
 
-Images containing the authentication property fixes preserve spaces, backslashes and Unicode in explicit
+Master builds that include apache/hugegraph#3327 and #3316 preserve spaces, backslashes and Unicode in explicit
 signing keys. Use the same key on every Server replica. When upgrading from an image that misread such a key, explicitly supply the intended
 `HG_SERVER_AUTH_TOKEN_SECRET` again; retaining the old configuration also retains its misread key. If the active key changes, sign in again to
 obtain new tokens. The 1.7.0 image limitation above still applies.
@@ -237,11 +237,13 @@ existing data and arrange account recovery before upgrading.
 
 `wait-storage.sh` waits up to 300 seconds for an `Up` Store. This duration is hardcoded and cannot be changed through environment variables.
 
-In repaired Server builds, HStore startup gives partition polling
+In master builds including apache/hugegraph#3327, HStore startup gives partition polling
 and the final `/v1/partitions` diagnostic separate `WAIT_PARTITION_TIMEOUT_S` budgets. Earlier builds bound polling only; the final diagnostic
 request has no timeout. With the default value, a stalled final response times out after 120 seconds; setting the value to `0` disables
-GNU timeout's limit. JVM exit observation may wait until that diagnostic completes or reaches its timeout; signal-triggered shutdown remains
-interruptible.
+GNU timeout's limit.
+The entrypoint waits for `wait-partition.sh` before waiting for the Java launcher. If Java exits while partition polling is still waiting,
+that poll can consume its full timeout before the entrypoint observes the exit. If polling succeeds, the diagnostic step can then consume
+a second full timeout before observation finishes; signal-triggered shutdown remains interruptible.
 
 `HG_SERVER_INIT_STORE_ENABLED` accepts only the case-insensitive boolean values recognized by `HugeConfig`: `y`, `t`, `yes`, `on`, `true`, `n`, `f`, `no`, `off`, `false`. Other values, including `0` and `1`, terminate the entrypoint.
 
