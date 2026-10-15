@@ -37,7 +37,8 @@ No local Helm rendering verifies live cluster reachability, volumes or JVM capac
 
 ### Helm test coverage
 
-`helm test` checks `DEFAULT-hugegraph` binding and rejects visible associated indexes in `INVALID` state on each Server Pod.
+`helm test` checks `DEFAULT-hugegraph` binding and requires visible associated indexes to be in `CREATED` state on each Server Pod.
+Run it after index jobs finish; the test retries temporary construction states within `server.testTimeoutSeconds`.
 It reads indexes by ID without refreshing the full index cache; it does not prove index query results or complete schema consistency.
 For existing data, use `--set-file server.testGremlin=assertions.groovy` during Helm upgrade to add read-only business assertions on every Pod.
 The script must use `assert` or throw on unexpected results; returning `false` alone does not fail the request.
