@@ -659,7 +659,7 @@ PUT http://localhost:8080/graphspaces/DEFAULT/graphs/hugegraph/graph_read_mode
 
 #### 6.3.5 LOADING owner 管理 {#loading-ownership}
 
-自 HugeGraph 1.8.0 起提供 owner 协议 1 接口（需配合尚未合并至 `master` 的 Server PR #3331 与 Toolchain PR #815）；
+自 HugeGraph 1.8.0 起提供 owner 协议 1 接口；
 Loader 需使用配套的 1.8.0 及以上版本客户端。旧版本发行包不包含该协议；仅支持 `LOADING` 枚举不能说明支持这些接口。
 启用鉴权时，两个接口沿用模式设置接口的权限要求，即图空间管理权限（`space`）或该图所有者权限，并校验 STATUS 写权限。
 Server 将句柄绑定到实际鉴权用户；token 本身不赋予权限。申请、释放和重试必须保持相同身份。

@@ -28,8 +28,8 @@ HugeGraph-Loader 是 HugeGraph 的数据导入组件，能够将多种数据源�
 > 
 > **测试指南**：如需在本地运行 Loader 测试，请参考 [工具链本地测试指南](/cn/docs/guides/toolchain-local-test)
 
-> **并发导入保护方案**：自 1.8.0 起，普通导入支持在同一 Server 实例上获取 owner 保护
-> （需配合尚未合并至 `master` 的 Server PR #3331 与 Toolchain PR #815）。旧版 Server 保持下文说明的原有导入行为。
+> **并发导入保护方案**：自 1.8.0 起，普通导入支持在同一 Server 实例上获取 owner 保护。
+> 旧版 Server 保持下文说明的原有导入行为。
 
 ### 2 获取 HugeGraph-Loader
 
@@ -987,7 +987,7 @@ bin/hugegraph-loader.sh \
 
 #### 3.4.6 并发导入与 LOADING owner {#loading-ownership}
 
-自 1.8.0 版本起，Loader 支持并发导入模式所有权保护协议（需配合尚未合并至 `master` 的 Server PR #3331 与 Toolchain PR #815）。
+自 1.8.0 版本起，Loader 支持并发导入模式所有权保护协议。
 
 ```mermaid
 graph TD

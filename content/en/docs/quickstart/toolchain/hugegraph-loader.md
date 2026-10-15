@@ -27,8 +27,7 @@ It will be explained in detail below.
 
 > Note: HugeGraph-Loader requires HugeGraph Server service, please refer to [HugeGraph-Server Quick Start](/docs/quickstart/hugegraph/hugegraph-server) to download and start Server
 
-> **Concurrency protection:** starting with HugeGraph 1.8.0, ordinary imports acquire same-Server ownership protection
-> (requires unreleased Server PR #3331 and Client/Loader PR #815, which are not merged into `master` yet).
+> **Concurrency protection:** starting with HugeGraph 1.8.0, ordinary imports acquire same-Server ownership protection.
 > Older Servers retain the legacy import behavior described below.
 
 > **Testing Guide**: For running HugeGraph-Loader tests locally, please refer to [HugeGraph Toolchain Local Testing Guide](/docs/guides/toolchain-local-test)
@@ -992,8 +991,7 @@ Expected result: two vertices and zero edges imported. This example uses dedicat
 
 #### 3.4.6 Concurrent imports and LOADING ownership {#loading-ownership}
 
-Starting with HugeGraph 1.8.0, Loader supports concurrent import protection via the LOADING ownership protocol
-(requires unreleased Server PR #3331 and Client/Loader PR #815, which are not merged into `master` yet).
+Starting with HugeGraph 1.8.0, Loader supports concurrent import protection via the LOADING ownership protocol.
 
 ```mermaid
 graph TD
