@@ -1006,7 +1006,7 @@ graph TD
 
 1. **Probe and Acquire**: Loader probes `/mode/owners`. The first Loader obtains an ownership handle (`instance/epoch/token`),
    transitioning graph mode from `NONE` to `LOADING`; concurrent Loaders can join.
-2. **Data Import**: Loaders holding valid handles execute concurrent imports safely.
+2. **Data Import**: Loaders holding valid handles execute concurrent imports while preserving `LOADING` mode.
 3. **Graceful Release**: When an import completes, Loader drains its workers and releases its handle. When the last owner releases,
    graph mode automatically returns to `NONE`.
 4. **Failure Recovery**: If abnormal exit (e.g. `kill -9`) leaves an orphaned owner, stop and drain all related imports and graph writes,
@@ -1016,13 +1016,14 @@ graph TD
 
 > [!NOTE]
 > **Compatibility and Operational Notes**
-> - **Legacy Compatibility**: During ordinary imports, only a `404` status on `/mode/owners` falls back to the legacy enum `LOADING`/`NONE` flow
->   (maintains compatibility with Server 1.7, without multi-loader protection). Network or permission errors do not trigger fallback.
+> - **Legacy Compatibility**: During ordinary imports, only an unsupported-route `404` status on `/mode/owners` falls back to the legacy enum
+>   `LOADING`/`NONE` flow (maintains compatibility with Server 1.7, without multi-loader protection).
+>   Network or permission errors, or a `404` for a missing graph, do not trigger fallback.
 > - **Restore and Graph Source Imports**: Retain the `RESTORING` flow without ownership probes or automatic resets. After a restore import completes,
 >   manually reset graph mode to `NONE` before starting ordinary imports.
 > - **Scope & Lifecycle**: Ownership is bound to the target Server instance without cross-node synchronization or automatic lease expiry.
 >   For embedded programmatic integrations, callers must invoke `HugeGraphLoader.shutdown()` to attempt a single graceful release. If release
->   fails, the handle is not retried, the owner remains active on the Server, and the administrator recovery step above is required.
+>   fails, the handle is not retried; the owner may remain active on the Server, and the administrator recovery step above may be required.
 
 ### 4 Complete example
 
