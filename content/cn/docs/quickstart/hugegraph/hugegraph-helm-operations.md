@@ -36,6 +36,9 @@ Server 等待存储的默认上限为 300 秒，可以用 `server.storageWaitTim
 
 ### Helm test 检查范围 {#helm-test-coverage}
 
+索引状态检查和 `server.testGremlin` 需要使用[更新后的 Helm test chart](https://github.com/apache/hugegraph/pull/3349)。
+旧 chart 的测试通过不代表索引已处于 `CREATED` 状态。
+
 `helm test` 逐 Server Pod 检查图绑定（默认检查 `DEFAULT-hugegraph`，可通过 `server.testGraphAlias` 指定图别名），并要求当前可见关联索引处于 `CREATED` 状态。
 请在索引创建／重建任务结束后执行，检查期间不要并发修改 schema。
 在 HStore 上，读取尚未完成的索引可能将临时状态缓存到其他 Pod；重试不会刷新该状态。
@@ -45,7 +48,7 @@ Helm 的 `--timeout` 不会修改这个窗口。
 它按 ID 读取索引，不刷新全量索引缓存；不证明索引查询结果或完整 schema 一致性。
 对已有数据，可在 Helm 升级时用 `--set-file server.testGremlin=assertions.groovy` 添加逐 Pod 的只读业务断言。
 脚本必须用 `assert` 或抛异常表示结果不符，仅返回 `false` 不会让请求失败。
-[业务查询断言](https://github.com/apache/hugegraph/blob/master/helm/hugegraph/docs/operations.md#business-query-assertions)
+[业务查询断言](https://github.com/apache/hugegraph/blob/8f1be623850542b911816ad876f4d7f7efe611c2/helm/hugegraph/docs/operations.md#business-query-assertions)
 给出了示例与检查边界。未配置脚本时明确显示业务断言已跳过，默认 hook 不创建 schema 或数据。
 自定义脚本使用 hook 的 Server 凭据执行（开启鉴权时为 `admin`），不强制只读；请提供可信的只读断言。
 

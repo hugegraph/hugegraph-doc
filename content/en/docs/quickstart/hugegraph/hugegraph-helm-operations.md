@@ -37,6 +37,9 @@ No local Helm rendering verifies live cluster reachability, volumes or JVM capac
 
 ### Helm test coverage
 
+Index-state validation and `server.testGremlin` require the [updated Helm test chart](https://github.com/apache/hugegraph/pull/3349).
+A passing test on older charts does not establish that indexes are `CREATED`.
+
 `helm test` validates graph binding on every Server Pod (`DEFAULT-hugegraph` by default, or configured via `server.testGraphAlias`), and requires
 currently visible associated indexes to be in `CREATED` state.
 Run it after index creation/rebuild jobs finish, with no schema changes during the test.
@@ -47,7 +50,7 @@ Helm's `--timeout` does not change that window.
 It reads indexes by ID without refreshing the full index cache; it does not prove index query results or complete schema consistency.
 For existing data, use `--set-file server.testGremlin=assertions.groovy` during Helm upgrade to add read-only business assertions on every Pod.
 The script must use `assert` or throw on unexpected results; returning `false` alone does not fail the request.
-See [business query assertions](https://github.com/apache/hugegraph/blob/master/helm/hugegraph/docs/operations.md#business-query-assertions)
+See [business query assertions](https://github.com/apache/hugegraph/blob/8f1be623850542b911816ad876f4d7f7efe611c2/helm/hugegraph/docs/operations.md#business-query-assertions)
 for an example and coverage limits. Without a script, business assertions are reported as skipped.
 The default hook creates no schema or data. Custom scripts use the hook's Server credential (`admin` with auth enabled);
 read-only execution is not enforced, so supply trusted, read-only assertions.
