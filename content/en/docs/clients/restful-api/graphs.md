@@ -684,7 +684,7 @@ PUT http://localhost:8080/graphspaces/DEFAULT/graphs/hugegraph/graph_read_mode
 Starting with HugeGraph 1.8.0, the Server provides the protocol 1 endpoints for LOADING ownership
 (requires a Server whose `GET .../mode/owners` returns `protocol: 1` and a matching Loader; current `master` does not include it yet);
 Loader integration requires a matching 1.8.0 or newer client.
-Released packages and current `master` builds lack this protocol. Support for the `LOADING` enum alone does not imply support for it.
+Released packages, earlier 1.8 builds, and current `master` builds lack this protocol. Support for the `LOADING` enum alone does not imply support for it.
 With authentication enabled, both endpoints use the mode setter's permissions: graph-space management (`space`) or graph ownership, with STATUS write
 authorization. Server binds the handle to the authenticated principal; a token grants no permission. Keep the same identity for acquire, release and retries.
 
@@ -720,8 +720,8 @@ PUT http://localhost:8080/graphspaces/DEFAULT/graphs/hugegraph/mode/owners
 ```
 
 An acquire succeeded only when the response returns `200` with `state: "active"`, echoing `protocol`, `instance`, `epoch`, `token`, and `mode: "LOADING"`.
-A `200` response with `state: "released"` means the handle is finished or was preemptively released; it does not grant ownership. In that case, start again
-with a fresh GET for `instance` and `epoch` and generate a new token.
+A `200` response with `state: "released"` means the handle is finished or was preemptively released; it does not grant ownership. In that case, stop and drain
+that import attempt, then start a new attempt with a fresh GET for `instance` and `epoch` and generate a new token.
 Release with `action: "release"` and the same handle; its response has `state: "released"` and the effective graph mode. Calling release before acquire is
 recorded and causes a subsequent acquire with that handle to return `released`.
 Keep one handle for retries; Server checks its principal, instance and epoch. A released handle cannot acquire again.

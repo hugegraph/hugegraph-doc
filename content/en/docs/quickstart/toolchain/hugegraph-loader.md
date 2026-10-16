@@ -1023,6 +1023,7 @@ graph TD
 >   Network or permission errors, or a `404` for a missing graph, do not trigger fallback.
 > - **Restore and Graph Source Imports**: Retain the `RESTORING` flow without ownership probes or automatic resets. After a restore import completes,
 >   manually reset graph mode to `NONE` before starting ordinary imports.
+>   Do not run restore, graph-source, Spark connector, or older Loader imports while owned imports are active.
 > - **Scope & Lifecycle**: Ownership is bound to the target Server instance without cross-node synchronization or automatic lease expiry.
 >   For embedded programmatic integrations, callers must invoke `HugeGraphLoader.shutdown()` to attempt a single graceful release. If release
 >   fails, the handle is not retried; the owner may remain active on the Server, and the administrator recovery step above may be required.
