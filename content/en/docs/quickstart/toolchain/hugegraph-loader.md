@@ -27,7 +27,8 @@ It will be explained in detail below.
 
 > Note: HugeGraph-Loader requires HugeGraph Server service, please refer to [HugeGraph-Server Quick Start](/docs/quickstart/hugegraph/hugegraph-server) to download and start Server
 
-> **Concurrency protection:** starting with HugeGraph 1.8.0, ordinary imports acquire same-Server ownership protection.
+> **Concurrency protection:** starting with HugeGraph 1.8.0, ordinary imports acquire same-Server ownership protection
+> (requires a Server whose `GET .../mode/owners` returns `protocol: 1` and a matching Loader; current `master` does not include it yet).
 > Older Servers retain the legacy import behavior described below.
 
 > **Testing Guide**: For running HugeGraph-Loader tests locally, please refer to [HugeGraph Toolchain Local Testing Guide](/docs/guides/toolchain-local-test)
@@ -991,7 +992,8 @@ Expected result: two vertices and zero edges imported. This example uses dedicat
 
 #### 3.4.6 Concurrent imports and LOADING ownership {#loading-ownership}
 
-Starting with HugeGraph 1.8.0, Loader supports concurrent import protection via the LOADING ownership protocol.
+Starting with HugeGraph 1.8.0, Loader supports concurrent import protection via the LOADING ownership protocol
+(requires a Server whose `GET .../mode/owners` returns `protocol: 1` and a matching Loader; current `master` does not include it yet).
 
 ```mermaid
 graph TD
@@ -999,7 +1001,7 @@ graph TD
     B -->|Concurrent Loaders join| B
     B -->|Loader finishes & releases| B
     B -->|Last Loader releases| C["Restores to NONE"]
-    B -.->|Abnormal exit / kill -9| D["Manual Recovery / Restart"]
+    B -.->|Abnormal exit / kill -9| D["Manual Release / Recovery / Restart"]
     D -.->|"Last owner released, or recover/restart"| A
     D -.->|"Other owners still active"| B
 ```

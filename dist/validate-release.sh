@@ -709,7 +709,7 @@ stop_services() {
 
 client_classpath() {
     # Match ordinary Loader: its fat JAR relocates okhttp3 and must not mix with the regular SDK.
-    find -L "$1/lib" -maxdepth 1 -type f -name '*.jar' ! -name 'apache-hugegraph-loader-*-shaded.jar' \
+    find -L "$1/lib" -name '*.jar' ! -name 'apache-hugegraph-loader-*-shaded.jar' \
         | sort | paste -sd: -
 }
 
