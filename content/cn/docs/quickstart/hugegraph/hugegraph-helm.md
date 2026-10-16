@@ -5,7 +5,7 @@ weight: 4
 search_keywords: [HugeGraph Helm, Kubernetes, K8s, NodePort, Hubble, 内网部署, OCI, GHCR, Artifact Hub]
 ---
 
-本文适用于 HugeGraph **1.8.0 及以后版本**，需要支持 OCI 的 Helm **3.8+** 和 Kubernetes (K8s) **1.23+**。
+本文适用于 HugeGraph **1.8.0 及以后版本**，需要支持 OCI 的 Helm **3.10+** 和 Kubernetes (K8s) **1.23+**。
 可从 GHCR 或 Docker Hub 安装 `hugegraph-helm`。Chart 与 HugeGraph 服务分别维护版本，例如 `0.2.x` 的 Chart 可以部署 `1.8.x` 的服务。
 
 > [!WARNING]
@@ -116,8 +116,13 @@ NodePort 省略或设为 `0` 时自动分配，固定端口由 Kubernetes 根据
 
 默认 `server.serviceId` 与 `server.graphSpace` 均为 `DEFAULT`。如需将 Server 注册到指定的业务服务名或图空间，可通过 values 指定：
 
+仅修改已有部署的配置时，保留当前 Chart 版本和 values。用 `helm list` 查看版本，替换下面的版本占位符：
+
 ```bash
-helm upgrade --install hugegraph "$CHART" --devel -n hugegraph \
+helm list -n hugegraph
+CHART=oci://ghcr.io/hugegraph/hugegraph-helm
+CHART_VERSION='<已安装的Chart版本>'
+helm upgrade hugegraph "$CHART" --version "$CHART_VERSION" -n hugegraph --reuse-values \
   --set-string server.serviceId=analytics \
   --set-string server.graphSpace=team_a \
   --set-string server.testGraphAlias=team_a-demo
@@ -136,9 +141,19 @@ GitOps 凭据、仅 API 部署以及无域名的 HTTP Ingress。
 等待 PD 的 init container 复用 Store 镜像，Helm test 复用 Server 镜像。这两个镜像已包含 `curl`，无需额外 curl 镜像或启动时安装软件。
 自定义镜像可以继续使用显式 `store.waitImage` 和 `server.waitImage` 覆盖。
 
+### 存储配置
+
+`storageClassName` 为空时继承集群默认 StorageClass，`"-"` 表示显式不使用 StorageClass。
+local PV 需要预建宿主机目录、匹配容量、`nodeAffinity` 和 `kubernetes.io/no-provisioner` StorageClass。
+`WaitForFirstConsumer` 根据 Pod 调度约束绑定，创建资源前请查看七个卷的完整例子。
+新建临时实例可以设置 `persistence.enabled=false` 使用 `emptyDir`，组件存储开关优先。
+PVC 失败不会自动降级为临时存储，已经初始化的 PD/Store 切换存储模式会被拒绝。
+
 ### 离线安装和私库
 
 先选择最新版本，再按该版本下载 Chart，将 `.tgz` 搬入内网。可以直接安装，也可以接入已有的 OCI 或 HTTP 私库。
+内网安装需通过 `--set global.imageRegistry=...` 覆盖镜像私库，
+参见 [values-internal-registry.yaml](https://github.com/apache/hugegraph/blob/master/helm/hugegraph/examples/values-internal-registry.yaml)。
 
 ```bash
 CHART=oci://ghcr.io/hugegraph/hugegraph-helm
@@ -147,7 +162,9 @@ helm pull "$CHART" --version "$CHART_VERSION"
 ```
 
 ```bash {tab="直接安装"}
+# 内网环境需覆盖镜像私库（或使用 -f values-internal-registry.yaml）
 helm install hugegraph "./hugegraph-helm-${CHART_VERSION}.tgz" -n hugegraph \
+  --set global.imageRegistry=registry.example.com \
   --create-namespace --wait --timeout 15m
 ```
 
@@ -155,7 +172,9 @@ helm install hugegraph "./hugegraph-helm-${CHART_VERSION}.tgz" -n hugegraph \
 helm registry login registry.example.com
 helm push "./hugegraph-helm-${CHART_VERSION}.tgz" oci://registry.example.com/charts
 helm install hugegraph oci://registry.example.com/charts/hugegraph-helm \
-  --version "$CHART_VERSION" -n hugegraph --create-namespace --wait --timeout 15m
+  --version "$CHART_VERSION" -n hugegraph \
+  --set global.imageRegistry=registry.example.com \
+  --create-namespace --wait --timeout 15m
 ```
 
 ```bash {tab="HTTP 私库"}
@@ -164,16 +183,12 @@ helm install hugegraph oci://registry.example.com/charts/hugegraph-helm \
 helm repo add hugegraph-internal https://charts.example.com
 helm repo update hugegraph-internal
 helm install hugegraph hugegraph-internal/hugegraph-helm \
-  --version "$CHART_VERSION" -n hugegraph --create-namespace --wait --timeout 15m
+  --version "$CHART_VERSION" -n hugegraph \
+  --set global.imageRegistry=registry.example.com \
+  --create-namespace --wait --timeout 15m
 ```
 
 私库地址请替换为实际地址。Chart 包不包含容器镜像；完整离线部署还需搬运配置引用的所有容器镜像，并覆盖镜像地址。
-
-`storageClassName` 为空时继承集群默认 StorageClass，`"-"` 表示显式不使用 StorageClass。
-local PV 需要预建宿主机目录、匹配容量、`nodeAffinity` 和 `kubernetes.io/no-provisioner` StorageClass。
-`WaitForFirstConsumer` 根据 Pod 调度约束绑定，创建资源前请查看七个卷的完整例子。
-新建临时实例可以设置 `persistence.enabled=false` 使用 `emptyDir`，组件存储开关优先。
-PVC 失败不会自动降级为临时存储，已经初始化的 PD/Store 切换存储模式会被拒绝。
 
 ## 4 鉴权和 Secret
 

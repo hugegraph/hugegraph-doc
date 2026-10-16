@@ -5,7 +5,7 @@ weight: 4
 search_keywords: [HugeGraph Helm, Kubernetes, K8s, NodePort, Hubble, OCI, GHCR, Artifact Hub]
 ---
 
-This guide covers HugeGraph **1.8.0 and later**, using Helm **3.8+** with OCI support and Kubernetes (K8s) **1.23+**.
+This guide covers HugeGraph **1.8.0 and later**, using Helm **3.10+** with OCI support and Kubernetes (K8s) **1.23+**.
 Install `hugegraph-helm` from GHCR or Docker Hub. Chart and HugeGraph versions are maintained separately:
 for example, a `0.2.x` Chart can deploy a `1.8.x` service.
 
@@ -120,8 +120,14 @@ the chart does not force `30000–32767`. Legacy HTTP acknowledgement fields rem
 
 Both `server.serviceId` and `server.graphSpace` default to `DEFAULT`. To register the Server with a specific service name or graph space in PD:
 
+For configuration-only changes, keep the installed Chart version and values.
+Find the version with `helm list` and replace the placeholder below:
+
 ```bash
-helm upgrade --install hugegraph "$CHART" --devel -n hugegraph \
+helm list -n hugegraph
+CHART=oci://ghcr.io/hugegraph/hugegraph-helm
+CHART_VERSION='<installed-chart-version>'
+helm upgrade hugegraph "$CHART" --version "$CHART_VERSION" -n hugegraph --reuse-values \
   --set-string server.serviceId=analytics \
   --set-string server.graphSpace=team_a \
   --set-string server.testGraphAlias=team_a-demo
@@ -140,10 +146,20 @@ The default mirror inventory is only `hugegraph/pd`, `hugegraph/store`, `hugegra
 Store's PD wait init container and the Helm test reuse Store and Server images respectively, which already contain `curl`.
 No separate curl image or runtime package installation is required. Explicit `store.waitImage` / `server.waitImage` overrides remain supported.
 
+### Storage configuration
+
+For storage, empty `storageClassName` inherits the cluster default, while `"-"` explicitly selects no StorageClass.
+Local PVs require prepared host directories, matching capacities, `nodeAffinity` and a `kubernetes.io/no-provisioner` StorageClass;
+`WaitForFirstConsumer` binds with the Pod's scheduling constraints. See the complete seven-volume example before creating resources.
+For a new temporary installation, set `persistence.enabled=false` to use `emptyDir`; component storage flags override it.
+The chart never replaces a failed PVC with temporary storage and rejects PD/Store storage-mode changes on initialized releases.
+
 ### Offline installation and internal repositories
 
 Select the latest version, download that Chart and move the `.tgz` into your network.
 Install it directly or upload it to an existing OCI or HTTP repository.
+In air-gapped environments, override the image registry with `--set global.imageRegistry=...`,
+see [values-internal-registry.yaml](https://github.com/apache/hugegraph/blob/master/helm/hugegraph/examples/values-internal-registry.yaml).
 
 ```bash
 CHART=oci://ghcr.io/hugegraph/hugegraph-helm
@@ -152,7 +168,9 @@ helm pull "$CHART" --version "$CHART_VERSION"
 ```
 
 ```bash {tab="Install archive"}
+# Override the image registry in air-gapped clusters (or use -f values-internal-registry.yaml)
 helm install hugegraph "./hugegraph-helm-${CHART_VERSION}.tgz" -n hugegraph \
+  --set global.imageRegistry=registry.example.com \
   --create-namespace --wait --timeout 15m
 ```
 
@@ -160,7 +178,9 @@ helm install hugegraph "./hugegraph-helm-${CHART_VERSION}.tgz" -n hugegraph \
 helm registry login registry.example.com
 helm push "./hugegraph-helm-${CHART_VERSION}.tgz" oci://registry.example.com/charts
 helm install hugegraph oci://registry.example.com/charts/hugegraph-helm \
-  --version "$CHART_VERSION" -n hugegraph --create-namespace --wait --timeout 15m
+  --version "$CHART_VERSION" -n hugegraph \
+  --set global.imageRegistry=registry.example.com \
+  --create-namespace --wait --timeout 15m
 ```
 
 ```bash {tab="Internal HTTP"}
@@ -169,17 +189,13 @@ helm install hugegraph oci://registry.example.com/charts/hugegraph-helm \
 helm repo add hugegraph-internal https://charts.example.com
 helm repo update hugegraph-internal
 helm install hugegraph hugegraph-internal/hugegraph-helm \
-  --version "$CHART_VERSION" -n hugegraph --create-namespace --wait --timeout 15m
+  --version "$CHART_VERSION" -n hugegraph \
+  --set global.imageRegistry=registry.example.com \
+  --create-namespace --wait --timeout 15m
 ```
 
 Replace the example registry addresses with your own.
 The archive contains no container images: mirror all configured container images separately, then override their addresses.
-
-For storage, empty `storageClassName` inherits the cluster default, while `"-"` explicitly selects no StorageClass.
-Local PVs require prepared host directories, matching capacities, `nodeAffinity` and a `kubernetes.io/no-provisioner` StorageClass;
-`WaitForFirstConsumer` binds with the Pod's scheduling constraints. See the complete seven-volume example before creating resources.
-For a new temporary installation, set `persistence.enabled=false` to use `emptyDir`; component storage flags override it.
-The chart never replaces a failed PVC with temporary storage and rejects PD/Store storage-mode changes on initialized releases.
 
 ## 4 Authentication and secrets
 
@@ -211,7 +227,8 @@ helm upgrade hugegraph "$CHART" --devel -n hugegraph \
 helm test hugegraph -n hugegraph --logs --timeout 5m
 ```
 
-Existing explicit helper images also remain under `--reuse-values`; add `--set-string store.waitImage= --set-string server.waitImage=` to reuse component images.
+Existing explicit helper images also remain under `--reuse-values`;
+add `--set-string store.waitImage= --set-string server.waitImage=` to reuse component images.
 Adopt new defaults deliberately with `--reset-values` and a reviewed file retaining your image, credential, storage and topology settings.
 Do not treat PD membership, storage or credential changes as ordinary independent overrides; consult the lifecycle reference.
 
