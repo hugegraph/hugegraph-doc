@@ -250,8 +250,8 @@ yet, or registered as `Pending` because they are not in PD's `pd.initial-store-l
 ### 9 Legacy GraphID upgrade preflight
 
 HugeGraph-Store provides legacy GraphID upgrade preflight checks during bootstrap and upgrade processes.
-Released 1.7.0 and earlier Store builds do not contain this preflight guard.
-Use a Store build supporting this capability before relying on the refusal behavior below.
+Released 1.7.0 and current `master` builds do not contain this preflight guard yet (pending merge of the corresponding Store implementation);
+ensure you use a Store build containing this fix before relying on the refusal behavior below.
 
 These Store builds check existing graph-data column families before allocating a missing graph ID, first opening a cold
 partition DB during metadata bootstrap, starting its Raft state machine, or activating a staged snapshot. Before pruning, the first cold DB open checks
@@ -264,4 +264,4 @@ resuming writes or replay. Do not delete graph-to-ID mappings or assign all rese
 Store/Raft location metadata may already have been updated before the check, so the entire bootstrap is not read-only. The check performs no automatic
 migration or ownership repair; a complete 1.7 upgrade and recovery still require deployment-specific validation.
 
-See the [Store GraphID upgrade documentation](https://github.com/apache/hugegraph/blob/master/docs/store-graphid-upgrade.md) for details.
+See the [Store GraphID upgrade documentation](https://github.com/apache/hugegraph/blob/d9ff79f/docs/store-graphid-upgrade.md) for details.
