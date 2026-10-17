@@ -25,26 +25,27 @@ Metrics and permission APIs vary by version.
 Hubble still manages graph data through the **Server graph API**. In distributed mode, it discovers Servers through PD
 and collects cluster information from PD and Store. Hubble does not read or write graph data directly in Store.
 
-For the official Compose deployment, prepare `.env` in the main repository's `docker/` directory following its README, then generate the Hubble configuration:
+1. **Generate Hubble configuration.** Prepare `.env` in the main repository's `docker/` directory following the Docker README.
 
-```bash
-set -a
-. ./.env
-set +a
-./set-hubble-pd-password.sh hstore
-```
+   ```bash
+   set -a
+   . ./.env
+   set +a
+   ./set-hubble-pd-password.sh hstore
+   ```
 
-The script reads the loaded `HG_PD_AUTH_SECRET_KEY` and writes the PD operations password to the host file
-`docker/conf/hubble/hstore.local.properties`. Edit this generated file to customize connection or operations settings, preserving
-`operations.pd.password` so it matches PD's secret. Do not replace it with the tracked `.example` template. Compose mounts it read-only at
-`/hubble/conf/hugegraph-hubble.properties` inside the container; do not edit it there. Do not commit the generated file or `.env`.
-Running the script again overwrites the generated file, so reapply custom settings afterward.
+   The script reads the loaded `HG_PD_AUTH_SECRET_KEY` and writes the PD operations password to the host file
+   `docker/conf/hubble/hstore.local.properties`. Edit this generated file to customize connection or operations settings, preserving
+   `operations.pd.password` so it matches PD's secret. Do not replace it with the tracked `.example` template. Compose mounts it read-only at
+   `/hubble/conf/hugegraph-hubble.properties` inside the container; do not edit it there. Do not commit the generated file or `.env`.
+   Running the script again overwrites the generated file, so reapply custom settings afterward.
 
-Start the services from the same `docker/` directory and confirm Server registration and Store readiness:
+1. **Start the services.** Use the same `docker/` directory and confirm Server registration and Store readiness.
 
-```bash
-docker compose -f docker-compose-hstore.yml up -d --wait
-```
+   ```bash
+   docker compose -f docker-compose-hstore.yml up -d --wait
+   ```
+{.steps}
 
 For separately deployed services, follow the [PD deployment guide](/docs/quickstart/hugegraph/hugegraph-pd/) and
 [HStore deployment guide](/docs/quickstart/hugegraph/hugegraph-hstore/). A source or binary Hubble deployment instead uses the package's
@@ -89,15 +90,19 @@ The name cannot change after creation. The alias and description can change; ali
 Choose GraphSpace administrators from existing accounts.
 
 “Advanced deployment and resource limits” includes CPU and memory limits for graph query/write services and asynchronous compute tasks,
-plus the storage capacity limit. These are deployment and quota settings, not current usage or a promise to resize Docker containers when the form is saved.
-Defaults are 100 graphs, 64 CPU cores and 128 GB of memory for each of the graph and compute services, and 1000000 GB of storage.
-Keep the defaults for a container trial. Configure Kubernetes namespaces, Operator images, and algorithm images only for the corresponding deployment or
-compute use.
+plus the storage capacity limit. These deployment quotas neither report current usage nor resize existing containers.
+
+> [!DETAILS]- Advanced deployment defaults
+>
+> Defaults are 100 graphs, 64 CPU cores and 128 GB of memory for each of the graph and compute services, and 1000000 GB of storage.
+> Keep the defaults for a container trial. Configure Kubernetes namespaces, Operator images, and algorithm images only for the corresponding deployment
+> or compute use.
 
 Select a space before opening a graph. Check the current graph after switching spaces, especially when spaces contain identically named graphs.
 The list reflects account access. If a space is missing, check membership permissions before creating more graphs.
 
 ![GraphSpace creation and advanced resource limits](/docs/images/hubble/graphspace.jpg)
+{width="2048" height="984"}
 
 ### Reuse Schema templates
 
@@ -133,6 +138,7 @@ legacy custom roles on older Servers are not interchangeable with these presets.
 See [Server authentication and authorization](/docs/config/config-authentication/).
 
 ![GraphSpace members and access presets](/docs/images/hubble/members.jpg)
+{width="2048" height="984"}
 
 ## Locate problems through the cluster overview
 
@@ -146,8 +152,6 @@ Graphs may remain queryable when topology is available but some metrics are miss
 The UI distinguishes unsupported, unavailable, stale, and failed collections and includes observation times.
 An empty value is not zero, and an older value is not a current observation.
 
-![Cluster topology, node status, and capacity](/docs/images/hubble/cluster-overview.jpg)
-
 ### Read node details
 
 | Node | Main observations | Use |
@@ -156,7 +160,10 @@ An empty value is not zero, and an older value is not a current observation.
 | PD | Leader/Follower role, status, and runtime metrics supplied upstream | Check the metadata/scheduling entrypoint; do not infer a role when Leader information is absent. |
 | Store | Partition and Leader partition counts, system/disk metrics, Raft group and enabled group counts | Inspect storage nodes and replica service and compare distribution across nodes. |
 
-![Store system, drive, Raft, and partition metrics](/docs/images/hubble/store-node.jpg)
+```gallery
+![Cluster topology, node status, and capacity](/docs/images/hubble/cluster-overview.jpg) # Start with cluster health and affected sources
+![Store system, drive, Raft, and partition metrics](/docs/images/hubble/store-node.jpg) # Inspect the affected Store node
+```
 
 The PD Leader and Store Leader partitions serve different purposes: PD coordinates cluster metadata, while a Store leads the respective data partition's Raft
 group.
