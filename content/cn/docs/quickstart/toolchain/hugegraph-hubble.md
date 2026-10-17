@@ -11,7 +11,7 @@ Hubble 是 HugeGraph 的 Web 管理与图可视化界面。你可以在同一个
 并在图、表格和 JSON 视图之间切换。本文用 **单机 RocksDB Server + Hubble** 走通这些操作，不需要 PD 或 Store。
 
 如果使用 HStore，请先阅读本文的通用操作，再看 [HStore 分布式补充](/cn/docs/quickstart/toolchain/visualization/hugegraph-hubble-hstore/)。
-本文以 Toolchain `master`（当前为 `1.8.0`）为准；Docker `latest` 是可变标签，使用时应核对实际版本。
+本文以 Toolchain 和 Server 的 `master`（当前均为 `1.8.0`）为准；Docker `latest` 是可变标签，使用时应核对实际版本。
 
 > [!WARNING]
 > 不要直接对外暴露 Hubble 或 Server。生产环境使用 HTTPS、容器部署、
@@ -56,10 +56,9 @@ Hubble 没有独立账号库。个人中心与账号管理只在相应认证和�
 `latest` 便于体验当前功能，正式部署应固定镜像版本或 digest。镜像是便捷分发物，正式发布包见 [下载页](/cn/docs/download/download/)。
 界面入口取决于 Server 提供的能力。
 
-> [!DETAILS]- 配图环境与版本识别
+> [!DETAILS]- 核实部署版本
 >
-> 算法与账号配图使用 Toolchain `1.8.0` 构建的 Hubble 与 Server `1.7.0`。
-> `/about` 返回的静态值 `3.0.0` 不能用于判断构建版本，`latest` 也不固定对应这组版本。
+> 配图用于定位界面，实际版本以部署使用的镜像 digest 和构建信息为准。
 
 Compose 的 `server-data` 和 `hubble-data` 分别保存图数据与 Hubble 元数据；更多持久化与生产配置见
 [Server 部署指南](/cn/docs/quickstart/hugegraph/hugegraph-server/)。

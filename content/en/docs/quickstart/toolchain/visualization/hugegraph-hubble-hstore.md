@@ -8,7 +8,7 @@ search_keywords: [HugeGraph Hubble, HStore, PD, GraphSpace, cluster management]
 
 This guide covers the differences between HStore + PD and standalone RocksDB.
 For modeling, importing data, and querying, see the [Hubble standalone guide](/docs/quickstart/toolchain/hugegraph-hubble/).
-This guide follows Toolchain `master`.
+This guide follows Toolchain, Server, PD, and Store `master` (all currently `1.8.0`).
 
 The main repository's [docker/docker-compose-hstore.yml](https://github.com/apache/hugegraph/blob/master/docker/docker-compose-hstore.yml)
 already combines PD, Store, Server, and Hubble. Follow the adjacent
@@ -16,8 +16,7 @@ already combines PD, Store, Server, and Hubble. Follow the adjacent
 then start it from `docker/`; do not maintain another deployment YAML.
 The settings below explain connection differences and do not replace the README's PD credential and service-readiness requirements.
 
-The screenshots use Hubble built from Toolchain `1.8.0` with Server, PD, and Store `1.7.0`. Hubble currently returns the static value `3.0.0`
-from `/about`, which does not identify its build version. This pairing describes the screenshot environment; `latest` is mutable.
+Docker `latest` is mutable. Screenshots help locate controls; verify actual versions from the deployed image digests and build information.
 Metrics and permission APIs vary by version.
 
 ## Connect to a distributed cluster

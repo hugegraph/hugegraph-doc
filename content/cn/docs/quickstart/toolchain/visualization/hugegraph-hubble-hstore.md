@@ -8,14 +8,14 @@ search_keywords: [HugeGraph Hubble, HStore, PD, GraphSpace, 集群管理]
 
 本篇补充 HStore + PD 部署与单机 RocksDB 的差异。建模、导入和查询的通用操作见
 [Hubble 基础与单机指南](/cn/docs/quickstart/toolchain/hugegraph-hubble/)。
-内容以 Toolchain `master` 为准。
+内容以 Toolchain、Server、PD 和 Store 的 `master`（当前均为 `1.8.0`）为准。
 
 主仓库的 [docker/docker-compose-hstore.yml](https://github.com/apache/hugegraph/blob/master/docker/docker-compose-hstore.yml)
 已提供 PD、Store、Server 与 Hubble 的组合。按同目录 [Docker README](https://github.com/apache/hugegraph/blob/master/docker/README.md)
 准备 `.env` 和生成的 Hubble 本地配置，再从 `docker/` 目录启动；不要另维护一份部署 YAML。
 下文配置用于解释连接差异，不能替代 README 中 PD 凭据及服务就绪的要求。
-图中使用 Toolchain `1.8.0` 构建的 Hubble 与 Server、PD、Store `1.7.0`。Hubble 的 `/about` 当前返回静态值 `3.0.0`，
-不能据此判断构建版本；此组合只对应本篇配图的运行环境，`latest` 标签会变化。不同版本可提供的指标和权限接口有所区别。
+Docker `latest` 是可变标签。配图用于定位界面，实际版本以部署使用的镜像 digest 和构建信息为准。
+不同版本可提供的指标和权限接口有所区别。
 
 ## 连接分布式集群
 

@@ -11,7 +11,7 @@ Hubble is the HugeGraph Web management and graph visualization interface. Use on
 and switch between graph, table, and JSON results. This guide uses **standalone RocksDB Server + Hubble**, without PD or Store.
 
 For HStore, read the shared operations here first, then follow the [distributed supplement](/docs/quickstart/toolchain/visualization/hugegraph-hubble-hstore/).
-This guide follows Toolchain `master` (currently `1.8.0`); Docker `latest` is mutable, so check the actual running versions.
+This guide follows Toolchain and Server `master` (both currently `1.8.0`); Docker `latest` is mutable, so verify the deployed versions.
 
 > [!WARNING]
 > Do not expose Hubble or Server directly to the public network. In production, use HTTPS, containers,
@@ -60,10 +60,9 @@ Use `latest` to try current features, and pin a published image version or diges
 Images are convenience distributions; official release archives are on the [download page](/docs/download/download/).
 Available controls depend on Server capabilities.
 
-> [!DETAILS]- Screenshot environment and version identification
+> [!DETAILS]- Verify the deployed versions
 >
-> The algorithm and account screenshots use Hubble built from Toolchain `1.8.0` with Server `1.7.0`.
-> The static `/about` value `3.0.0` does not identify the build, and `latest` is not fixed to this pairing.
+> Screenshots help locate controls. Verify actual versions from the deployed image digests and build information.
 
 Compose's `server-data` and `hubble-data` retain graph data and Hubble metadata respectively. For further persistence and production settings,
 see the [Server deployment guide](/docs/quickstart/hugegraph/hugegraph-server/).
