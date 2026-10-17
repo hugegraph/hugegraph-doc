@@ -144,7 +144,9 @@ g.V().hasLabel('person').outE('created').inV().path()
 调整布局、颜色或显示范围只改变画布；新增、编辑和 Gremlin 写入才会改变 Server 中的数据。
 
 `Ctrl` / `Command` + `Enter` 执行查询。立即执行适合小规模探索；长查询可交给后台任务，避免一次返回整张大图。
-Cypher 页签只在 Server 支持时提供。Text2GQL 当前是界面预览，未连接模型或查询服务，不能直接生成可执行查询。
+Cypher 只在 Server 支持时提供。Text2GQL 可以用自然语言生成并编辑只读 Gremlin/Cypher，
+支持内置或临时模型、共享 Prompt 和异步提交。配置和使用方式见
+[Text2GQL 自然语言查询](/cn/docs/quickstart/toolchain/visualization/hugegraph-hubble-text2gql/)。
 
 ## 内置图算法：用表单探索关系
 

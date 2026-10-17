@@ -156,7 +156,9 @@ adding/editing elements and Gremlin writes change Server data.
 
 Use `Ctrl` / `Command` + `Enter` to execute. Immediate mode suits small explorations; submit long queries asynchronously
 and avoid returning an entire large graph. Cypher is available only when Server supports it.
-Text2GQL is currently a UI preview with no model or query service connected; it cannot generate executable queries.
+Text2GQL generates editable read-only Gremlin/Cypher from natural language,
+with built-in or temporary models, shared prompts, and async submission. See
+[Text2GQL natural-language queries](/docs/quickstart/toolchain/visualization/hugegraph-hubble-text2gql/) for setup and usage.
 
 ## Built-in algorithms: explore with parameter forms
 
