@@ -6,17 +6,16 @@ weight: 2
 search_keywords: [HugeGraph Hubble, HStore, PD, GraphSpace, cluster management]
 ---
 
-This guide covers the differences between HStore + PD and standalone RocksDB.
-For modeling, importing data, and querying, see the [Hubble standalone guide](/docs/quickstart/toolchain/hugegraph-hubble/).
-This guide follows Toolchain, Server, PD, and Store `master` (all currently `1.8.0`).
+This guide highlights the key differences between HStore + PD distributed deployments and standalone RocksDB.
+For general graph modeling, data import, and query workflows, see the [Hubble standalone guide](/docs/quickstart/toolchain/hugegraph-hubble/).
+Content aligns with the Toolchain, Server, PD, and Store `master` branches (all currently `1.8.0`).
 
 The main repository's [docker/docker-compose-hstore.yml](https://github.com/apache/hugegraph/blob/master/docker/docker-compose-hstore.yml)
-already combines PD, Store, Server, and Hubble. Follow the adjacent
-[Docker README](https://github.com/apache/hugegraph/blob/master/docker/README.md) to prepare `.env` and generated Hubble local configuration,
-then start it from `docker/`; do not maintain another deployment YAML.
-The settings below explain connection differences and do not replace the README's PD credential and service-readiness requirements.
-
-Docker `latest` is mutable. Screenshots help locate controls; verify actual versions from the deployed image digests and build information.
+provides complete orchestration for PD, Store, Server, and Hubble. Follow the adjacent
+[Docker README](https://github.com/apache/hugegraph/blob/master/docker/README.md) to prepare `.env` and generate the local Hubble configuration,
+then launch services from `docker/` without maintaining separate Compose files.
+The guidance below focuses on connectivity and operations; ensure prerequisite credentials and service readiness from the README are met.
+Docker `latest` is a moving tag. Screenshots assist in UI navigation; verify deployed versions via image digests and build details.
 Metrics and permission APIs vary by version.
 
 ## Connect to a distributed cluster
@@ -33,11 +32,11 @@ and collects cluster information from PD and Store. Hubble does not read or writ
    ./set-hubble-pd-password.sh hstore
    ```
 
-   The script reads the loaded `HG_PD_AUTH_SECRET_KEY` and writes the PD operations password to the host file
-   `docker/conf/hubble/hstore.local.properties`. Edit this generated file to customize connection or operations settings, preserving
-   `operations.pd.password` so it matches PD's secret. Do not replace it with the tracked `.example` template. Compose mounts it read-only at
-   `/hubble/conf/hugegraph-hubble.properties` inside the container; do not edit it there. Do not commit the generated file or `.env`.
-   Running the script again overwrites the generated file, so reapply custom settings afterward.
+   The script reads `HG_PD_AUTH_SECRET_KEY` from `.env` and writes the generated PD operations password to the host file
+   `docker/conf/hubble/hstore.local.properties`. Edit this generated file to adjust connection or operations settings (do not overwrite
+   the tracked `.example` template), ensuring `operations.pd.password` matches the PD secret. Compose mounts this file read-only into
+   the container; do not edit inside the container. Both `.env` and the generated file contain secrets and should not be committed to Git.
+   Re-running the script overwrites the generated file, requiring custom settings to be reapplied.
 
 1. **Start the services.** Use the same `docker/` directory and confirm Server registration and Store readiness.
 
@@ -64,16 +63,18 @@ pd.server=pd:8620
 | `pd.peers` | PD **gRPC** addresses, separated by commas. | `127.0.0.1:8686` |
 | `pd.server` | PD **REST** address for cluster operations, not a list of gRPC peers. | `127.0.0.1:8620` |
 
-Do not interchange ports `8686` and `8620`, or retain `127.0.0.1` for connections between containers.
-The bundled file explicitly sets `pd.enabled=false`, while the Java fallback for a missing key is `true`; set it explicitly in either deployment.
-Restart source or binary Hubble deployments after configuration changes. For Compose, recreate the Hubble container from `docker/` after editing
-or regenerating the host file so the read-only bind mount loads it again; retain the original project name and all `-f` arguments:
+Distinguish between the two ports: `8686` is for gRPC and `8620` is for REST. Do not interchange them, and use container service names or reachable IPs
+rather than `127.0.0.1` for cross-container traffic.
+The bundled package sets `pd.enabled=false`. If omitted, the fallback default is `true`, so declare this setting explicitly in both standalone and distributed
+setups.
+After editing configuration: restart the Hubble process for source or binary deployments; for Docker Compose, recreate the Hubble container from `docker/`
+to reload the mounted configuration (retaining the project name and all `-f` arguments):
 
 ```bash
 docker compose -f docker-compose-hstore.yml up -d --force-recreate hubble
 ```
 
-You do not enter a Server host and port for each graph in the UI.
+In the Hubble UI, you do not need to configure a Server host and port for each graph.
 
 ## Organize graphs and permissions with GraphSpaces
 
@@ -193,9 +194,9 @@ For example, when a containerized Store advertises `store:8520`, set:
 operations.store.allowed_targets=[http://store:8520]
 ```
 
-For multiple nodes, list each trusted origin. Every entry must use `http` or `https` with an explicit port and no path, credentials, or wildcard,
-and must match the Store metric target returned by PD. Adding an origin to this list does not register or discover a node.
+For multi-node clusters, list every trusted target origin. Each entry must use `http` or `https` with an explicit port and no path, credentials, or wildcard,
+matching the Store metric target returned by PD. Adding an origin here only authorizes access—it does not register or discover nodes.
 
-If topology is available but metrics are incomplete, check backend connectivity and authentication to PD REST, the Store REST/metric targets returned by PD,
-and their match with the allowlist. A partially available overview means some sources could not be collected;
-it does not imply that all graph APIs are unavailable.
+If topology renders but node metrics are missing, check Hubble backend connectivity and credentials to PD REST, verify the Store REST and metric addresses
+returned by PD, and ensure targets are in `operations.store.allowed_targets`. A partially available overview indicates metrics collection was blocked for
+specific sources, not that graph APIs are down.

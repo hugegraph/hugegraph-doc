@@ -6,15 +6,15 @@ weight: 2
 search_keywords: [HugeGraph Hubble, HStore, PD, GraphSpace, 集群管理]
 ---
 
-本篇补充 HStore + PD 部署与单机 RocksDB 的差异。建模、导入和查询的通用操作见
+本篇重点介绍 HStore + PD 分布式部署与单机 RocksDB 的核心差异。图建模、数据导入和图遍历等通用操作请参考
 [Hubble 基础与单机指南](/cn/docs/quickstart/toolchain/hugegraph-hubble/)。
-内容以 Toolchain、Server、PD 和 Store 的 `master`（当前均为 `1.8.0`）为准。
+内容以 Toolchain、Server、PD 与 Store 的 `master` 分支（当前版本均为 `1.8.0`）为准。
 
 主仓库的 [docker/docker-compose-hstore.yml](https://github.com/apache/hugegraph/blob/master/docker/docker-compose-hstore.yml)
-已提供 PD、Store、Server 与 Hubble 的组合。按同目录 [Docker README](https://github.com/apache/hugegraph/blob/master/docker/README.md)
-准备 `.env` 和生成的 Hubble 本地配置，再从 `docker/` 目录启动；不要另维护一份部署 YAML。
-下文配置用于解释连接差异，不能替代 README 中 PD 凭据及服务就绪的要求。
-Docker `latest` 是可变标签。配图用于定位界面，实际版本以部署使用的镜像 digest 和构建信息为准。
+已提供完整的 PD、Store、Server 与 Hubble 服务编排。请直接参考同目录 [Docker README](https://github.com/apache/hugegraph/blob/master/docker/README.md)
+配置 `.env` 并生成 Hubble 本地配置文件，然后在 `docker/` 目录下启动，无需自行维护部署文件。
+下文重点说明连接与运维配置要点，部署前请确保满足 README 中的 PD 凭据与前置依赖要求。
+Docker `latest` 为动态标签，配图用于定位界面，实际版本以部署镜像的 digest 及构建信息为准。
 不同版本可提供的指标和权限接口有所区别。
 
 ## 连接分布式集群
@@ -31,10 +31,10 @@ Hubble 仍通过 **Server 的图 API** 管理数据。区别在于，分布式�
    ./set-hubble-pd-password.sh hstore
    ```
 
-   脚本读取 `.env` 中已载入的 `HG_PD_AUTH_SECRET_KEY`，将 PD 运维密码写入宿主机的 `docker/conf/hubble/hstore.local.properties`。
-   如需调整连接地址或运维配置，编辑这个生成文件，并保留生成的 `operations.pd.password`，使其与 PD 使用的密钥一致。
-   不要覆盖为跟踪的 `.example` 模板。Compose 将它只读挂载到容器的 `/hubble/conf/hugegraph-hubble.properties`，
-   不要进入容器修改。生成文件和 `.env` 都不应提交；以后重新运行脚本会覆盖生成文件，需要重新应用自定义配置。
+   脚本会读取 `.env` 中的 `HG_PD_AUTH_SECRET_KEY`，将生成的 PD 运维密码写入宿主机的 `docker/conf/hubble/hstore.local.properties`。
+   若需调整连接地址或运维参数，直接编辑该文件即可（请勿覆盖 Git 跟踪的 `.example` 模板文件），并确保 `operations.pd.password`
+   与 PD 所用密钥一致。Compose 会将该文件只读挂载到容器内部，无需进入容器修改。
+   该生成文件与 `.env` 均属于敏感配置，请勿提交到版本库；重新运行脚本会覆盖该文件，届时需重新补齐自定义参数。
 
 1. **启动服务。** 在同一 `docker/` 目录启动组合，确认 Server 已注册、Store 已就绪。
 
@@ -61,16 +61,16 @@ pd.server=pd:8620
 | `pd.peers` | PD **gRPC** 地址；多个地址用逗号分隔。 | `127.0.0.1:8686` |
 | `pd.server` | 集群运维使用的 PD **REST** 地址，不是 gRPC peer 列表。 | `127.0.0.1:8620` |
 
-不要把 `8686` 和 `8620` 混用，也不要在跨容器连接时保留 `127.0.0.1`。
-随包文件显式设置 `pd.enabled=false`，而该键缺失时 Java 默认值是 `true`，因此两种部署都应显式设置它。
-源码或二进制包部署在修改配置后重启 Hubble。Compose 部署在修改或重新生成宿主机配置后，从 `docker/` 目录重建 Hubble 容器，
-使只读挂载重新载入文件（沿用启动时的项目名及所有 `-f` 参数）：
+请注意区分两个端口：`8686` 为 gRPC 端口，`8620` 为 REST 端口，切勿混用；跨容器通信时请使用容器服务名或网络可达 IP，避免使用 `127.0.0.1`。
+发行包默认配置中显式设为 `pd.enabled=false`；若未配置该项，代码默认值为 `true`，因此单机与分布式部署均建议显式声明该配置。
+修改配置后：源码或二进制部署需重启 Hubble 服务；Docker Compose 部署则在 `docker/` 目录下重新创建 Hubble 容器以重新加载挂载配置
+（沿用启动时的项目名及所有 `-f` 参数）：
 
 ```bash
 docker compose -f docker-compose-hstore.yml up -d --force-recreate hubble
 ```
 
-页面无需逐图填写 Server 主机和端口。
+在 Hubble 界面中无需为每个图单独配置 Server 主机与端口。
 
 ## 用图空间组织图与权限
 
@@ -179,8 +179,8 @@ Compose 部署修改上文生成的宿主机 `docker/conf/hubble/hstore.local.pr
 operations.store.allowed_targets=[http://store:8520]
 ```
 
-多节点时列出每个允许访问的来源。每项必须是带显式端口的 `http` 或 `https` origin，不能带路径、凭据或通配符，
-并且应与 PD 返回的 Store 指标目标一致。仅在白名单里添加地址不会建立节点发现信息。
+多节点集群中需列出所有允许访问的目标地址。每项必须是包含显式端口的 `http` 或 `https` 源地址（Origin），不可包含路径、凭据或通配符，
+且需与 PD 返回的 Store 指标目标完全一致。注意：仅在白名单中添加地址不会自动建立节点发现。
 
-若拓扑可见但指标不完整，依次检查 Hubble 后端到 PD REST 的连通性与认证、PD 返回的 Store REST/指标目标，
-以及目标是否与白名单一致。概览的部分可用状态表示某些来源尚未成功采集，不等同于所有图 API 都不可用。
+若集群拓扑可见但节点指标不完整，请依次排查：Hubble 后端到 PD REST 的网络连通性与认证凭据、PD 返回的 Store REST 与指标地址，
+以及目标地址是否已加入上述白名单。概览中的部分可用状态仅表示特定来源指标采集受阻，并不代表图 API 服务不可用。
