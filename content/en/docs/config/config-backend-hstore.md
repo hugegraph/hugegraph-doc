@@ -249,19 +249,29 @@ yet, or registered as `Pending` because they are not in PD's `pd.initial-store-l
 
 ### 9 Legacy GraphID upgrade preflight
 
-HugeGraph-Store provides legacy GraphID upgrade preflight checks during bootstrap and upgrade processes.
-Released 1.7.0 and current `master` builds do not contain this preflight guard yet (pending merge of the corresponding Store implementation);
-ensure you use a Store build containing this fix before relying on the refusal behavior below.
+HugeGraph-Store provides legacy GraphID upgrade preflight guards during bootstrap and upgrade processes.
 
-These Store builds check existing graph-data column families before allocating a missing graph ID, first opening a cold
-partition DB during metadata bootstrap, starting its Raft state machine, or activating a staged snapshot. Before pruning, the first cold DB open checks
-all retained valid versions. Reserved `FFFE` legacy rows cause refusal.
-An incomplete selected DB version without `CURRENT` is also rejected when it would hide retained valid versions. This concerns affected old write paths;
-it does not mean that every 1.7 database needs migration, and the persisted ID format is unchanged.
+> [!NOTE]
+> Released 1.7.0 and current `master` builds do not contain this preflight guard yet (pending merge of the corresponding Store implementation);
+> ensure you use a Store build containing this fix before relying on the refusal behavior below.
 
-On refusal, preserve the original data DB versions, metadata, WAL and incoming/staged snapshots. Investigate the affected write and upgrade history before
-resuming writes or replay. Do not delete graph-to-ID mappings or assign all reserved-prefix rows to one graph: different graphs may share that prefix.
-Store/Raft location metadata may already have been updated before the check, so the entire bootstrap is not read-only. The check performs no automatic
-migration or ownership repair; a complete 1.7 upgrade and recovery still require deployment-specific validation.
+These Store builds check existing graph-data column families before allocating a missing graph ID, first opening a cold partition DB during
+metadata bootstrap, starting its Raft state machine, or activating a staged snapshot. Before pruning, the first cold DB open checks all retained
+valid versions:
+- **Legacy Row Sentinel**: Discovered legacy rows with reserved prefix `FFFE` trigger an immediate refusal.
+- **Version Integrity Check**: An incomplete selected DB version without `CURRENT` is also rejected when it would shadow retained valid versions.
+
+This guard concerns affected legacy write paths; it does not imply that every 1.7 database requires migration, and the persisted ID format is unchanged.
+
+> [!IMPORTANT]
+> **Recommended Actions on Refusal**
+> - **Preserve Raw Data**: Keep original data DB versions, metadata, WAL, incoming snapshots, and staged copies. Investigate the affected write and
+>   upgrade history before resuming writes or replay.
+> - **Avoid Mapping Deletions**: Do not delete graph-to-ID mappings or assign all reserved-prefix rows to a single graph
+>   (different graphs may share that prefix).
+> - **Bootstrap Not Read-Only**: Store/Raft location metadata may already have been updated before the check, so the entire
+>   bootstrap is not strictly read-only.
+> - **No Automatic Repair**: The preflight check only guards against corrupt states without automated data migration; 1.7 upgrade and recovery still require
+>   deployment-specific validation.
 
 See the [Store GraphID upgrade documentation](https://github.com/apache/hugegraph/blob/d9ff79f/docs/store-graphid-upgrade.md) for details.
