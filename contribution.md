@@ -148,8 +148,9 @@ that this site publishes automatically.
 
 OINK 1.3 adds these loading behaviors to Expo albums:
 
-- Processable local images larger than 960 pixels on either side get previews
-  fitted within 960 × 960 pixels in WebP; small images keep their source format.
+- Processable local images get previews fitted within 960 × 960 pixels in WebP
+  when either side exceeds 960 pixels or the file is a GIF; other images reuse
+  their original file.
   The viewer retains the original file and shows the cached preview while it loads.
 - The first four tiles load eagerly, with high priority on the first; later tiles
   are lazy. Viewing an original preloads one neighboring image on each side.
