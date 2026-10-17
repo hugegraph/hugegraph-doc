@@ -1,9 +1,9 @@
 ---
 title: "使用 Hubble 实现图可视化：单机快速上手"
-description: "用 Docker 启动 RocksDB Server 与 Hubble，从示例图开始理解 Schema、导入 CSV、执行 Gremlin 并查看图结果。"
+description: "用 Docker 启动 RocksDB Server 与 Hubble，从示例图开始建模、导入 CSV，并用 Gremlin、Cypher 或 Text2GQL 查询图数据。"
 linkTitle: "Hubble 基础与单机"
 weight: 1
-search_keywords: [HugeGraph Hubble, 图可视化, 图形化界面, Web 管理界面, RocksDB]
+search_keywords: [HugeGraph Hubble, 图可视化, 图形化界面, Web 管理界面, RocksDB, Text2GQL, 自然语言查询, Prompt]
 search_boost: 1.6
 ---
 
@@ -144,9 +144,38 @@ g.V().hasLabel('person').outE('created').inV().path()
 调整布局、颜色或显示范围只改变画布；新增、编辑和 Gremlin 写入才会改变 Server 中的数据。
 
 `Ctrl` / `Command` + `Enter` 执行查询。立即执行适合小规模探索；长查询可交给后台任务，避免一次返回整张大图。
-Cypher 只在 Server 支持时提供。Text2GQL 可以用自然语言生成并编辑只读 Gremlin/Cypher，
-支持内置或临时模型、共享 Prompt 和异步提交。配置和使用方式见
-[Text2GQL 自然语言查询](/cn/docs/quickstart/toolchain/visualization/hugegraph-hubble-text2gql/)。
+Cypher 只在 Server 支持时提供。快捷键按当前聚焦的输入框执行，左侧生成查询，右侧执行已有语句。
+
+### Text2GQL 自然语言查询 {#text2gql}
+
+在【自然语言】中描述问题，Text2GQL 会根据当前图的 Schema 生成只读 Gremlin 或 Cypher，并执行查询。
+生成的语句可以继续编辑，修改后仍会检查是否只读。切到【异步】时，生成和手写查询都可以提交为后台任务。
+输入框会按语言恢复当前图最近一次记录，恢复后不会自动执行；记录中的【自然语言】列保留原问题。
+
+```gallery
+![Text2GQL 查询与图结果](/cn/docs/images/hubble/text2gql.jpg) # 查询工作台
+![内置模型设置](/cn/docs/images/hubble/text2gql-settings.jpg) # 模型设置
+![Gremlin 与 Cypher Prompt 模板](/cn/docs/images/hubble/text2gql-prompt.jpg) # Text2GQL Prompt
+```
+
+| 模型来源 | 配置与保存方式 |
+| --- | --- |
+| 使用内置模型 | 在【系统与运维 → 模型设置】统一配置，Key 加密存入 H2，不回传浏览器 |
+| 使用临时模型 | 在查询页填写 API 类别、Base URL、模型名称和临时 API Key；Key 只留在页面内存，刷新后清除 |
+
+OpenAI、DeepSeek、GLM 等选择【OpenAI 兼容接口】，本地 Ollama 选择【Ollama（本地）】，无认证时可不填 Key。
+Base URL 必须能从 Hubble 后端访问，容器中的 `localhost` 指容器自身。共享模型由管理员配置；Server 未开启认证时，访问者也能管理配置。
+
+在模型设置标题旁打开 **Text2GQL Prompt**，可分别修改 Gremlin/Cypher 的生成要求和 few-shot 示例。
+【应用】后还需保存模型设置，模板才会存入 H2，供内置模型和临时模型共同使用。当前 Schema 会自动附加。
+
+> [!DETAILS]- Key 备份与数据保存
+>
+> 备份 H2 时需一并保留主密钥文件，默认是 `data/text2gql-master.key`，丢失后无法解密已有 Key。
+> 生成请求会向所选模型发送问题、Schema 和必要的纠错信息，不发送查询结果。问题与执行语句保存在 Hubble 的执行记录中。
+> 浏览器可以记住成功使用的地址和模型名，不保存临时 Key。
+
+页脚分别显示模型生成耗时和查询请求耗时，异步提交耗时不代表后台任务运行时间。
 
 ## 内置图算法：用表单探索关系
 

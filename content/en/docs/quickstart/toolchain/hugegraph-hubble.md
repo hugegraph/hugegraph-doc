@@ -1,9 +1,9 @@
 ---
 title: "Graph Visualization with Hubble: Standalone Quick Start"
-description: "Visualize graph data with Hubble and RocksDB Server: start with Docker, explore schema, import CSV, and run Gremlin queries."
+description: "Use Hubble and RocksDB Server to manage schema, import CSV, and query graph data with Gremlin, Cypher, or Text2GQL."
 linkTitle: "Hubble Basics and Standalone"
 weight: 1
-search_keywords: [HugeGraph Hubble, graph visualization, Web management interface, RocksDB]
+search_keywords: [HugeGraph Hubble, graph visualization, Web management interface, RocksDB, Text2GQL, natural-language queries, Prompt]
 search_boost: 1.6
 ---
 
@@ -156,9 +156,40 @@ adding/editing elements and Gremlin writes change Server data.
 
 Use `Ctrl` / `Command` + `Enter` to execute. Immediate mode suits small explorations; submit long queries asynchronously
 and avoid returning an entire large graph. Cypher is available only when Server supports it.
-Text2GQL generates editable read-only Gremlin/Cypher from natural language,
-with built-in or temporary models, shared prompts, and async submission. See
-[Text2GQL natural-language queries](/docs/quickstart/toolchain/visualization/hugegraph-hubble-text2gql/) for setup and usage.
+The shortcut generates a query from the focused natural-language input, or runs the statement from the focused query editor.
+
+### Text2GQL natural-language queries {#text2gql}
+
+Describe a question in **Natural language**. Text2GQL uses the current graph's schema to generate and execute read-only Gremlin or Cypher.
+Generated statements remain editable and retain read-only checks after editing. **Async** mode supports both generated and manual queries.
+Inputs restore the graph's latest record for each language without running it; the **Natural language** column retains the original question.
+
+```gallery
+![Text2GQL query and graph results](/docs/images/hubble/text2gql.jpg) # Query workspace
+![Shared model settings](/docs/images/hubble/text2gql-settings.jpg) # Model settings
+![Gremlin and Cypher Prompt templates](/docs/images/hubble/text2gql-prompt.jpg) # Text2GQL Prompt
+```
+
+| Model source | Configuration and storage |
+| --- | --- |
+| Use built-in model | Configure under **System & Operations → Model settings**; Keys are encrypted in H2 and never returned to the browser |
+| Use temporary model | Enter the API type, Base URL, model name, and temporary API Key on the query page; the Key clears on refresh |
+
+Choose **OpenAI compatible** for OpenAI, DeepSeek, GLM, and similar services, or **Ollama (local)** for local Ollama; unauthenticated Ollama needs no Key.
+The Base URL must be reachable from Hubble's backend; container `localhost` refers to that container.
+Administrators manage shared settings. When Server authentication is disabled, anyone who can access the deployment can manage them.
+
+Open **Text2GQL Prompt** beside the model settings heading to edit separate Gremlin/Cypher instructions and few-shot examples.
+After **Apply**, save model settings to persist the templates in H2 for both built-in and temporary models.
+The current schema is appended automatically.
+
+> [!DETAILS]- Key backups and data storage
+>
+> Back up the master-key file with H2. Its default location is `data/text2gql-master.key`; losing it prevents decryption of saved Keys.
+> Generation sends the question, schema, and necessary correction information to the selected model, excluding query results.
+> Hubble execution records retain questions and statements. The browser can remember successful URLs and model names, but never temporary Keys.
+
+Input footers show model generation time and query request time separately. Async submission time excludes background execution.
 
 ## Built-in algorithms: explore with parameter forms
 

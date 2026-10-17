@@ -9,5 +9,4 @@ Start with a standalone deployment without PD, then read the distributed differe
 
 - [Hubble basics with standalone RocksDB](/docs/quickstart/toolchain/hugegraph-hubble/): startup, sample graphs, modeling, imports, and queries.
 - [Hubble with an HStore cluster](/docs/quickstart/toolchain/visualization/hugegraph-hubble-hstore/): PD discovery, GraphSpaces, and cluster operations.
-- [Text2GQL natural-language queries](/docs/quickstart/toolchain/visualization/hugegraph-hubble-text2gql/): model setup, prompts, generation, and history.
 {.cards}
