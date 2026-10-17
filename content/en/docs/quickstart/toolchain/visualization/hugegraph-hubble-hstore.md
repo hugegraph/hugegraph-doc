@@ -159,6 +159,7 @@ An empty value is not zero, and an older value is not a current observation.
 | Server | Availability, JVM/CPU/memory, and backend metrics | Check the query/write entrypoint and resource pressure. |
 | PD | Leader/Follower role, status, and runtime metrics supplied upstream | Check the metadata/scheduling entrypoint; do not infer a role when Leader information is absent. |
 | Store | Partition and Leader partition counts, system/disk metrics, Raft group and enabled group counts | Inspect storage nodes and replica service and compare distribution across nodes. |
+{.td-table--wide}
 
 ```gallery
 ![Cluster topology, node status, and capacity](/docs/images/hubble/cluster-overview.jpg) # Start with cluster health and affected sources

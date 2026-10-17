@@ -147,6 +147,7 @@ GraphSpace（图空间）将图、Schema 模板和访问权限组织在同一个
 | Server | 节点可用性、JVM/CPU/内存及后端指标 | 判断查询与写入入口是否可达，并检查资源压力。 |
 | PD | Leader/Follower 角色、状态及上游可提供的运行指标 | 确认元数据与调度入口；Leader 信息缺失时不推断角色。 |
 | Store | 分区数、Leader 分区数、系统/磁盘指标，以及 Raft 组数和启用组数 | 检查存储节点及副本服务，结合其他节点比较分布。 |
+{.td-table--wide}
 
 ```gallery
 ![集群拓扑、节点状态与容量信息](/cn/docs/images/hubble/cluster-overview.jpg) # 集群概览，先看异常来源
