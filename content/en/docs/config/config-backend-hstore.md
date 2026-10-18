@@ -273,7 +273,7 @@ This guard concerns affected legacy write paths; it does not imply that every 1.
 >   (different graphs may share that prefix).
 > - **Bootstrap Not Read-Only**: Store/Raft location metadata may already have been updated before the check, so the entire
 >   bootstrap is not strictly read-only.
-> - **No Automatic Repair**: The preflight check only guards against corrupt states without automated data migration; 1.7 upgrade and recovery still require
->   deployment-specific validation.
+> - **No Automatic Repair**: The preflight check only refuses unsafe operations and performs no automatic migration or ownership repair;
+>   1.7 upgrade and recovery still require deployment-specific validation.
 
 See the [Store GraphID upgrade documentation](https://github.com/apache/hugegraph/blob/d9ff79f/docs/store-graphid-upgrade.md) for details.
