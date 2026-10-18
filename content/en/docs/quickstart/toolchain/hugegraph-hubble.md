@@ -34,8 +34,9 @@ If you already have the repository locally, navigate directly to its `docker/` d
 which pre-configures `pd.enabled=false` and `server.direct_url=http://server:8080`. Because both services communicate over a shared Docker network,
 you do not need to configure Server endpoints per graph. Start Compose directly from `docker/` so relative file paths resolve correctly.
 
-Hubble listens on host port `8088` by default; Server publishes `8080`. For a local trial, set Server's
-`ports` in Compose to `127.0.0.1:8080:8080` to prevent exposing unauthenticated ports beyond loopback.
+Hubble publishes on host loopback port `8088` by default (controlled by `HUBBLE_PUBLISH_HOST`, defaulting to `127.0.0.1`), whereas Server publishes
+`8080` across all interfaces. For a local trial, set Server's `ports` in Compose to `127.0.0.1:8080:8080` to prevent exposing unauthenticated ports
+beyond loopback (set `HUBBLE_PUBLISH_HOST=0.0.0.0` if remote access to Hubble is required).
 
 Choose an unused project name for this trial and keep these variables in the same terminal session:
 
@@ -151,6 +152,11 @@ The keyboard shortcut acts on whichever input currently has focus: generating a 
 the natural language prompt, or running statements in the code editor.
 
 ### Text2GQL natural-language queries {#text2gql}
+
+> [!NOTE]
+> The Text2GQL backend capabilities (including Model settings, built-in/temporary models, and Prompt templates) require a Hubble build with
+> [apache/hugegraph-toolchain#824](https://github.com/apache/hugegraph-toolchain/pull/824) or a release containing it.
+> Earlier builds display a preview tab without model management.
 
 Describe your query requirement in the **Natural language** input. Text2GQL combines the current graph schema to generate read-only Gremlin or Cypher
 and execute it automatically. Generated statements can be edited freely (read-only safety checks still apply before execution).

@@ -31,7 +31,7 @@ Hubble 仍通过 **Server 的图 API** 管理数据。区别在于，分布式�
    ./set-hubble-pd-password.sh hstore
    ```
 
-   脚本会读取 `.env` 中的 `HG_PD_AUTH_SECRET_KEY`，将生成的 PD 运维密码写入宿主机的 `docker/conf/hubble/hstore.local.properties`。
+   脚本会读取 `.env` 中的 `HG_PD_AUTH_SECRET_KEY`，将其值作为 `operations.pd.password` 写入生成文件 `docker/conf/hubble/hstore.local.properties`。
    若需调整连接地址或运维参数，直接编辑该文件即可（请勿覆盖 Git 跟踪的 `.example` 模板文件），并确保 `operations.pd.password`
    与 PD 所用密钥一致。Compose 会将该文件只读挂载到容器内部，无需进入容器修改。
    该生成文件与 `.env` 均属于敏感配置，请勿提交到版本库；重新运行脚本会覆盖该文件，届时需重新补齐自定义参数。

@@ -33,8 +33,8 @@ cd hugegraph/docker
 已预设 `pd.enabled=false` 与 `server.direct_url=http://server:8080`。两项服务处于同一 Docker 网络中通信，
 无需为每个图单独配置 Server 地址。请直接在 `docker/` 目录下启动，以确保相对配置路径有效。
 
-Hubble 默认监听宿主机 `8088` 端口；Server 默认发布 `8080`。若仅供本机试用，可将 Compose 中 Server 的
-`ports` 改为 `127.0.0.1:8080:8080`，避免匿名端口暴露到外部网络。
+Hubble 默认只在宿主机回环地址开放 `8088`（由 `HUBBLE_PUBLISH_HOST` 环境变量控制，默认为 `127.0.0.1`）；
+Server 默认对外发布 `8080`。若仅供本机试用，可将 Compose 中 Server 的 `ports` 改为 `127.0.0.1:8080:8080`，避免匿名端口暴露到外部网络。
 
 为本次试用指定一个独立的项目名，后续命令在同一终端中沿用这些环境变量；另起终端时请重新设置：
 
@@ -64,7 +64,6 @@ Compose 中的 `server-data` 与 `hubble-data` 卷分别持久化保存图数据
 
 ## 首页：找到当前任务的入口
 
-首页按“图概览 → 图导入 → 图查询”组织工作入口，适合第一次使用时了解整体流程。
 首页按“图概览 → 图导入 → 图查询”组织核心工作流。左侧导航栏可随时切换各功能模块；
 顶部的图选择器用于切换当前操作的目标图，所有查询、Schema 操作和异步任务均作用于当前选中的图。
 单机模式下仅包含默认的 `DEFAULT` 图空间，无需配置 PD。
@@ -142,6 +141,10 @@ g.V().hasLabel('person').outE('created').inV().path()
 Cypher 查询仅在 Server 后端支持时提供。快捷键会作用于当前获得焦点的输入框（在自然语言框中生成查询，在语句框中执行已有语句）。
 
 ### Text2GQL 自然语言查询 {#text2gql}
+
+> [!NOTE]
+> Text2GQL 后端能力（包括模型设置、内置/临时模型管理与 Prompt 模板）依赖包含
+> [apache/hugegraph-toolchain#824](https://github.com/apache/hugegraph-toolchain/pull/824) 的 Hubble 构建或后续发布版本；未合入该特性的旧版本仅提供预览占位，不包含模型设置页面。
 
 在【自然语言】输入框中用自然语言描述查询需求，Text2GQL 会结合当前图的 Schema 自动生成只读 Gremlin 或 Cypher 语句并执行查询。
 生成的语句支持二次编辑（执行前同样会进行只读安全校验）。切换至【异步】模式时，生成的查询与手写查询均可提交为后台异步任务。

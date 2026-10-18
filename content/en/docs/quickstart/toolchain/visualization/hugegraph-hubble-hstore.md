@@ -32,7 +32,7 @@ and collects cluster information from PD and Store. Hubble does not read or writ
    ./set-hubble-pd-password.sh hstore
    ```
 
-   The script reads `HG_PD_AUTH_SECRET_KEY` from `.env` and writes the generated PD operations password to the host file
+   The script reads `HG_PD_AUTH_SECRET_KEY` from `.env` and writes its value as `operations.pd.password` into the generated file
    `docker/conf/hubble/hstore.local.properties`. Edit this generated file to adjust connection or operations settings (do not overwrite
    the tracked `.example` template), ensuring `operations.pd.password` matches the PD secret. Compose mounts this file read-only into
    the container; do not edit inside the container. Both `.env` and the generated file contain secrets and should not be committed to Git.
