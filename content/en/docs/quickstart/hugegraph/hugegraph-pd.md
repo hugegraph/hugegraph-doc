@@ -25,7 +25,8 @@ PD listens on three ports:
 #### 2.1 Requirements
 
 - Operating System: Linux or macOS (Windows has not been fully tested)
-- Java version: Java 17 for HugeGraph 1.8.0+ (the Maven build accepts only JDK 17; the start script rejects older runtimes; 1.7.0 is the last release supporting Java 11)
+- Java version: Java 17 for HugeGraph 1.8.0+ (the Maven build accepts only JDK 17;
+  the start script rejects older runtimes; 1.7.0 is the last release supporting Java 11)
 - Maven version: ≥ 3.6.3 (for building from source)
 
 ### 3 Deployment
@@ -41,7 +42,7 @@ Apache downloads currently provide the complete 1.7.0 binary bundle containing P
 
 ```bash
 # Historical release 1.7.0 retains incubating in filenames and directories
-wget https://downloads.apache.org/hugegraph/1.7.0/apache-hugegraph-incubating-1.7.0.tar.gz
+curl -fLO --connect-timeout 10 --max-time 1800 https://downloads.apache.org/hugegraph/1.7.0/apache-hugegraph-incubating-1.7.0.tar.gz
 tar zxf apache-hugegraph-incubating-1.7.0.tar.gz
 cd apache-hugegraph-incubating-1.7.0/apache-hugegraph-pd-incubating-1.7.0
 ```
@@ -107,7 +108,7 @@ docker run -d \
 | `HG_PD_DATA_PATH` | No | `/hugegraph-pd/pd_data` | `pd.data-path` | Metadata path. |
 | `HG_PD_INITIAL_STORE_COUNT` | No | `1` | `pd.initial-store-count` | Minimum Store count needed for cluster availability. |
 | `HG_PD_ACTUATOR_EXPOSURE` | No | `health,metrics,prometheus` | `management.endpoints.web.exposure.include` | Public Actuator endpoint allowlist; `*` is forbidden. |
-{.hg-pd-env}
+{.td-table--wide}
 
 The master entrypoint requires all five mandatory variables, builds `SPRING_APPLICATION_JSON` overrides, then starts PD. Other settings come from image `conf/application.yml`; `JAVA_OPTS` is passed to the JVM. Deprecated `GRPC_HOST`, `RAFT_ADDRESS`, `RAFT_PEERS`, and `PD_INITIAL_STORE_LIST` remain supported with warnings.
 
@@ -132,6 +133,7 @@ These tables were checked against `hg-pd-dist` configuration and Java defaults a
 | `grpc.host` | `127.0.0.1` | none, required | Address this PD advertises for gRPC. Store and Server connect here, so set it to a reachable IPv4 address or hostname, never `127.0.0.1` or `0.0.0.0`, in a distributed deployment. |
 | `grpc.port` | `8686` | none, required | gRPC port. |
 | `server.port` | `8620` | none, required | REST API port. Also the port reported in Raft member information. |
+{.td-table--wide}
 
 `application.yml.template` also carries `grpc.netty-server.max-inbound-message-size: 100MB`, but PD sets the gRPC server's inbound message limit to 1 GB in code, so that key has no effect.
 
@@ -145,6 +147,7 @@ These tables were checked against `hg-pd-dist` configuration and Java defaults a
 | `raft.ip-whitelist.enabled` | not set | `true` | When true, the Raft RPC port accepts connections only from the addresses resolved from `raft.peers-list`; other clients are dropped and logged as `Blocked connection from <ip>`. The allowlist is re-resolved when the peer list changes, but a peer that keeps its hostname and changes IP (a restarted container, for example) needs a PD restart. |
 | `raft.snapshotInterval` | not set | `300` | Seconds between Raft snapshots. |
 | `raft.rpc-timeout` | not set | `10000` | Raft RPC connect, request and install-snapshot timeout, in milliseconds. |
+{.td-table--wide}
 
 **PD core**
 
@@ -155,6 +158,7 @@ These tables were checked against `hg-pd-dist` configuration and Java defaults a
 | `pd.initial-store-count` | `1` | `3` | Minimum number of active Store nodes. Below this the cluster state becomes `Cluster_Not_Ready` and the cluster is treated as unavailable. Set it to the number of stores you deploy. |
 | `pd.initial-store-list` | `127.0.0.1:8500` | empty | Comma separated Store gRPC addresses (`ip:port`) that are activated automatically when they register. An entry may also carry a group id as `store_address/group_id`. |
 | `pd.cluster_id` | not set | `1` | Cluster id, used to keep separate PD clusters apart. |
+{.td-table--wide}
 
 **Store management**
 
@@ -165,6 +169,7 @@ These tables were checked against `hg-pd-dist` configuration and Java defaults a
 | `store.monitor_data_enabled` | `true` | `false` | Whether to persist Store monitoring samples. |
 | `store.monitor_data_interval` | `1 minute` | `1 minute` | Sampling interval, written as `<number> <unit>` with unit one of `second`, `minute`, `hour`, `day`, `month`, `year`. The number defaults to 1 when omitted. |
 | `store.monitor_data_retention` | `1 day` | `1 day` | How long monitoring samples are kept, same format as above. |
+{.td-table--wide}
 
 **Partitions**
 
@@ -172,6 +177,7 @@ These tables were checked against `hg-pd-dist` configuration and Java defaults a
 |-----|---------------|------------------|-------------|
 | `partition.default-shard-count` | `1` | `3` | Number of replicas per partition. Use `3` for a production cluster. |
 | `partition.store-max-shard-count` | `12` | `24` | Maximum number of partition replicas one Store holds. |
+{.td-table--wide}
 
 The initial partition count is derived from these two values and the size of `pd.initial-store-list`:
 
@@ -190,6 +196,7 @@ initial partitions = store count * partition.store-max-shard-count / partition.d
 | `management.metrics.export.prometheus.enabled` | `true` | Spring Boot default | Exposes `/actuator/prometheus`. |
 | `management.endpoints.web.exposure.include` | `health,metrics,prometheus` | Spring Boot exposes only `health` by default | Actuator allowlist; these endpoints bypass the PD REST Basic interceptor. |
 | `logging.config` | `file:./conf/log4j2.xml` | none | Log4j2 configuration. Writes `logs/hugegraph-pd.log`, `logs/hugegraph-pd_raft.log` and `logs/audit-hugegraph-pd.log`. |
+{.td-table--wide}
 
 **Thread pools**
 
@@ -201,6 +208,7 @@ initial partitions = store count * partition.store-max-shard-count / partition.d
 | `job.uninterruptibleThreadPool.core` | `0` | Core size of the background metadata job pool. A value of 0 or less means half the available processors. |
 | `job.uninterruptibleThreadPool.max` | `256` | Maximum size of that pool. |
 | `job.uninterruptibleThreadPool.queue` | unbounded | Queue capacity of that pool. |
+{.td-table--wide}
 
 #### 4.2 Single-node configuration
 
@@ -307,14 +315,19 @@ In the PD installation directory, execute:
 The script requires Java 17 or later on `PATH` or in `JAVA_HOME` (Java ≥ 11 on 1.7.0).
 It exits without doing anything if it finds a Java process already using this installation's `conf` directory.
 
-Supported flags:
+The lifecycle details below describe current master builds. The downloaded 1.7.0 launcher does not include those repairs.
+Supported flags, with GC version limits noted below:
 
 | Flag | Values | Default | Description |
 |------|--------|---------|-------------|
 | `-d` | `true`, `false` | `true` | Daemon mode. See the note below. |
-| `-g` | `zgc`, `ZGC` | not set | Garbage collector. Leave the flag off for the default G1GC. Any other value, `g1` included, aborts the start. |
+| `-g` | See version limits below | not set | Select the garbage collector. Unsupported values abort startup. |
 | `-j` | JVM options | empty | Extra JVM options, for example `-j "-Xmx8g -Xms8g"`. |
 | `-y` | `true`, `false` | `false` | Attach the OpenTelemetry Java agent. The agent is downloaded into `plugins/` on first use, its MD5 is verified, and traces are exported over gRPC to `http://127.0.0.1:4317`. |
+
+Master builds accept `g1`, `G1`, `zgc` and `ZGC`.
+The downloaded 1.7.0 launcher accepts only `zgc` or `ZGC` as explicit choices; `-g g1`, `-g G1` and other values abort startup.
+Omit `-g` for the default path. For rejected values, inspect `logs/hugegraph-pd-stdout.log`.
 
 The `-d` flag controls daemon mode:
 
@@ -533,3 +546,5 @@ All paths below are relative to `http://<pd-host>:8620` and need the Basic heade
 The two `log` endpoints take a time range as `{"startTime": "...", "endTime": "..."}`; `yyyy-MM-dd HH:mm:ss` and `yyyy-MM-dd` are among the accepted formats.
 
 PD registers its own meters under the `hg` prefix, so `/actuator/prometheus` exposes `hg_up`, `hg_graphs`, `hg_stores` and `hg_terms` alongside the standard JVM metrics, plus per-graph partition and size meters once graphs exist.
+
+In versions after 1.7.0, PD also exports, for each registered store, `hg_store_state{store="<id>",state="<state>"}`, which is `1` for the store's current state (`Unknown`, `Pending`, `Up`, `Offline`, `Exiting` or `Tombstone`) and `0` for the others, and `hg_store_leader_count{store="<id>"}`, the number of shard groups whose leader is on that store. A rebuilt Store reports `0` leaders until leadership moves back to it. Every PD member reads the same replicated metadata, so select one instance before aggregating these series.

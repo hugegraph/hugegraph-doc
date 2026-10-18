@@ -112,6 +112,7 @@ hstore 的 Docker 镜像会自动套用这份模板：它删除 `conf/graphs/hug
 |------------------------|--------|-----------------------------------------------------------------|
 | hstore.partition_count | 0      | 分区数量，PD 依据该值控制分区（Number of partitions）。         |
 | hstore.shard_count     | 0      | 副本数量，PD 依据该值控制分区副本（Number of copies）。         |
+{.td-table--wide}
 
 #### 4.1 hstore.partition_count
 
@@ -146,6 +147,7 @@ PD 对该值的处理方式：
 | graph.load_from_local_config | rest-server.properties | false          | 控制构造阶段预加载。应用初始化仍扫描并尝试加载本地配置，`false` 不会阻止本地加载。图配置变化通过重启 Server 应用。 | `ServerOptions.java:366-372` |
 | auth.graph_store             | rest-server.properties | hugegraph      | 保存权限数据的图，关闭 init-store 时会校验它使用 `hstore` 后端    | `ServerOptions.java:602-609` |
 | graphspace                   | {graph}.properties     | DEFAULT        | PD 看到的图名的第一段                                             | `CoreOptions.java:679-685`   |
+{.td-table--wide}
 
 `init-store.sh` 从不初始化 `hstore` 图。在开启的路径上，它扫描 `conf/graphs` 并跳过后端为 `hstore` 的每一个图。如果用 `init_store.enabled=false` 整体关闭这一步，它会改为校验 admin 账号仍然能在 PD 启动路径上被创建：
 `usePD` 必须为 true、权限图必须存在于本地配置中且后端为 `hstore`、`auth.admin_pa` 必须显式设置为非空值。否则启动会直接失败，而不是使用公开的默认密码创建账号。
@@ -208,3 +210,27 @@ curl http://localhost:8080/metrics/backend
 ```
 
 响应中的 `nodes` 就是 PD 返回的活跃 Store 数量。`nodes` 为 `0` 说明 Server 连上了 PD，但 PD 中没有状态为 `Up` 的 Store，通常是 Store 节点还没注册，或者因为不在 PD 的 `pd.initial-store-list` 中而注册成了 `Pending`。
+
+### 9 旧 GraphID 升级预检
+
+HugeGraph-Store 在启动和升级流程中提供针对旧版 GraphID 的安全预检保护机制。
+
+> [!NOTE]
+> 已发布的 1.7.0 发行版以及当前 `master` 分支暂未包含该预检保护（待对应 Store 补丁合并）；
+> 依赖下述拦截保护前，请确认使用的是已包含该修复特性的 Store 构建。
+
+包含该特性的 Store 构建会在分配缺失的图 ID、元数据启动阶段首次冷打开尚未缓存的分区 DB、启动对应分区的 Raft 状态机，
+或激活暂存快照前，检查已有图数据列族。首次打开时会在清理旧版本前检查所有仍保留的有效 DB 版本：
+- **旧数据前缀拦截**：发现保留前缀 `FFFE` 的旧数据时将拒绝操作。
+- **DB 版本完整性检查**：选中的不完整 DB 版本若缺少 `CURRENT` 且会遮蔽仍保留的有效版本，同样会予以拒绝。
+
+该机制针对受历史写入路径影响的数据，并不意味着所有 1.7 数据库都需要迁移，持久化 ID 格式保持不变。
+
+> [!IMPORTANT]
+> **预检拦截处置建议**
+> - **保留现场数据**：保留原始 DB 版本、元数据、WAL，以及输入快照和暂存副本，在恢复写入或回放前排查相关写入与升级历史。
+> - **切勿盲目修改映射**：不要删除图到 ID 的映射，也不要将所有保留前缀行归给同一个图（不同图可能共享同一前缀）。
+> - **启动流程非只读**：Store/Raft 位置元数据可能已在预检拦截前更新，整个启动流程并非严格只读。
+> - **无自动修复**：预检仅提供安全拦截，不会自动迁移数据或修复归属；1.7 升级与灾备恢复仍需针对具体环境进行充分验证。
+
+详细机制与处置依据见[对应版本升级指南中的 Store GraphID 升级说明](https://github.com/apache/hugegraph/blob/d9ff79f/docs/store-graphid-upgrade.md)。

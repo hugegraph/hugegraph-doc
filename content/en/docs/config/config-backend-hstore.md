@@ -130,6 +130,7 @@ These are the only keys in the `hstore` config space. They belong in the graph p
 |------------------------|---------------|---------------------------------------------------------------|
 | hstore.partition_count | 0             | Number of partitions, which PD controls partitions based on.   |
 | hstore.shard_count     | 0             | Number of copies, which PD controls partition copies based on. |
+{.td-table--wide}
 
 #### 4.1 hstore.partition_count
 
@@ -171,6 +172,7 @@ in the checked Server master commit `2f827d6` where the option is declared.
 | graph.load_from_local_config | rest-server.properties | false | Controls constructor preloading. Application initialization still scans and attempts to load local configurations, so `false` does not block local loading. Restart Server to apply graph configuration changes. | `ServerOptions.java:366-372` |
 | auth.graph_store             | rest-server.properties | hugegraph      | The graph that holds auth data, checked against the `hstore` backend when init-store is off   | `ServerOptions.java:602-609` |
 | graphspace                   | {graph}.properties     | DEFAULT        | First segment of the graph name PD sees                                                       | `CoreOptions.java:679-685`   |
+{.td-table--wide}
 
 `init-store.sh` never initializes an `hstore` graph. On the enabled path it scans `conf/graphs` and skips
 every graph whose backend is `hstore`. If you turn the whole step off with `init_store.enabled=false`, it
@@ -246,3 +248,32 @@ curl http://localhost:8080/metrics/backend
 The `nodes` value in the response is the count of active stores PD returns. A `nodes` value of `0` means the
 Server reached PD but PD has no store in state `Up`, which usually means the Store nodes have not registered
 yet, or registered as `Pending` because they are not in PD's `pd.initial-store-list`.
+
+### 9 Legacy GraphID upgrade preflight
+
+HugeGraph-Store provides legacy GraphID upgrade preflight guards during bootstrap and upgrade processes.
+
+> [!NOTE]
+> Released 1.7.0 and current `master` builds do not contain this preflight guard yet (pending merge of the corresponding Store implementation);
+> ensure you use a Store build containing this fix before relying on the refusal behavior below.
+
+These Store builds check existing graph-data column families before allocating a missing graph ID, first opening a cold partition DB during
+metadata bootstrap, starting its Raft state machine, or activating a staged snapshot. Before pruning, the first cold DB open checks all retained
+valid versions:
+- **Legacy Row Sentinel**: Discovered legacy rows with reserved prefix `FFFE` trigger an immediate refusal.
+- **Version Integrity Check**: An incomplete selected DB version without `CURRENT` is also rejected when it would shadow retained valid versions.
+
+This guard concerns affected legacy write paths; it does not imply that every 1.7 database requires migration, and the persisted ID format is unchanged.
+
+> [!IMPORTANT]
+> **Recommended Actions on Refusal**
+> - **Preserve Raw Data**: Keep original data DB versions, metadata, WAL, incoming snapshots, and staged copies. Investigate the affected write and
+>   upgrade history before resuming writes or replay.
+> - **Avoid Mapping Deletions**: Do not delete graph-to-ID mappings or assign all reserved-prefix rows to a single graph
+>   (different graphs may share that prefix).
+> - **Bootstrap Not Read-Only**: Store/Raft location metadata may already have been updated before the check, so the entire
+>   bootstrap is not strictly read-only.
+> - **No Automatic Repair**: The preflight check only refuses unsafe operations and performs no automatic migration or ownership repair;
+>   1.7 upgrade and recovery still require deployment-specific validation.
+
+See the [Store GraphID upgrade documentation](https://github.com/apache/hugegraph/blob/d9ff79f/docs/store-graphid-upgrade.md) for details.

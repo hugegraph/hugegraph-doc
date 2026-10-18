@@ -22,7 +22,8 @@ Each Store node keeps graph data in RocksDB and replicates it with Raft (JRaft):
 #### 2.1 Requirements
 
 - Operating System: Linux or macOS (Windows has not been fully tested)
-- Java version: Java 17 for HugeGraph 1.8.0+ (the Maven build accepts only JDK 17; the start script rejects older runtimes; 1.7.0 is the last release supporting Java 11)
+- Java version: Java 17 for HugeGraph 1.8.0+ (the Maven build accepts only JDK 17;
+  the start script rejects older runtimes; 1.7.0 is the last release supporting Java 11)
 - Maven version: ≥ 3.6.3 (for building from source)
 - Deploy HugeGraph-PD first for multi-node deployment
 
@@ -39,7 +40,7 @@ Apache downloads currently provide the complete 1.7.0 binary bundle containing P
 
 ```bash
 # Historical release 1.7.0 retains incubating in filenames and directories
-wget https://downloads.apache.org/hugegraph/1.7.0/apache-hugegraph-incubating-1.7.0.tar.gz
+curl -fLO --connect-timeout 10 --max-time 1800 https://downloads.apache.org/hugegraph/1.7.0/apache-hugegraph-incubating-1.7.0.tar.gz
 tar zxf apache-hugegraph-incubating-1.7.0.tar.gz
 cd apache-hugegraph-incubating-1.7.0/apache-hugegraph-store-incubating-1.7.0
 ```
@@ -131,6 +132,7 @@ docker run -d \
 | `HG_STORE_GRPC_PORT` | No | `8500` | `grpc.port` | gRPC service port. |
 | `HG_STORE_REST_PORT` | No | `8520` | `server.port` | REST API port. |
 | `HG_STORE_DATA_PATH` | No | `/hugegraph-store/storage` | `app.data-path` | Data path. |
+{.td-table--wide}
 
 The master entrypoint writes these values into `SPRING_APPLICATION_JSON`, overriding image `conf/application.yml`. Other options still come from that file and `application-pd.yml`; Java runs in the foreground. Deprecated `PD_ADDRESS`, `GRPC_HOST`, and `RAFT_ADDRESS` remain supported with warnings.
 
@@ -171,6 +173,7 @@ This file contains only `rocksdb` and Actuator exposure settings.
 | `grpc.netty-server.max-inbound-message-size` | `1000MB` | gRPC default | Maximum size of a single inbound gRPC message. Bound by the `grpc-spring-boot-starter` Netty server. |
 | `grpc.server.wait-time` | not set | `3600` | Seconds a scan stream waits for the client to consume a page before the server aborts it. |
 | `server.port` | `8520` | required | REST and Actuator port. Also reported to PD as the `rest.port` label. |
+{.td-table--wide}
 
 **Raft**
 
@@ -189,6 +192,7 @@ This file contains only `rocksdb` and Actuator exposure settings.
 | `raft.maxEntriesSize` | not set | `256` | Maximum number of entries in one `AppendEntries` request. |
 | `raft.maxBodySize` | not set | `524288` | Maximum byte size of one `AppendEntries` request. |
 | `ave-logEntry-size-ratio` | not set | `0.95` | Smoothing ratio used to estimate the average log entry size. Note that this key sits at the top level, not under `raft`. |
+{.td-table--wide}
 
 **Storage and labels**
 
@@ -199,6 +203,7 @@ This file contains only `rocksdb` and Actuator exposure settings.
 | `app.fake-pd` | not set | `false` | Built-in PD mode for standalone testing. Do not use it in production. |
 | `app.placeholder-size` | not set | `10` | Size in GB of a `placeholder` file created in each data path at startup, so space can be freed in an emergency. `0` disables it. |
 | `app.label.<name>` | not set | none | Arbitrary key/value labels sent to PD in the store heartbeat. The node adds `rest.port` on its own. |
+{.td-table--wide}
 
 **RocksDB**
 
@@ -208,6 +213,7 @@ This file contains only `rocksdb` and Actuator exposure settings.
 | `rocksdb.write_buffer_size` | `32000000` | `33554432` | Memtable size in bytes. When absent or `0`, the node uses `total_memory_size / 1000`. |
 | `rocksdb.min_write_buffer_number_to_merge` | `16` | `16` | Number of memtables merged together before a flush. |
 | `rocksdb.write_buffer_ratio` | not set | `0.66` | Share of `total_memory_size` given to the write cache. The rest becomes the block cache. |
+{.td-table--wide}
 
 Any other option defined in `org/apache/hugegraph/rocksdb/access/RocksDBOptions.java` can be added under the same `rocksdb:` block, for example `rocksdb.max_background_jobs`, `rocksdb.level0_file_num_compaction_trigger` or `rocksdb.bloom_filter_bits_per_key`.
 
@@ -221,6 +227,7 @@ Any other option defined in `org/apache/hugegraph/rocksdb/access/RocksDBOptions.
 | `thread.pool.scan.core` | `128` | Core threads serving scans. `0` means 4 times the CPU count. |
 | `thread.pool.scan.max` | `1000` | Maximum scan threads. |
 | `thread.pool.scan.queue` | `0` | Scan task queue capacity. |
+{.td-table--wide}
 
 **gRPC callback queue (1.8.0)**
 
@@ -242,6 +249,7 @@ resources; do not rely on `thread.pool.grpc.queue` for load control. Version 1.7
 | `query.push-down.fetch_timeout` | `300000` | Fetch timeout in milliseconds. |
 | `query.push-down.memory_limit_count` | `50000` | Row limit for in-memory operations such as sorting. |
 | `query.push-down.index_size_limit_count` | `50000` | Index sst file size limit in kB. |
+{.td-table--wide}
 
 **Background jobs**
 
@@ -255,6 +263,7 @@ resources; do not rely on `thread.pool.grpc.queue` for load control. Version 1.7
 | `job.uninterruptibleThreadPool.queue` | `2147483647` | Queue capacity of the uninterruptible job pool. |
 | `job.cleaner.batch.size` | `10000` | Keys deleted per batch by the TTL cleaner. |
 | `job.start-time` | `0` | Hour of day (0 to 23) at which the daily TTL cleanup runs. Values outside that range fall back to 19. |
+{.td-table--wide}
 
 **Built-in PD mode**
 
@@ -266,15 +275,19 @@ Only for single-node development and debugging, activated by `app.fake-pd: true`
 | `fake-pd.peers-list` | `''` | Raft addresses of the same nodes. |
 | `fake-pd.partition-count` | `3` | Number of partitions. |
 | `fake-pd.shard-count` | `3` | Replicas per partition. |
+{.td-table--wide}
 
 **Diagnostics**
 
-| Key | Code default | Meaning |
-|-----|--------------|---------|
-| `arthas.telnetPort` | `8566` | Arthas telnet port, used when `/v1/arthasstart` is called. |
-| `arthas.httpPort` | `8565` | Arthas HTTP port. |
-| `arthas.ip` | `0.0.0.0` | Arthas bind address. |
-| `arthas.disabledCommands` | `jad` | Arthas commands to disable. |
+Starting with HugeGraph 1.8.0, Store HTTP activation (`GET /v1/arthasstart`) is disabled and returns `403`. Legacy configuration fields are kept only
+for compatibility. Run the bundled script as the service OS user on the host to diagnose the running JVM (official container images include JDK 17):
+
+```bash
+bin/arthas.sh
+```
+
+For multiple processes on one host, specify `--pid <PID> --telnet-port 3659`. For command options, authentication, and security practices, see
+[Start the Arthas agent](/docs/clients/restful-api/other/#1116-start-the-arthas-agent).
 
 #### 4.4 Per-node changes
 
@@ -297,14 +310,20 @@ Ensure that the PD service is already started, then in the Store installation di
 ./bin/start-hugegraph-store.sh
 ```
 
-The script accepts four flags:
+The lifecycle and timeout details below describe master builds that include launcher script repairs.
+The downloaded 1.7.0 launcher does not include those repairs.
+The script accepts four flags, with GC version limits noted below:
 
 | Flag | Values | Default | Description |
 |------|--------|---------|-------------|
 | `-d` | `true`, `false` | `true` | Daemon mode. See below. |
-| `-g` | `ZGC`, `zgc` | not set | Garbage collector. Omit the flag for G1, which is the default. Any value other than `ZGC` or `zgc` aborts the start, including `g1`, even though the script's own usage line suggests it. |
+| `-g` | See version limits below | not set | Select the garbage collector. Unsupported values abort startup. |
 | `-j` | JVM options string | empty | Extra JVM options, for example `-j "-Xmx16g -Xms8g"`. |
 | `-y` | `true`, `false` | `false` | Attach the OpenTelemetry Java agent, downloading it into `plugins/` on first use, and export traces to `127.0.0.1:4317`. |
+
+Master builds accept `g1`, `G1`, `zgc` and `ZGC`.
+The downloaded 1.7.0 launcher accepts only `zgc` or `ZGC` as explicit choices; `-g g1`, `-g G1` and other values abort startup.
+Omit `-g` for the default path. For rejected values, inspect `logs/hugegraph-store-server.log`.
 
 Daemon mode:
 
@@ -314,6 +333,11 @@ Daemon mode:
 JVM memory, unless you set `JAVA_OPTIONS` yourself: `-Xms512m`, and `-Xmx` set to half the free memory, clamped to the 512 MB to 2048 MB range. The script also adds `-XX:MetaspaceSize=256M`, a heap dump on out-of-memory into `logs/`, and a rolling GC log at `logs/gc.log`. Production nodes normally need a much larger heap, so pass one explicitly, for example `-j "-Xmx32g -Xms32g"`.
 
 The script refuses to start if `ulimit -n` or `ulimit -u` is below 1024, and it preloads jemalloc on x86_64 and arm64 when the shared object can be downloaded and verified.
+
+In master builds, each optional jemalloc download allows
+5 seconds to connect and 30 seconds in total. The 1.7.0 helper has no connection or total timeout.
+A timeout or failed verification follows the existing fallback:
+startup continues without preloading the downloaded library. Verified cached libraries can still be reused; partial downloads are removed.
 
 After successful startup, you can see logs similar to the following in `logs/hugegraph-store-server.log`:
 
@@ -481,7 +505,9 @@ The Store node exposes these read-only endpoints on `server.port`:
 
 Master Store configuration exposes all Actuator endpoints with `management.endpoints.web.exposure.include: "*"` and enables Prometheus. These endpoints lack PD REST Basic protection; restrict Store REST network access.
 
-The node also serves maintenance endpoints that change state or run heavy work: `PUT /-/state`, `GET /-/cleaner`, `GET /v1/partition/dump/{id}`, `GET /v1/partition/clean/{id}`, `POST /v1/compat?id=<partition>`, `GET /v1/arthasstart`, `POST /raft/options`, and the `/fix/*` and `/test/*` groups. Use them only for troubleshooting, and keep the REST port off untrusted networks.
+The node also serves maintenance endpoints that change state or run heavy work: `PUT /-/state`, `GET /-/cleaner`,
+`GET /v1/partition/dump/{id}`, `GET /v1/partition/clean/{id}`, `POST /v1/compat?id=<partition>`, `POST /raft/options`, and the `/fix/*` and `/test/*` groups.
+Use them only for troubleshooting, and keep the REST port off untrusted networks.
 
 #### 7.2 Check registration from PD
 
