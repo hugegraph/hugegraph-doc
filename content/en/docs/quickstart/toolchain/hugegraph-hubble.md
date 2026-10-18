@@ -175,8 +175,10 @@ Inputs automatically restore the graph's most recent query prompt without runnin
 | Use temporary model | Enter the API type, Base URL, model name, and temporary API Key on the query page; the Key clears on refresh |
 
 Choose **OpenAI compatible** for OpenAI, DeepSeek, GLM, and similar services, or **Ollama (local)** for local Ollama; unauthenticated Ollama needs no Key.
-The Base URL must be reachable from Hubble's backend; container `localhost` refers to that container.
-Administrators manage shared settings. When Server authentication is disabled, anyone who can access the deployment can manage them.
+The Base URL must be reachable from Hubble's backend; container `localhost` refers to that container. Public endpoints require HTTPS, while plain HTTP is
+accepted only for loopback or private-network models; when changing the Base URL in Model settings, supply a new Key or explicitly clear the saved Key.
+Only the `admin` account (a super administrator in PD mode) manages shared settings. When Server authentication is disabled, anyone who can access the
+deployment can manage them.
 
 Under model settings, click **Text2GQL Prompt** in the header to customize Gremlin and Cypher generation rules and few-shot examples.
 Click **Apply** and then save model settings to persist templates to the H2 database for both built-in and temporary models.

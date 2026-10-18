@@ -162,8 +162,9 @@ Cypher 查询仅在 Server 后端支持时提供。快捷键会作用于当前�
 | 使用临时模型 | 在查询页填写 API 类别、Base URL、模型名称和临时 API Key；Key 只保留在前端内存中，刷新后清除 |
 
 使用 OpenAI、DeepSeek、GLM 等模型时选择【OpenAI 兼容接口】；使用本地运行的 Ollama 时选择【Ollama（本地）】（无认证时 Key 可留空）。
-注意：Base URL 必须能被 Hubble 后端服务正常访问（若 Hubble 运行在容器中，`localhost` 指向容器本身而非宿主机）。
-全局内置模型由管理员统一配置；未开启 Server 认证时，任何访问者均可配置。
+注意：Base URL 必须能被 Hubble 后端服务正常访问（若 Hubble 运行在容器中，`localhost` 指向容器本身而非宿主机）。公网端点必须使用 HTTPS，HTTP 仅允许用于
+本地回环或私网模型；在【模型设置】中修改 Base URL 时，必须重新填写 Key 或清空已保存的 Key。
+全局内置模型仅由 `admin` 账号（PD 模式下为超级管理员）统一配置；未开启 Server 认证时，任何访问者均可配置。
 
 在模型设置页面右上角打开 **Text2GQL Prompt**，可分别定制 Gremlin 与 Cypher 的生成规则及 Few-shot 示例。
 点击【应用】后需保存模型设置，模板将持久化存入 H2 数据库供内置模型与临时模型共享，生成时会自动附加当前图的 Schema。
