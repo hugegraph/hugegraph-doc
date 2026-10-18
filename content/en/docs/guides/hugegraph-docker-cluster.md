@@ -182,6 +182,7 @@ The following tables describe current master entrypoints and Compose files, not 
 | `HG_PD_DATA_PATH` | No | `/hugegraph-pd/pd_data` | `pd.data-path` |
 | `HG_PD_INITIAL_STORE_COUNT` | No | `1` | `pd.initial-store-count` |
 | `HG_PD_AUTH_SECRET_KEY` | Yes (current master Docker) | None | `auth.secret-key`; PD REST Basic password, also used by Server and Hubble |
+{.td-table--wide}
 
 > **Deprecated aliases**: `GRPC_HOST` → `HG_PD_GRPC_HOST`, `RAFT_ADDRESS` → `HG_PD_RAFT_ADDRESS`, `RAFT_PEERS` → `HG_PD_RAFT_PEERS_LIST`, `PD_INITIAL_STORE_LIST` → `HG_PD_INITIAL_STORE_LIST`. Old names are mapped only when new names are unset, with a warning. Missing required variables cause the entrypoint to exit with code 2.
 
@@ -195,6 +196,7 @@ The following tables describe current master entrypoints and Compose files, not 
 | `HG_STORE_GRPC_PORT` | No | `8500` | `grpc.port` |
 | `HG_STORE_REST_PORT` | No | `8520` | `server.port` |
 | `HG_STORE_DATA_PATH` | No | `/hugegraph-store/storage` | `app.data-path` |
+{.td-table--wide}
 
 > **Deprecated aliases**: `PD_ADDRESS` → `HG_STORE_PD_ADDRESS`, `GRPC_HOST` → `HG_STORE_GRPC_HOST`, `RAFT_ADDRESS` → `HG_STORE_RAFT_ADDRESS`.
 
@@ -209,6 +211,8 @@ Unlike PD and Store, Server has no mandatory entrypoint variables: only set valu
 | `HG_SERVER_USE_PD` | `false` | `usePD` in `rest-server.properties` |
 | `HG_SERVER_CLUSTER` | `hg-test` | `cluster` in `rest-server.properties` |
 | `HG_SERVER_REST_URL` | `http://0.0.0.0:8080` (set in the image) | `restserver.url` |
+| `HG_SERVER_URLS_TO_PD` | `http://0.0.0.0:8080` | `server.urls_to_pd`: comma-separated URLs this Server registers in PD instead of `restserver.url`; read only when `server.deploy_in_k8s` is `true`; give each URL its own `http://` prefix, since only the first entry gets one added; whitespace is removed |
+| `HG_SERVER_DEPLOY_IN_K8S` | `false` | `server.deploy_in_k8s` in `rest-server.properties` |
 | `HG_SERVER_MIN_FREE_MEMORY` | `64`（MB） | `restserver.min_free_memory` |
 | `HG_SERVER_INIT_STORE_ENABLED` | `true` | `init_store.enabled`; set `false` for PD/HStore deployments whose metadata is managed by storage |
 | `HG_SERVER_AUTH_TOKEN_SECRET` | Generated when `PASSWORD` is set | `auth.token_secret` in both configuration files; at least 32 bytes |
@@ -222,6 +226,7 @@ Unlike PD and Store, Server has no mandatory entrypoint variables: only set valu
 | `PD_AUTH_USER` | `store` | Basic username for PD REST calls from `wait-storage.sh` |
 | `PD_AUTH_PASSWORD` | Empty | PD REST Basic password; must match `HG_PD_AUTH_SECRET_KEY` when PD REST authentication is enabled |
 | `WAIT_PARTITION_TIMEOUT_S` | `120` | Partition polling timeout; also bounds the final diagnostic in builds with the fix described below |
+{.td-table--wide}
 
 Master builds that include authentication property fixes preserve spaces, backslashes and Unicode in explicit
 signing keys. Use the same key on every Server replica. When upgrading from an image that misread such a key, explicitly supply the intended
@@ -245,7 +250,7 @@ The entrypoint waits for `wait-partition.sh` before waiting for the Java launche
 that poll can consume its full timeout before the entrypoint observes the exit. If polling succeeds, the diagnostic step can then consume
 a second full timeout before observation finishes; signal-triggered shutdown remains interruptible.
 
-`HG_SERVER_INIT_STORE_ENABLED` accepts only the case-insensitive boolean values recognized by `HugeConfig`: `y`, `t`, `yes`, `on`, `true`, `n`, `f`, `no`, `off`, `false`. Other values, including `0` and `1`, terminate the entrypoint.
+`HG_SERVER_INIT_STORE_ENABLED` and `HG_SERVER_DEPLOY_IN_K8S` accept only the case-insensitive boolean values recognized by `HugeConfig`: `y`, `t`, `yes`, `on`, `true`, `n`, `f`, `no`, `off`, `false`. Other values, including `0` and `1`, terminate the entrypoint.
 
 After successful initialization, the entrypoint writes `docker/init_complete`; later starts skip reinitialization but still invoke `bin/init-store.sh` to revalidate configuration each time initialization is disabled.
 
@@ -263,6 +268,7 @@ Compose files, rather than entrypoints, read these variables:
 | `HUGEGRAPH_ADMIN_PASSWORD` | None | Passed to Server as `PASSWORD` |
 | `HUGEGRAPH_AUTH_TOKEN_SECRET` | None | Master Compose passes this to Server as `HG_SERVER_AUTH_TOKEN_SECRET`; the 1.7.0 image ignores it |
 | `HG_PD_AUTH_SECRET_KEY` | None | HStore PD REST Basic password; Compose supplies it to PD and Server and uses it to generate local Hubble configuration |
+{.td-table--wide}
 
 ## Port Reference
 
