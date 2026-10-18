@@ -36,7 +36,8 @@ cd hugegraph/docker
 Hubble 默认只在宿主机回环地址开放 `8088`（由 `HUBBLE_PUBLISH_HOST` 环境变量控制，默认为 `127.0.0.1`）；
 Server 默认对外发布 `8080`。若仅供本机试用，可将 Compose 中 Server 的 `ports` 改为 `127.0.0.1:8080:8080`，避免匿名端口暴露到外部网络。
 
-为本次试用指定一个独立的项目名，后续命令在同一终端中沿用这些环境变量；另起终端时请重新设置：
+为本次试用指定一个独立的项目名，后续命令在同一终端中沿用这些环境变量；若另起终端，请重新 export 相同的 `HUBBLE_DEMO_PROJECT`
+（可单独运行 `docker compose ls` 查看项目名），不要重复执行以下脚本生成新项目名：
 
 ```bash
 export HUGEGRAPH_VERSION=latest

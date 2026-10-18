@@ -38,7 +38,8 @@ Hubble publishes on host loopback port `8088` by default (controlled by `HUBBLE_
 `8080` across all interfaces. For a local trial, set Server's `ports` in Compose to `127.0.0.1:8080:8080` to prevent exposing unauthenticated ports
 beyond loopback (set `HUBBLE_PUBLISH_HOST=0.0.0.0` if remote access to Hubble is required).
 
-Choose an unused project name for this trial and keep these variables in the same terminal session:
+Choose an unused project name for this trial and keep these variables in the same terminal session. In another terminal, export the same
+`HUBBLE_DEMO_PROJECT` value again (run `docker compose ls` on its own to find it) instead of re-running the block to generate a new name:
 
 ```bash
 export HUGEGRAPH_VERSION=latest
