@@ -248,3 +248,52 @@ curl http://localhost:8080/metrics/backend
 The `nodes` value in the response is the count of active stores PD returns. A `nodes` value of `0` means the
 Server reached PD but PD has no store in state `Up`, which usually means the Store nodes have not registered
 yet, or registered as `Pending` because they are not in PD's `pd.initial-store-list`.
+
+### 9 Check GraphID compatibility before upgrading from 1.7
+
+**Availability:** the command and guards below are proposed changes, pending merge and release. They are not
+included in HugeGraph 1.7.0. Use a Store distribution built with the
+[candidate fix and detailed recovery guide](https://github.com/hugegraph/hugegraph/blob/6fc8775dad33149093c888f01e25677deb16e3a1/docs/graphid-upgrade.md);
+do not assume that an existing release includes them.
+
+Some 1.7 batch writes used the reserved GraphID prefix `0xFFFE` before a mapping existed. Later Store code
+allocates a valid ID, including during Raft replay, which can hide those historical rows. Replacing the JAR
+with 1.7 does not undo a persisted mapping. See [issue #3224](https://github.com/apache/hugegraph/issues/3224)
+and the [allocation fix](https://github.com/apache/hugegraph/pull/3153).
+
+Before the first upgraded Store starts, stop application writers and preserve matching 1.7 PD, every Store's
+data and Raft paths, and Server configuration. Take snapshots with 1.7 and stop the Stores before copying
+files; stopping alone does not prove that WAL-disabled writes were flushed. Retain the complete original backup.
+
+With Java 17 available through `JAVA_HOME` or `PATH`, run this command from the candidate Store distribution
+once for **each stopped Store**, using that Store's effective configuration and data roots:
+
+```bash
+bin/hugegraph-store-check.sh --check \
+  --config /srv/hugegraph-store/conf \
+  --data-path /srv/store-data-a,/srv/store-data-b
+```
+
+The command reads local `application.yml` and, when present, `application-pd.yml`, without starting Spring,
+PD or Store. It does not resolve Spring environment, JSON or profile overrides. For Docker, supply the actual
+`HG_STORE_DATA_PATH` as `--data-path`; use local configuration containing the resolved RocksDB settings.
+It creates no database and refuses locked active databases. Exit `0` means no incompatible persisted GraphID
+was found in the inspected databases and latest snapshots; it does not prove complete backups or historical
+ownership. Exit `2` reports legacy rows, invalid mappings or inspection errors. Treat any nonzero launcher or
+command status as a failed check.
+
+The proposed startup guard checks before the Store engine, Raft groups and registration with PD initialize;
+the earlier configuration listener can still contact PD. Incoming snapshots are checked before replacing the
+local partition database. These guards refuse incompatible data without converting keys or adding another
+read/write format to normal requests.
+
+Do not assign all `0xFFFE` rows to one graph: the user graph and `DEFAULT/~sys_graph/g` can share that prefix,
+and system variables can occupy business tables. A mapping change cannot establish ownership or recover
+overwritten values. For a trusted 1.7 source that still returns complete application data, the detailed guide
+uses existing Tools `backup`/`restore` into a **new, empty, independent** target, retaining the export.
+The reviewed CLI flow covers DEFAULT GraphSpace schema, vertices and edges. It does not cover graph variables,
+system KV, task/OLAP state or operational configuration; authentication needs its separate procedure. Other
+GraphSpaces need an explicitly aware client, and ordinary export does not preserve every TTL expiration time.
+Validate schema and element IDs, properties, edge endpoints, queries, restart and new writes before cutover.
+Uncertain ownership or missing data requires a trusted backup or original input first; counts and JAR rollback
+are insufficient recovery checks.

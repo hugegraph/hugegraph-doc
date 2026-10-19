@@ -210,3 +210,42 @@ curl http://localhost:8080/metrics/backend
 ```
 
 响应中的 `nodes` 就是 PD 返回的活跃 Store 数量。`nodes` 为 `0` 说明 Server 连上了 PD，但 PD 中没有状态为 `Up` 的 Store，通常是 Store 节点还没注册，或者因为不在 PD 的 `pd.initial-store-list` 中而注册成了 `Pending`。
+
+### 9 从 1.7 升级前检查 GraphID 兼容性
+
+**可用性：**下述命令与保护逻辑仍是待合并、待发布的提案，不包含在 HugeGraph 1.7.0 中。
+请使用包含[候选修复及详细恢复指南](https://github.com/hugegraph/hugegraph/blob/6fc8775dad33149093c888f01e25677deb16e3a1/docs/graphid-upgrade.md)
+所述变更的 Store 发行包，不要假定已有发行版包含这些功能。
+
+1.7 的部分批量写入会在映射尚不存在时使用保留 GraphID 前缀 `0xFFFE`。后续 Store 代码会分配合法 ID，
+Raft 日志回放也可能触发分配，导致历史行不可见。把 JAR 换回 1.7 不会撤销已经持久化的映射。
+背景见[问题 #3224](https://github.com/apache/hugegraph/issues/3224)和[分配修复](https://github.com/apache/hugegraph/pull/3153)。
+
+首次启动升级后的 Store 前，停止应用写入，并保留相互匹配的 1.7 PD、每个 Store 的数据与 Raft 路径，以及 Server 配置。
+先用 1.7 创建快照，再停止 Store 并复制文件；仅仅停服不能证明关闭 WAL 时的写入已经刷盘。保留完整的原始备份。
+
+通过 `JAVA_HOME` 或 `PATH` 提供 Java 17，在候选 Store 发行包目录中，针对**每个已停止的 Store**，
+使用该节点实际生效的配置与数据根目录运行：
+
+```bash
+bin/hugegraph-store-check.sh --check \
+  --config /srv/hugegraph-store/conf \
+  --data-path /srv/store-data-a,/srv/store-data-b
+```
+
+命令读取本地 `application.yml` 和存在时的 `application-pd.yml`，不会启动 Spring、PD 或 Store，
+也不会解析 Spring 的环境变量、JSON 或 profile 覆盖项。Docker 部署必须把实际的 `HG_STORE_DATA_PATH`
+传给 `--data-path`，并使用已经解析出有效 RocksDB 设置的本地配置。命令不会创建数据库，并拒绝检查被写入进程锁定的数据库。
+退出码 `0` 仅表示所检查的持久化数据库与最新快照未发现不兼容 GraphID，不能证明备份完整或历史数据归属正确。
+退出码 `2` 表示历史行、非法映射或检查错误；启动器或命令的任何非零退出码都应视为检查失败。
+
+拟议的启动保护在 Store 引擎、Raft 组和向 PD 注册之前检查；更早的配置监听器仍可能联系 PD。
+接收快照时，在替换本地分区数据库前检查。这些保护会拒绝不兼容数据，不转换 key，也不为正常请求增加第二套读写格式。
+
+不要把全部 `0xFFFE` 行分配给一个图：用户图和 `DEFAULT/~sys_graph/g` 可能共享该前缀，系统变量也可能占用业务表。
+修改映射不能证明归属，也不能恢复被覆盖的值。如果可信的 1.7 源仍能返回完整应用数据，可按详细指南，
+使用现有 Tools 的 `backup`/`restore` 迁移到**全新、空白且独立**的目标集群，并保留导出备份。
+已核对的 CLI 流程覆盖 DEFAULT GraphSpace 的 Schema、顶点和边，不包含图变量、系统 KV、任务/OLAP 状态或运行配置；
+鉴权数据需要单独处理。其他 GraphSpace 需要显式支持图空间的客户端，普通导出也不能保留所有 TTL 到期时间。
+切换前校验 Schema 与元素 ID、属性、边端点、查询、重启和新写入。归属不明或数据缺失时，必须先找到可信备份或原始输入；
+仅比较数量或回退 JAR 不能完成恢复验证。
