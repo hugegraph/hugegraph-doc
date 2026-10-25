@@ -213,6 +213,8 @@ Hubble 默认开启，当前镜像的登录仍依赖 Server 鉴权。只使用 A
 使用 Helm 原生值复用保留已有部署的 UI、入口、存储和凭据设置。
 
 ```bash
+# 私库部署时替换为实际可访问的 Chart 地址。
+CHART=oci://ghcr.io/hugegraph/hugegraph-helm
 helm get values hugegraph -n hugegraph --all
 # 测试环境继续跟随最新版本；生产升级请改用 --version 指定已审阅的稳定版本。
 helm upgrade hugegraph "$CHART" --devel -n hugegraph \
