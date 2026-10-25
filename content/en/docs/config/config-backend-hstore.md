@@ -270,6 +270,55 @@ A GraphID preflight failure during later local recovery requests a nonzero exit.
 incoming snapshot and staged copy. The entire application startup is not read-only: configuration loading can already have contacted PD,
 and later bootstrap stages can have changed Store/Raft location metadata.
 
+#### Offline check before startup
+
+> [!NOTE]
+> These commands additionally require a Store build containing the [offline checker change](https://github.com/apache/hugegraph/pull/3399).
+> Availability depends on that runtime change being merged and included in your distribution; this guide does not establish that a released tag has the script.
+> The registration guard and offline command are separate entry points. A build with only the registration guard need not include this command.
+
+Stop writers, retain matching PD, Store data and Raft backups, and complete the original version's snapshot and Store shutdown procedure.
+Using Java 17, selected through `JAVA_HOME` or `PATH`, run from the Store distribution containing the change:
+
+```bash
+bin/hugegraph-store-check.sh --check
+```
+
+`--config` selects a local configuration directory, defaulting to the distribution's `conf`. Use `--data-path` for the effective data roots.
+Separate multiple roots with commas in one argument. Do not repeat `--data-path`: duplicate options are rejected rather than accumulated.
+
+```bash
+bin/hugegraph-store-check.sh --check \
+  --config /srv/hugegraph-store/conf \
+  --data-path /srv/store-data-a,/srv/store-data-b
+```
+
+Replace these example paths with deployment values. Relative paths resolve from the Store distribution.
+The command reads `application.yml` followed by `application-pd.yml` when present.
+It starts no Spring context, PD, Server or Raft node and creates no inspected DB.
+It does not automatically apply Spring environment, JSON or profile overrides. For example, pass a container's `HG_STORE_DATA_PATH` explicitly through
+`--data-path`; the entrypoint's `SPRING_APPLICATION_JSON` is not applied. Configuration files must also contain the resolved effective RocksDB settings.
+
+For Topling, prepare the verified runtime assets first, set `TOPLINGDB_ROCKSDB_PROVIDER=topling`,
+and retain `rocksdb.provider=topling` in effective configuration.
+The checker shares the Store launcher's runtime selector, and the selected JNI JAR precedes the bundled standard RocksDB classes.
+Missing or unverified assets fail the check; do not switch providers to treat that failure as a pass.
+
+Check every stopped Store. Active DB locks cause refusal; a separate read-only process also cannot see a running Store's unflushed memtables.
+The scope includes configured data roots, retained DB versions, each partition's latest local snapshot and other recorded storage locations.
+It seeks `FFFE` per column family and validates GraphID metadata instead of scanning every business row
+or invoking the normal opener that can prune old versions.
+
+| Result | Meaning and action |
+| --- | --- |
+| Exit 0 | No incompatible prefix or invalid mapping was found in the inspected persisted DBs and latest snapshots; retain backups and continue normal upgrade acceptance |
+| Exit 2 | Legacy data, invalid mappings, active locks, configuration or I/O problems; resolve the path-specific diagnosis and recheck before upgrading |
+| Other nonzero exit | The launcher, JVM or check did not succeed; refuse the upgrade instead of treating this as clean |
+
+Exit 0 does not establish historical ownership, backup completeness or acceptance of the whole upgrade, and never authorizes merging prefixes.
+On refusal, follow the trusted-source recovery boundaries below. See the
+[runtime upgrade guide](https://github.com/hugegraph/hugegraph/blob/fix/graphid-upgrade-guard/docs/graphid-upgrade.md) for the command contract.
+
 #### Upgrade and migration
 
 Stop application writes and back up the original cluster's data, metadata and Raft state. Data that passes the GraphID guard needs no migration for this issue;
