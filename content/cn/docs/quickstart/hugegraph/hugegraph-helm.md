@@ -242,7 +242,7 @@ SeaTunnel 默认关闭。开启后，Helm 会启动常驻的 SeaTunnel 引擎，
 > 以下命令在 HugeGraph 源码根目录执行。
 
 ```mermaid
-flowchart LR
+flowchart TB
     A["数据源 / 远端图 A"] --> ST
     subgraph Release["一个 Helm release"]
         ST["SeaTunnel hybrid<br/>一个或多个常驻节点"] -->|读写| HG["HugeGraph<br/>Server + PD + Store"]

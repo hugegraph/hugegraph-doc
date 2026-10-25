@@ -252,7 +252,7 @@ The official `apache/seatunnel:3.0.0` image includes HugeGraph Source/Sink, so n
 > Run the following commands from the HugeGraph source root.
 
 ```mermaid
-flowchart LR
+flowchart TB
     A["Data source / remote graph A"] --> ST
     subgraph Release["One Helm release"]
         ST["SeaTunnel hybrid<br/>One or more persistent nodes"] -->|Read/write| HG["HugeGraph<br/>Server + PD + Store"]
