@@ -2,7 +2,7 @@
 title: "Deploy HugeGraph with Helm"
 linkTitle: "Helm Deployment"
 weight: 4
-search_keywords: [HugeGraph Helm, Kubernetes, K8s, NodePort, Hubble, OCI, GHCR, Artifact Hub]
+search_keywords: [HugeGraph Helm, Kubernetes, K8s, NodePort, Hubble, OCI, GHCR, Artifact Hub, SeaTunnel Helm]
 ---
 
 This guide covers HugeGraph **1.8.0 and later**, using Helm **3.10+** with OCI support and Kubernetes (K8s) **1.23+**.
@@ -239,3 +239,145 @@ A contradictory budget fails rendering with the relevant parameter names. Storag
 The default `helm test` hook checks connectivity and reads. After installation or recovery, also test a new UI login and your application's
 read/write queries.
 For scheduling, NetworkPolicy, rolling updates and recovery, see [Kubernetes operations](./hugegraph-helm-operations.md).
+
+## 6 Start SeaTunnel alongside HugeGraph
+
+SeaTunnel is disabled by default. Enabling it starts a persistent engine with its built-in job UI.
+The official `apache/seatunnel:3.0.0` image includes HugeGraph Source/Sink, so no derived image or plugin installation is needed.
+
+> [!NOTE]
+> This section requires a Chart with the `seatunnel` settings, introduced in
+> [code PR #333](https://github.com/hugegraph/hugegraph/pull/333).
+> Until that feature is merged and released, use its source branch rather than assuming the OCI package above includes it.
+> Run the following commands from the HugeGraph source root.
+
+```mermaid
+flowchart LR
+    A["Data source / remote graph A"] --> ST
+    subgraph Release["One Helm release"]
+        ST["SeaTunnel hybrid<br/>One or more persistent nodes"] -->|Read/write| HG["HugeGraph<br/>Server + PD + Store"]
+    end
+    U["Administrator"] -->|Basic auth: UI / REST| ST
+```
+
+### 6.1 Choose standalone or cluster
+
+A hybrid node handles both scheduling and execution. Standalone runs one persistent node; cluster runs several of the same node type.
+Both use one StatefulSet definition. HugeGraph replica counts are independent: one PD, Store and Server can run with two SeaTunnel nodes.
+
+For a new test environment, choose one command. `values-single.yaml` selects the single-replica HugeGraph topology only.
+
+```bash {tab="Standalone SeaTunnel"}
+helm install hugegraph ./helm/hugegraph -n hugegraph --create-namespace \
+  -f helm/hugegraph/values-single.yaml \
+  -f helm/hugegraph/examples/values-seatunnel-standalone.yaml \
+  --wait --timeout 30m
+```
+
+```bash {tab="SeaTunnel cluster"}
+helm install hugegraph ./helm/hugegraph -n hugegraph --create-namespace \
+  -f helm/hugegraph/values-single.yaml \
+  -f helm/hugegraph/examples/values-seatunnel-cluster.yaml \
+  --wait --timeout 30m
+```
+
+For an existing HugeGraph release, retain its complete values, add `seatunnel.enabled: true` and the chosen mode, then run `helm upgrade`.
+Do not replace an existing cluster with the single-replica preset just to enable SeaTunnel.
+The official SeaTunnel image is large; allow time for the first pull or mirror it to your internal registry first.
+
+### 6.2 Open the UI and sign in
+
+The HTTP entry follows the top-level `mode`, independently of the standalone/cluster choice in `seatunnel.mode`:
+
+| Top-level mode | Default entry | Access from outside Kubernetes |
+|---|---|---|
+| `easy` | NodePort | Reachable node IP and the assigned NodePort |
+| `strict` | ClusterIP and NetworkPolicy | Port-forward, or an existing gateway with rules for actual callers |
+
+Override the entry with `seatunnel.service.type`; set a fixed port with `seatunnel.service.nodePort`.
+Omission or `0` lets Kubernetes allocate a port. Find the assigned entry or forward it locally:
+
+```bash {tab="easy: node entry"}
+kubectl -n hugegraph get svc hugegraph-seatunnel \
+  -o jsonpath='{.spec.ports[?(@.name=="http")].nodePort}{"\n"}'
+kubectl get nodes -o wide
+# Open http://<reachable-node-ip>:<NodePort>/#/overview
+```
+
+```bash {tab="Local port-forward"}
+kubectl -n hugegraph port-forward svc/hugegraph-seatunnel 8081:8080
+# Open http://127.0.0.1:8081/#/overview
+```
+
+The UI and REST use a separate SeaTunnel administrator, not the HugeGraph login password.
+The default username is `admin`; a generated password is stored in `hugegraph-seatunnel-auth`.
+Read it and enter the credentials in the browser's Basic authentication prompt:
+
+```bash
+kubectl -n hugegraph get secret hugegraph-seatunnel-auth \
+  -o jsonpath='{.data.password}' | base64 --decode
+```
+
+Normal online upgrades retain this password. To rotate it, set `seatunnel.auth.password` in controlled values and upgrade.
+Set a custom username with `seatunnel.auth.username`; the actual name is also stored in the Secret's `username` key.
+Offline and GitOps rendering need fixed, controlled credentials; they cannot rely on online `lookup` to reuse a generated password.
+
+> [!WARNING]
+> HTTP Basic protects the UI, static assets and REST, not per-user or per-job permissions.
+> Port 5801 is the internal member and Java CLI channel. It does not use HTTP Basic; keep it internal to trusted networks and Kubernetes access.
+> Use an existing HTTPS gateway for external access. In strict mode, an extra HTTP entry also needs `networkPolicy.seatunnel.extraIngress`.
+
+### 6.3 Run the prepared examples
+
+Helm supplies the current release's Server DNS, port, graph space and administrator Secret reference to the connectors, and mounts two job files.
+Users still create graphs and submit jobs; installation does not write graph data automatically.
+
+1. **Create the graph**: use Hubble or the HugeGraph API to create an empty `DEFAULT/graph_a`.
+   If you override `HG_GRAPH_SPACE` or `HG_GRAPH_NAME`, create that graph instead.
+2. **Import ten records**: submit the mounted Sink example, which writes ten fixed records to `seatunnel_demo_person`.
+
+   ```bash
+   kubectl -n hugegraph exec sts/hugegraph-seatunnel -- \
+     /opt/seatunnel/bin/seatunnel.sh --master cluster \
+     --config /opt/seatunnel/config/hugegraph-sink.conf
+   ```
+
+3. **Read them back**: submit the Source example, which reads that label and writes records to the execution node's Console log.
+
+   ```bash
+   kubectl -n hugegraph exec sts/hugegraph-seatunnel -- \
+     /opt/seatunnel/bin/seatunnel.sh --master cluster \
+     --config /opt/seatunnel/config/hugegraph-source.conf
+   ```
+{.steps}
+
+Standalone also uses `--master cluster` to submit to the persistent engine.
+Both jobs should reach `FINISHED`, with ten records read and written; also verify graph data and the UI DAG.
+Console output can appear on any hybrid Pod, not necessarily `-0`.
+External clients use the same HTTP entry with SeaTunnel credentials and the
+[REST API](https://seatunnel.apache.org/docs/next/engines/zeta/rest-api-and-web-ui/).
+
+> [!DETAILS]- Change connection settings or examples
+> `HG_HOST/PORT/PROTOCOL` points to this release's Server; `HG_USERNAME/PASSWORD` references its administrator credentials.
+> `HG_GRAPH_SPACE` comes from `server.graphSpace`, and `HG_GRAPH_NAME` defaults to `graph_a`.
+> Same-name entries in `seatunnel.env` override these defaults, including Secret references for a dedicated account.
+> Override native job files by filename in `seatunnel.config`. Other graphs also need mappings for their labels, properties and ID strategies.
+
+### 6.4 Switch modes and migrate a graph
+
+Stop jobs first, then edit the complete values: `seatunnel.mode: standalone` for one node,
+or `seatunnel.mode: cluster` and `replicas: 2` or more for a cluster. Upgrade without redeploying HugeGraph:
+
+```bash
+helm upgrade hugegraph ./helm/hugegraph -n hugegraph \
+  -f my-values.yaml --wait --timeout 30m
+```
+
+Switching in either direction can restart the engine and does not resume jobs automatically.
+Data already written to HugeGraph remains; the temporary checkpoint directory does not guarantee persistent recovery.
+Setting `seatunnel.enabled: false` removes the engine and Service, while the authentication Secret follows its retention policy.
+
+For graph A to graph B, run **schema → vertices → edges**, configuring the remote source address, credentials and network rules.
+Local `HG_*` defaults do not discover remote graphs.
+See [Source export and migration](/docs/quickstart/toolchain/export-migration/hugegraph-seatunnel-source/) for mappings and ID limits,
+and [Sink imports](/docs/quickstart/toolchain/import/hugegraph-seatunnel-connector/) for data sources.

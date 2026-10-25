@@ -2,7 +2,7 @@
 title: "使用 Helm 部署 HugeGraph"
 linkTitle: "Helm 部署"
 weight: 4
-search_keywords: [HugeGraph Helm, Kubernetes, K8s, NodePort, Hubble, 内网部署, OCI, GHCR, Artifact Hub]
+search_keywords: [HugeGraph Helm, Kubernetes, K8s, NodePort, Hubble, 内网部署, OCI, GHCR, Artifact Hub, SeaTunnel Helm]
 ---
 
 本文适用于 HugeGraph **1.8.0 及以后版本**，需要支持 OCI 的 Helm **3.10+** 和 Kubernetes (K8s) **1.23+**。
@@ -230,3 +230,139 @@ PD 成员、持久存储和共享凭据变更需要按生命周期说明协调�
 
 默认 `helm test` hook 检查连接和读取。安装或恢复后，还应重新登录 UI，并验证应用实际使用的读写查询。
 调度、NetworkPolicy、滚动升级和恢复见 [Kubernetes 运维](./hugegraph-helm-operations.md)。
+
+## 6 同时启动 SeaTunnel
+
+SeaTunnel 默认关闭。开启后，Helm 会启动常驻的 SeaTunnel 引擎，并带上内置任务前端。
+官方 `apache/seatunnel:3.0.0` 镜像已包含 HugeGraph Source/Sink，无需另做镜像或安装插件。
+
+> [!NOTE]
+> 本节需要包含 `seatunnel` 配置的 Chart，功能对应[代码 PR #333](https://github.com/hugegraph/hugegraph/pull/333)。
+> 在该功能合入并发布前，请使用对应源码分支；不要假定上文下载的 OCI 包已包含它。
+> 以下命令在 HugeGraph 源码根目录执行。
+
+```mermaid
+flowchart LR
+    A["数据源 / 远端图 A"] --> ST
+    subgraph Release["一个 Helm release"]
+        ST["SeaTunnel hybrid<br/>一个或多个常驻节点"] -->|读写| HG["HugeGraph<br/>Server + PD + Store"]
+    end
+    U["管理人员"] -->|Basic 认证：UI / REST| ST
+```
+
+### 6.1 选择单机或集群
+
+hybrid 节点同时负责调度和执行。单机是一个常驻节点，集群是多个同类节点；它们使用同一套 StatefulSet。
+HugeGraph 的副本数与 SeaTunnel 模式独立选择，例如 1 PD + 1 Store + 1 Server 也能配两个 SeaTunnel 节点。
+
+新建测试环境时，选择下面一种方式。`values-single.yaml` 只设置 HugeGraph 的单副本拓扑。
+
+```bash {tab="SeaTunnel 单机"}
+helm install hugegraph ./helm/hugegraph -n hugegraph --create-namespace \
+  -f helm/hugegraph/values-single.yaml \
+  -f helm/hugegraph/examples/values-seatunnel-standalone.yaml \
+  --wait --timeout 30m
+```
+
+```bash {tab="SeaTunnel 集群"}
+helm install hugegraph ./helm/hugegraph -n hugegraph --create-namespace \
+  -f helm/hugegraph/values-single.yaml \
+  -f helm/hugegraph/examples/values-seatunnel-cluster.yaml \
+  --wait --timeout 30m
+```
+
+已有 HugeGraph 部署时，保留原来的完整 values，只加入 `seatunnel.enabled: true` 和所需模式，再执行 `helm upgrade`。
+不要为了开启 SeaTunnel 把原有集群替换成单副本预设。官方 SeaTunnel 镜像较大，首次拉取可预留更长时间，或提前镜像到内网仓库。
+
+### 6.2 打开前端并登录
+
+SeaTunnel 的 HTTP 入口沿用顶层 `mode`，与 `seatunnel.mode` 的单机／集群选择互不影响：
+
+| 顶层模式 | 默认入口 | 集群外访问 |
+|---|---|---|
+| `easy` | NodePort | 可达节点 IP + 分配的 NodePort |
+| `strict` | ClusterIP + NetworkPolicy | 端口转发，或按实际调用方配置已有网关和放行规则 |
+
+`seatunnel.service.type` 可覆盖入口类型，`seatunnel.service.nodePort` 可指定端口；省略或设为 `0` 时由 Kubernetes 分配。
+查看实际入口，或在本机做端口转发：
+
+```bash {tab="easy：节点入口"}
+kubectl -n hugegraph get svc hugegraph-seatunnel \
+  -o jsonpath='{.spec.ports[?(@.name=="http")].nodePort}{"\n"}'
+kubectl get nodes -o wide
+# 打开 http://<可达节点IP>:<NodePort>/#/overview
+```
+
+```bash {tab="本机端口转发"}
+kubectl -n hugegraph port-forward svc/hugegraph-seatunnel 8081:8080
+# 打开 http://127.0.0.1:8081/#/overview
+```
+
+前端和 REST 使用独立的 SeaTunnel 管理员，不使用 HugeGraph 的登录密码。默认用户名为 `admin`，密码自动生成并保存在
+`hugegraph-seatunnel-auth` Secret。读取密码后，在浏览器的 Basic 登录框中填写：
+
+```bash
+kubectl -n hugegraph get secret hugegraph-seatunnel-auth \
+  -o jsonpath='{.data.password}' | base64 --decode
+```
+
+普通在线升级会复用此密码；需要轮换时，在受控 values 中设置 `seatunnel.auth.password` 后升级。
+自定义用户名用 `seatunnel.auth.username`，实际值也保存在 Secret 的 `username` 键。
+离线或 GitOps 渲染应固定受控凭据，不能依赖在线 `lookup` 复用随机密码。
+
+> [!WARNING]
+> HTTP Basic 保护前端、静态资源和 REST，不提供按用户或作业划分的细粒度权限。
+> 5801 是内部成员和 Java CLI 通道，不受 HTTP Basic 保护，不要对外公开；只在可信集群网络和 Kubernetes 权限范围使用。
+> 对外访问可接入已有 HTTPS 网关。strict 模式额外开放 HTTP 入口时，还需配置 `networkPolicy.seatunnel.extraIngress`。
+
+### 6.3 运行已经配好的示例
+
+Helm 会把本 release 的 Server DNS、端口、图空间和管理员 Secret 引用传给连接器，并挂载两份作业文件。
+建图和提交任务仍由用户执行，安装时不会自动写入数据。
+
+1. **创建图**：通过 Hubble 或 HugeGraph API 创建空的 `DEFAULT/graph_a`。
+   改写 `HG_GRAPH_SPACE` 或 `HG_GRAPH_NAME` 后，应创建对应图。
+2. **导入十条数据**：运行挂载的 Sink 示例，向 `seatunnel_demo_person` 标签写入十条固定记录。
+
+   ```bash
+   kubectl -n hugegraph exec sts/hugegraph-seatunnel -- \
+     /opt/seatunnel/bin/seatunnel.sh --master cluster \
+     --config /opt/seatunnel/config/hugegraph-sink.conf
+   ```
+
+3. **读回数据**：运行 Source 示例，读取同一标签并输出到执行节点的 Console 日志。
+
+   ```bash
+   kubectl -n hugegraph exec sts/hugegraph-seatunnel -- \
+     /opt/seatunnel/bin/seatunnel.sh --master cluster \
+     --config /opt/seatunnel/config/hugegraph-source.conf
+   ```
+{.steps}
+
+单机也使用 `--master cluster`，表示提交给常驻引擎。两项作业都应为 `FINISHED`、读写各十条；再核对图中数据和前端 DAG。
+Console 日志可能在任一 hybrid Pod，不限定在 `-0` 节点。外部客户端通过同一 HTTP 入口、携带 SeaTunnel 凭据调用
+[REST API](https://seatunnel.apache.org/docs/next/engines/zeta/rest-api-and-web-ui/)。
+
+> [!DETAILS]- 需要改连接信息或示例时
+> 默认的 `HG_HOST/PORT/PROTOCOL` 指向本 release 的 Server，`HG_USERNAME/PASSWORD` 引用它的管理员凭据，
+> `HG_GRAPH_SPACE` 取 `server.graphSpace`，`HG_GRAPH_NAME` 默认为 `graph_a`。
+> `seatunnel.env` 中的同名条目可覆盖默认值，包括引用专用账号的 Secret。
+> 原生作业文件可通过 `seatunnel.config` 按文件名覆盖。换成其他图时，还需按实际标签、属性和 ID 策略调整映射。
+
+### 6.4 切换模式与迁移图
+
+先停止作业，再修改完整 values：单机设 `seatunnel.mode: standalone`；集群设 `seatunnel.mode: cluster`、`replicas: 2` 或更多。
+随后升级，不需要重新部署 HugeGraph：
+
+```bash
+helm upgrade hugegraph ./helm/hugegraph -n hugegraph \
+  -f my-values.yaml --wait --timeout 30m
+```
+
+单机切到集群、集群切回单机都可能重启引擎，不会自动续跑任务。已经写入 HugeGraph 的数据保留；默认临时 checkpoint 不提供持久化恢复保证。
+`seatunnel.enabled: false` 会移除引擎和 Service，认证 Secret 则按保留策略留下。
+
+从图 A 复制到图 B 时，按 **Schema → 顶点 → 边** 的顺序执行，并配置远端源图的地址、凭据及必要网络规则。
+本地的 `HG_*` 不会自动发现远端图。任务映射和 ID 限制见
+[Source 导出与迁移](/cn/docs/quickstart/toolchain/export-migration/hugegraph-seatunnel-source/)；数据源接入见
+[Sink 导入](/cn/docs/quickstart/toolchain/import/hugegraph-seatunnel-connector/)。

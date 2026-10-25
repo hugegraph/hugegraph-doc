@@ -11,6 +11,10 @@ SeaTunnel connects data sources such as databases and Kafka to HugeGraph. The co
 > **Version requirement: This guide targets SeaTunnel [3.0+](https://seatunnel.apache.org/download/).**
 > All examples use the `mappings` configuration available in SeaTunnel 3.0+.
 
+With HugeGraph Helm, you can [start SeaTunnel alongside HugeGraph](/docs/quickstart/hugegraph/hugegraph-helm/#6-start-seatunnel-alongside-hugegraph).
+That path prepares the HugeGraph connector, engine configuration and local credential references.
+This page covers job mappings for other data sources.
+
 [![Loader imports data directly with graph mappings; SeaTunnel 3.0+ combines Source, Transform, and Sink, and both support JDBC, Kafka, and graph data](/docs/images/seatunnel/seatunnel-vs-loader-en.png)](/docs/images/seatunnel/seatunnel-vs-loader-en.png)
 
 Click a diagram to view the original size.
