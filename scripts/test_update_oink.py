@@ -97,12 +97,14 @@ class UpgradeInventoryTest(unittest.TestCase):
                             "import os\n" +
                             "assert 'HUGO_MODULE_REPLACEMENTS' not in os.environ\n" +
                             "assert 'HUGO_THEME' not in os.environ\n" +
+                            "assert 'HUGO_PANICONWARNING' not in os.environ\n" +
                             "assert os.environ['GOWORK'] == 'off'\n" +
                             "assert os.environ['HUGO_MODULE_WORKSPACE'] == 'off'\n" +
                             f"print('{SITE_MODULE} {MODULE}@v1.2.0')\n")
             hugo.chmod(0o755)
             preview = {"HUGO_BIN": str(hugo), "HUGO_MODULE_REPLACEMENTS": "oink -> /tmp/local-theme",
-                       "HUGO_THEME": "/tmp/local-preview", "GOWORK": "/tmp/go.work", "HUGO_MODULE_WORKSPACE": "/tmp/hugo.work"}
+                       "HUGO_THEME": "/tmp/local-preview", "HUGO_PANICONWARNING": "true",
+                       "GOWORK": "/tmp/go.work", "HUGO_MODULE_WORKSPACE": "/tmp/hugo.work"}
             with patch.dict(os.environ, preview):
                 with update_oink.isolated_release():
                     update_oink.verify_hugo_graph(root, "v1.2.0")
@@ -319,11 +321,13 @@ class UpgradeInventoryTest(unittest.TestCase):
                 observations.append(list(argv))
                 self.assertNotIn("HUGO_MODULE_REPLACEMENTS", env)
                 self.assertNotIn("HUGO_THEME", env)
+                self.assertNotIn("HUGO_PANICONWARNING", env)
                 self.assertEqual(env["GOWORK"], "off")
                 self.assertEqual(env["HUGO_MODULE_WORKSPACE"], "off")
                 self.assertEqual(env["HUGO_BIN"], "/resolved/hugo")
 
-            with patch.dict(os.environ, {"HUGO_BIN": "./relative-hugo", "HUGO_MODULE_REPLACEMENTS": "preview"}), \
+            with patch.dict(os.environ, {"HUGO_BIN": "./relative-hugo", "HUGO_MODULE_REPLACEMENTS": "preview",
+                                         "HUGO_PANICONWARNING": "true"}), \
                  patch.object(update_oink.shutil, "which", return_value="/resolved/hugo"), \
                  patch.object(update_oink, "validation_snapshot", return_value="local-snapshot"), \
                  patch.object(update_oink, "run", side_effect=run):

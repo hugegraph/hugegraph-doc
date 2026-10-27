@@ -57,10 +57,14 @@ Hugo highlighting supplies inline line numbers. Ordinary snippets do not need a
 filename or title bar. For one short standalone command, OINK 1.4.0 supports:
 
 ````markdown
-```bash {class="td-code-command"}
+```bash {class="td-code-command" lineNos=false}
 scripts/hugo.sh server
 ```
 ````
+
+Command strips require exactly one line, no line numbers and no `collapse`.
+Keep `lineNos=false` explicit because this site's global highlighting enables
+line numbers.
 
 Adjacent examples of the same settings in supported formats can become tabs
 without a custom container:

@@ -98,6 +98,12 @@ Release checks disable inherited Hugo replacements and preview themes, set
 initialization cannot rewrite the checkout; the parent directory must be writable.
 Normal preview commands retain local-development capabilities.
 
+Manual CI dispatches inspect the immutable candidate's theme pin before scheduling
+builds. OINK 1.3.0 and 1.3.1 require standalone Dart Sass and are rejected by the
+current native-LibSass workflow; upgrade such a candidate to OINK 1.4.0 first.
+This restriction concerns the candidate's theme, not historical documentation:
+archived content continues to use the current site shell.
+
 Reuse the same external work directory to preserve the first lock/inventory
 backup, `review.json`, `toolchain.json`, build artifacts and captures. Initial
 runs reject reserved outputs instead of overwriting user files; existing

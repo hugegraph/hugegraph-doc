@@ -123,6 +123,22 @@ jobs:
             [[ "$latest_sha" =~ ^[0-9a-f]{40}$ ]]
             git fetch --no-tags origin "$latest_sha"
 
+            # Inspect the immutable candidate before scheduling native-only builds.
+            candidate_theme="$(
+              set -e
+              candidate_probe="$(mktemp -d "$RUNNER_TEMP/oink-candidate.XXXXXX")"
+              trap 'rm -f -- "$candidate_probe/go.mod"; rmdir -- "$candidate_probe"' EXIT
+              git show "$latest_sha:go.mod" > "$candidate_probe/go.mod"
+              go mod edit -json "$candidate_probe/go.mod" |
+                jq -er '.Require[] | select(.Path == "github.com/pgsty/oink") | .Version'
+            )"
+            case "$candidate_theme" in
+              v1.3.0|v1.3.1)
+                echo "::error::OINK $candidate_theme needs standalone Dart Sass. This workflow uses Hugo's built-in LibSass; upgrade the candidate to OINK v1.4.0 before dispatching again."
+                exit 1
+                ;;
+            esac
+
             case "$OPERATION" in
               staging-next)
                 # Dispatches must load this privileged workflow from master;

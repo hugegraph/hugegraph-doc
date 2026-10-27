@@ -80,26 +80,22 @@ for (const [locale, localeCases] of Object.entries(cases)) {
         .first()
         .locator('[role="option"]');
       await expect(pageResults.first(), `no Lunr results for ${query}`).toBeVisible();
-      await expect
-        .poll(() =>
-          pageResults.evaluateAll((rows) =>
-            rows
-              .slice(0, 3)
-              .map((row) => row.querySelector(".td-shell-search__item-title")?.textContent.trim())
-          )
-        )
-        .toContain(expectedTitle);
-      const titles = await pageResults.evaluateAll((rows) =>
-        rows.slice(0, 3).map((row) =>
-          row.querySelector(".td-shell-search__item-title")?.textContent.trim()
-        )
+      // OINK may append " › section" to a page's indexed title. Accept only
+      // that explicit suffix and activate the matching row within the top
+      // three, then verify its real destination rather than a title substring.
+      const expectedRank = () => pageResults.evaluateAll((rows, title) =>
+        rows.slice(0, 3).findIndex((row) => {
+          const label = row.querySelector(".td-shell-search__item-title")?.textContent.trim() || "";
+          return label === title || label.startsWith(title + " › ");
+        }), expectedTitle
       );
-      expect(
-        titles.includes(expectedTitle),
-        `${query} must rank ${expectedRef} in the top three`
-      ).toBe(true);
-      const target = pageResults.filter({ hasText: expectedTitle }).first();
-      await target.click();
+      await expect
+        .poll(expectedRank, { message: `${query} must rank ${expectedRef} in the top three` })
+        .toBeGreaterThanOrEqual(0);
+      const rank = await expectedRank();
+      expect(rank).toBeGreaterThanOrEqual(0);
+      expect(rank).toBeLessThan(3);
+      await pageResults.nth(rank).click();
       await expect(page).toHaveURL((url) => url.pathname === expectedRef);
     });
   }

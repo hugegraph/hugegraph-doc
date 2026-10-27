@@ -41,6 +41,8 @@ def release_environment():
     env = dict(os.environ)
     env.pop("HUGO_MODULE_REPLACEMENTS", None)
     env.pop("HUGO_THEME", None)
+    # LibSass emits an expected deprecation warning; release checks retain it.
+    env.pop("HUGO_PANICONWARNING", None)
     env.update(GOWORK="off", HUGO_MODULE_WORKSPACE="off")
     # Version assembly changes cwd; relative HUGO_BIN paths would stop working.
     hugo = env.get("HUGO_BIN")

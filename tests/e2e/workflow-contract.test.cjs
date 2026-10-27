@@ -300,6 +300,61 @@ test("manual candidates build and validate every immutable selected version usin
   }
 });
 
+test("manual candidate planning blocks only the two external-Sass releases", () => {
+  const { spawnSync } = require("node:child_process");
+  const os = require("node:os");
+  const directory = fs.mkdtempSync(path.join(os.tmpdir(), "candidate-theme-plan-"));
+  const env = {...process.env, BASH_ENV: "", GOTOOLCHAIN: "local",
+    GIT_AUTHOR_NAME: "Workflow contract", GIT_AUTHOR_EMAIL: "workflow@localhost",
+    GIT_COMMITTER_NAME: "Workflow contract", GIT_COMMITTER_EMAIL: "workflow@localhost"};
+  const git = (...args) => {
+    const result = spawnSync("git", args, {cwd: directory, env, encoding: "utf8"});
+    assert.equal(result.status, 0, result.stderr);
+    return result.stdout.trim();
+  };
+  try {
+    git("init", "--quiet", "--initial-branch=master");
+    git("remote", "add", "origin", directory);
+    fs.writeFileSync(path.join(directory, "versions.json"), JSON.stringify({
+      versions: [{id: "latest", archived: false, ref: "master"}]
+    }));
+    for (const [pin, rejected] of [["v1.2.0", false], ["v1.3.0", true], ["v1.3.1", true], ["v1.4.0", false]]) {
+      // Exercise both valid go.mod require forms through the real Go parser.
+      const requirement = pin === "v1.3.1"
+        ? `require (\n\tgithub.com/pgsty/oink ${pin}\n)\n`
+        : `require github.com/pgsty/oink ${pin}\n`;
+      const source = `module github.com/apache/hugegraph-doc\n\ngo 1.20\n\n${requirement}`;
+      fs.writeFileSync(path.join(directory, "go.mod"), source);
+      git("add", "go.mod");
+      git("-c", "core.hooksPath=/dev/null", "commit", "--quiet", "-m", pin);
+      git("branch", "--force", "candidate");
+      const sha = git("rev-parse", "HEAD");
+      const output = path.join(directory, `outputs-${pin}`);
+      const result = spawnSync("bash", ["--noprofile", "--norc", "-p", "-e", "-c",
+        stepScript("Resolve trusted event plan")], {
+        cwd: directory, encoding: "utf8",
+        env: {...env, EVENT_NAME: "workflow_dispatch", EVENT_SHA: sha,
+          OPERATION: "staging-next", SCOPE: "latest", CANDIDATE_BRANCH: "candidate",
+          CONFIRMATION: "publish asf-staging-oink", GITHUB_REF: "refs/heads/master",
+          PRODUCTION_ORIGIN: "https://production.example/", STAGING_ORIGIN: "https://staging.example/",
+          GITHUB_OUTPUT: output, RUNNER_TEMP: directory}
+      });
+      if (rejected) {
+        assert.notEqual(result.status, 0, pin);
+        assert.ok(result.stdout.includes(`OINK ${pin} needs standalone Dart Sass`), result.stdout);
+        assert.match(result.stdout, /upgrade the candidate to OINK v1\.4\.0/);
+        assert.equal(fs.existsSync(output), false);
+      } else {
+        assert.equal(result.status, 0, result.stderr);
+        assert.ok(fs.readFileSync(output, "utf8").includes(`source_sha=${sha}\n`));
+      }
+      assert.equal(fs.readFileSync(path.join(directory, "go.mod"), "utf8"), source);
+    }
+  } finally {
+    fs.rmSync(directory, {recursive: true, force: true});
+  }
+});
+
 test("manual aggregation retains staging flags without requiring new candidate CLI options", () => {
   const { spawnSync } = require("node:child_process");
   const os = require("node:os");
