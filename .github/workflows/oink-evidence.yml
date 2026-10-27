@@ -63,6 +63,9 @@ jobs:
       - name: Build reviewed baseline
         working-directory: .oink-before
         run: scripts/hugo.sh build --destination "$RUNNER_TEMP/oink-before-site"
+      - uses: actions/setup-node@820762786026740c76f36085b0efc47a31fe5020
+        with:
+          node-version: "24"
       - name: Install browser harness
         working-directory: tests/e2e
         run: |
