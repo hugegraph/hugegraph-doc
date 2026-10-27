@@ -49,6 +49,20 @@ jobs:
         run: sudo apt-get update && sudo apt-get install --yes --no-install-recommends webp
       - name: Build upgraded latest
         run: scripts/hugo.sh build --destination "$RUNNER_TEMP/oink-after-site"
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1
+        with:
+          ref: efa1d042316e3f18caef4a642a685f38d2ec596f
+          path: .oink-before
+          fetch-depth: 0
+          persist-credentials: false
+      - name: Install baseline's matching Sass toolchain
+        uses: ./.oink-before/.github/actions/setup-site-tools
+        with:
+          hugo-version: "0.168.0"
+          dart-sass-version: "1.105.2"
+      - name: Build reviewed baseline
+        working-directory: .oink-before
+        run: scripts/hugo.sh build --destination "$RUNNER_TEMP/oink-before-site"
       - name: Install browser harness
         working-directory: tests/e2e
         run: |
@@ -65,7 +79,7 @@ jobs:
             const servers = [];
             let browser;
             try {
-              for (const [port, dir] of [[4173, 'oink-after-site']]) {
+              for (const [port, dir] of [[4173, 'oink-after-site'], [4176, 'oink-before-site']]) {
                 servers.push(spawn('python3', ['serve.py', String(port), '--bind', '127.0.0.1', '--directory', process.env.RUNNER_TEMP + '/' + dir], {stdio:'ignore'}));
                 for (let attempt = 0; attempt < 60; attempt++) {
                   try { if ((await fetch('http://127.0.0.1:' + port)).ok) break; } catch {}
@@ -74,6 +88,16 @@ jobs:
               }
               browser = await chromium.launch();
               const page = await browser.newPage({ viewport: {width:1440,height:900}, deviceScaleFactor:1 });
+              let artifactOrigin = 'http://127.0.0.1:4176';
+              await page.route('**/*', async route => {
+                const requested = new URL(route.request().url());
+                if (!['https://hugegraph.apache.org', 'https://hugegraph-oink.staged.apache.org'].includes(requested.origin)) {
+                  await route.continue();
+                  return;
+                }
+                const response = await route.fetch({url:new URL(requested.pathname + requested.search, artifactOrigin).href});
+                await route.fulfill({response, headers:{...response.headers(), 'access-control-allow-origin':'*'}});
+              });
               page.on('console', message => console.log('BROWSER_CONSOLE ' + message.type() + ' ' + message.text()));
               page.on('pageerror', error => console.log('BROWSER_ERROR ' + error.message));
               page.on('requestfailed', request => console.log('REQUEST_FAILED ' + request.url() + ' ' + JSON.stringify(request.failure())));
@@ -81,12 +105,16 @@ jobs:
               mkdirSync('oink-evidence', {recursive:true});
               const shot = async (name, target = page) => {
                 await page.evaluate(() => document.fonts.ready);
+                if (await page.evaluate(() => Array.from(document.querySelectorAll('link[rel="stylesheet"]')).some(link => !link.sheet))) throw new Error('Stylesheet did not load');
                 const bytes = await target.screenshot({type:'jpeg',quality:80,animations:'disabled'});
                 writeFileSync('oink-evidence/' + name + '.jpg', bytes);
                 console.log('OINK_IMAGE_BEGIN ' + name);
                 console.log(bytes.toString('base64'));
                 console.log('OINK_IMAGE_END');
               };
+              await page.goto('http://127.0.0.1:4176/cn/docs/introduction/', {waitUntil:'networkidle'});
+              await shot('before-documentation');
+              artifactOrigin = 'http://127.0.0.1:4173';
               await page.goto('http://127.0.0.1:4173/cn/docs/introduction/', {waitUntil:'networkidle'});
               console.log('CSS_DIAG ' + JSON.stringify(await page.evaluate(() => ({
                 sheets: Array.from(document.querySelectorAll('link[rel="stylesheet"]')).map(link => ({href:link.href,integrity:link.integrity,loaded:!!link.sheet})),
