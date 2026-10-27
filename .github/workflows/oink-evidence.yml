@@ -147,6 +147,7 @@ jobs:
               }))));
               const tableButton = page.locator('[data-td-table-expand]').filter({hasText:'restserver.connection_max_requests'}).locator('.td-table-expand');
               if (await tableButton.count()) {
+                await page.locator('[data-td-table-expand]').filter({hasText:'restserver.connection_max_requests'}).locator('thead').hover();
                 await tableButton.click();
                 await shot('table-reader');
                 await page.keyboard.press('Escape');
