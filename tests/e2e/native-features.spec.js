@@ -25,7 +25,8 @@ for (const language of ['en', 'cn']) {
     const markdown = await request.get(`${releaseRoute}index.md`);
     expect(markdown.ok()).toBe(true);
     const text = await markdown.text();
-    expect(text).toContain('**1.7.0 · 2025-11-16**');
+    // Escape punctuation in the tag while preserving its literal Markdown text.
+    expect(text).toContain(String.raw`**1\.7\.0 · 2025-11-16**`);
     for (const url of releaseLinks) expect(text).toContain(`](${url})`);
     expect(text).not.toContain('{{< release-card');
   });
