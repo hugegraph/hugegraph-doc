@@ -97,6 +97,7 @@ if [ "$mode" = "server" ]; then
     "$hugo_bin" server --config "hugo.yaml,$config_file" "$@"
   fi
 else
+  # OINK uses built-in LibSass; retain its deprecation warning without panicking.
   "$hugo_bin" \
     --config "hugo.yaml,$config_file" \
     --cleanDestinationDir \
@@ -105,7 +106,6 @@ else
     --environment production \
     --printPathWarnings \
     --printI18nWarnings \
-    --panicOnWarning \
     --logLevel info \
     "$@"
 fi

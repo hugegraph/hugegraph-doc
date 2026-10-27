@@ -57,7 +57,7 @@ class UpgradeInventoryTest(unittest.TestCase):
             for name, contents in before.items():
                 self.assertEqual((root / name).read_bytes(), contents)
 
-    def test_baseline_check_never_requires_sass_or_compiles(self):
+    def test_baseline_check_never_requires_toolchain_or_compiles(self):
         with tempfile.TemporaryDirectory() as directory:
             baseline = Path(directory) / "baseline.json"
             baseline.write_text(json.dumps({"version": "v1.2.0", "files": {}}))
@@ -310,7 +310,7 @@ class UpgradeInventoryTest(unittest.TestCase):
     def test_validation_subprocesses_inherit_isolation_and_absolute_hugo_path(self):
         with tempfile.TemporaryDirectory() as directory:
             work = Path(directory)
-            (work / "toolchain.json").write_text(json.dumps(dict(hugo="hugo 0.168.0", sass="1.105.2", go="go1.27.0", webp="1.6.0")))
+            (work / "toolchain.json").write_text(json.dumps(dict(hugo="hugo 0.168.0", go="go1.27.3", webp="1.6.0")))
             (work / "resolved.json").write_text(json.dumps({"versions": [{"id": "latest", "sha": "example"}]}))
             observations = []
 
@@ -328,7 +328,7 @@ class UpgradeInventoryTest(unittest.TestCase):
                  patch.object(update_oink, "validation_snapshot", return_value="local-snapshot"), \
                  patch.object(update_oink, "run", side_effect=run):
                 update_oink.validate(work)
-            self.assertTrue(any("scripts/build_versions.py" in argv and "--force-rebuild" in argv for argv in observations))
+            self.assertTrue(any("scripts/build_versions.py" in argv and "--force-rebuild" not in argv for argv in observations))
             self.assertTrue(any(argv[0] == "/resolved/hugo" for argv in observations))
             self.assertTrue(any("discover" in argv for argv in observations))
             prepare = next(argv for argv in observations if "prepare" in argv)
@@ -341,7 +341,7 @@ class UpgradeInventoryTest(unittest.TestCase):
     def test_validation_builds_both_ai_modes_before_browser_tests(self):
         with tempfile.TemporaryDirectory() as directory:
             work = Path(directory)
-            (work / "toolchain.json").write_text(json.dumps(dict(hugo="hugo 0.168.0", sass="1.105.2", go="go1.27.0", webp="1.6.0")))
+            (work / "toolchain.json").write_text(json.dumps(dict(hugo="hugo 0.168.0", go="go1.27.3", webp="1.6.0")))
             (work / "resolved.json").write_text(json.dumps({"versions": []}))
             with patch.object(update_oink, "validation_snapshot", return_value="local-snapshot"), \
                  patch.object(update_oink, "run") as run:
@@ -357,9 +357,10 @@ class UpgradeInventoryTest(unittest.TestCase):
                 self.assertIn(f"tests/e2e/{config}.yaml", str(builds[0].args[0]))
                 self.assertLess(calls.index(builds[0]), calls.index(browser))
             plan = next(call.args[0] for call in calls if "scripts/version_cache.py" in call.args[0])
-            self.assertEqual(plan[plan.index("--sass-version") + 1], "1.105.2")
+            self.assertNotIn("--sass-version", plan)
             versions = next(call for call in calls if "scripts/build_versions.py" in call.args[0])
-            self.assertIn("--force-rebuild", versions.args[0])
+            # Exact receipts already invalidate changed themes/shells; resume can reuse unchanged archives.
+            self.assertNotIn("--force-rebuild", versions.args[0])
             self.assertEqual(versions.args[0][versions.args[0].index("--workers") + 1], "2")
             self.assertEqual(versions.kwargs["env"]["HUGO_CACHEDIR"], str(work / "hugo-cache"))
             visual = next(call for call in calls if call.args[0] == ["npm", "run", "test:visual"])

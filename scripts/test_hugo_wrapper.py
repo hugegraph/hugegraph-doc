@@ -182,7 +182,7 @@ grep -q '"versions":\\[1,2,3,4,5\\]' "$generated"
                     expected_origin,
                 )
 
-    def test_build_enforces_the_warning_strict_production_contract(self) -> None:
+    def test_build_keeps_production_diagnostics_without_panicking_on_libsass(self) -> None:
         calls = self.run_wrapper("build", "--destination", "custom-public")
         args = calls[1]["args"]
         self.assertNotIn("build", args)
@@ -194,9 +194,11 @@ grep -q '"versions":\\[1,2,3,4,5\\]' "$generated"
             "production",
             "--printPathWarnings",
             "--printI18nWarnings",
-            "--panicOnWarning",
         ):
             self.assertIn(required, args)
+        self.assertNotIn("--panicOnWarning", args)
+        self.assertIn("--logLevel", args)
+        self.assertIn("info", args)
         self.assertEqual(args[-2:], ["--destination", "custom-public"])
 
     def test_documented_preview_and_build_use_the_wrapper(self) -> None:

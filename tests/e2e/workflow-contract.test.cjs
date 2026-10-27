@@ -73,39 +73,20 @@ function jobBody(name) {
   return body[1];
 }
 
-test("all Hugo jobs share the pinned standalone compiler setup", () => {
+test("all Hugo jobs share the pinned native Hugo compiler setup", () => {
   const action = fs.readFileSync(path.resolve(__dirname, "../../.github/actions/setup-site-tools/action.yml"), "utf8");
   assert.match(workflow, /HUGO_VERSION: 0\.168\.0/);
-  assert.match(workflow, /DART_SASS_VERSION: 1\.105\.2/);
   for (const job of ["prepare", "build", "aggregate"]) {
     const body = jobBody(job);
     const setupPath = job === "prepare" ? "./.github/actions/setup-site-tools" : "./resolved/setup-site-tools";
     assert.equal(body.split(`uses: ${setupPath}\n`).length - 1, 1);
     assert.match(body, /hugo-version: \$\{\{ env\.HUGO_VERSION \}\}/);
-    assert.match(body, /dart-sass-version: \$\{\{ env\.DART_SASS_VERSION \}\}/);
     if (job !== "aggregate") assert.doesNotMatch(body, /actions\/setup-node/);
   }
   assert.match(action, /uses: peaceiris\/actions-hugo@[a-f0-9]{40}/);
   assert.match(action, /extended: true/);
-  assert.match(action, /https:\/\/github\.com\/sass\/dart-sass\/releases\/download\//);
-  assert.match(action, /sha256sum --check --strict/);
-  assert.match(action, /a530ee08d5792c80bdb9d9614b45fb58219c890cb42a280a80775f0af9c29582/);
-  assert.doesNotMatch(action, /npm|setup-node/);
-});
-
-test("compiler setup rejects unverified versions and platforms before downloading", () => {
-  const { spawnSync } = require("node:child_process");
-  const action = fs.readFileSync(path.resolve(__dirname, "../../.github/actions/setup-site-tools/action.yml"), "utf8");
-  const script = action.split("      run: |\n")[1].split("\n")
-    .filter(line => line.startsWith("        ")).map(line => line.slice(8)).join("\n");
-  for (const overrides of [{RUNNER_OS: "macOS"}, {RUNNER_ARCH: "ARM64"}, {DART_SASS_VERSION: "unverified"}]) {
-    const result = spawnSync("bash", ["-e", "-c", script], {
-      env: {...process.env, BASH_ENV: "", RUNNER_OS: "Linux", RUNNER_ARCH: "X64", DART_SASS_VERSION: "1.105.2", ...overrides}
-    });
-    assert.notEqual(result.status, 0);
-    assert.match(result.stdout.toString(), /::error::.*(?:verified official Sass archive|official archive checksum)/);
-    assert.doesNotMatch(result.stderr.toString(), /curl:|unbound variable/);
-  }
+  assert.doesNotMatch(action, /dart-sass|npm|setup-node/);
+  assert.doesNotMatch(workflow, /DART_SASS_VERSION|dart-sass-version|sass --version/);
 });
 
 test("old manual candidate sources receive the trusted compiler action via prepared artifacts", () => {
@@ -135,16 +116,32 @@ test("old manual candidate sources receive the trusted compiler action via prepa
   }
 });
 
-test("historical and Hugo resource caches include the Sass compiler", () => {
+test("historical and Hugo resource caches follow the native Hugo toolchain", () => {
   for (const job of ["prepare", "build"]) {
     const body = jobBody(job);
     assert.match(body, /--hugo-version "\$\(hugo version\)"/);
-    assert.match(body, /--sass-version "\$\(sass --version\)"/);
+    assert.match(body, /--go-version "\$\(go version\)"/);
+    assert.doesNotMatch(body, /--sass-version/);
   }
   const resourceCache = jobBody("build").split("      - name: Cache Hugo resources\n")[1]
     .split("      - name:")[0];
-  assert.equal((resourceCache.match(/env\.DART_SASS_VERSION/g) ?? []).length, 2);
+  assert.equal((resourceCache.match(/env\.HUGO_VERSION/g) ?? []).length, 2);
   assert.equal((resourceCache.match(/hashFiles\('resolved\/setup-site-tools\/action\.yml'\)/g) ?? []).length, 2);
+});
+
+test("partial historical hits schedule one group without downloading a bundle in prepare", () => {
+  const prepare = jobBody("prepare");
+  const lookup = stepBody("Look up a compatible historical bundle");
+  assert.match(lookup, /restore-keys: \$\{\{ runner\.os \}\}-\$\{\{ steps\.history-plan\.outputs\.prefix \}\}/);
+  assert.match(lookup, /lookup-only: true/);
+  const groups = stepBody("Select bounded build groups");
+  assert.match(groups, /history-lookup\.outputs\.cache-matched-key != ''/);
+  assert.doesNotMatch(groups, /outputs\.cache-hit/);
+  assert.match(prepare, /echo "prefix=\$\(jq -r \.cachePrefix cache-plan\.json\)"/);
+  assert.match(jobBody("build"), /restore-keys: \$\{\{ runner\.os \}\}-\$\{\{ needs\.prepare\.outputs\.cache_prefix \}\}/);
+  // Only an exact complete hit skips recording a new complete bundle.
+  assert.match(prepare, /history_hit:.*history-lookup\.outputs\.cache-hit/);
+  assert.match(jobBody("aggregate"), /needs\.prepare\.outputs\.history_hit != 'true'/);
 });
 
 test("superseded runs can cancel reporting and the required gate", () => {

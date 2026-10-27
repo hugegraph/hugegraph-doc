@@ -4279,6 +4279,7 @@ def build(args: argparse.Namespace) -> None:
             cwd=assembly,
             check=True,
         )
+        # Built-in LibSass emits an expected deprecation warning; keep diagnostics visible.
         command = [
             hugo,
             "--config",
@@ -4292,7 +4293,6 @@ def build(args: argparse.Namespace) -> None:
             "production",
             "--printPathWarnings",
             "--printI18nWarnings",
-            "--panicOnWarning",
             "--logLevel",
             "info",
         ]

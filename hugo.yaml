@@ -134,9 +134,9 @@ params:
   print:
     toc: true
   ui:
-    # Keep the familiar default; readers may choose the stable Paper style.
+    # Keep Slate by default; explicitly opt in to all four native styles.
     preset: slate
-    preset_menu: true
+    preset_menu: [paper, slate, ink, terminal]
     theme_color: '#532fc9'
     dark_mode:
       enable: true
