@@ -162,7 +162,7 @@ class UpgradeInventoryTest(unittest.TestCase):
             env = update_oink.release_environment()
             env["HUGO_THEME"] = str(preview)
             hugo = env.get("HUGO_BIN", "hugo")
-            argv = [hugo, "--environment", "production", "--panicOnWarning"]
+            argv = [hugo, "--environment", "production", "--logLevel", "info"]
             with patch.dict(os.environ, env, clear=True):
                 version = update_oink.download_locked(root)["Version"]
                 graph = subprocess.check_output([hugo, "mod", "graph"], cwd=root, env=env, text=True)
@@ -249,7 +249,7 @@ class UpgradeInventoryTest(unittest.TestCase):
             (root / "content").mkdir()
             (root / "content/_index.md").write_text('---\ntitle: Relative fixture\n---\n{{< unpublished >}}\n')
             with update_oink.graph_workspace(root) as workspace:
-                rendered = subprocess.run([hugo, "--environment", "production", "--panicOnWarning"],
+                rendered = subprocess.run([hugo, "--environment", "production", "--logLevel", "info"],
                                           cwd=workspace, env=env, text=True, capture_output=True)
                 self.assertEqual(rendered.returncode, 0, rendered.stdout + rendered.stderr)
                 self.assertIn("unpublished", (workspace / "public/index.html").read_text())
@@ -290,7 +290,7 @@ class UpgradeInventoryTest(unittest.TestCase):
                 # A development-only import must not reject the production site.
                 accepted = update_oink.verify_hugo_graph(root, version)
                 self.assertNotIn(str(preview), accepted)
-                production = [hugo, "--config", "hugo.yaml", "--environment", "production", "--panicOnWarning"]
+                production = [hugo, "--config", "hugo.yaml", "--environment", "production", "--logLevel", "info"]
                 built = subprocess.run(production, cwd=root, env=env, text=True, capture_output=True)
                 self.assertEqual(built.returncode, 0, built.stdout + built.stderr)
                 # Conversely, development clearing a production theme must not

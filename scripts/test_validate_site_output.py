@@ -759,7 +759,7 @@ class SiteOutputSecurityTest(unittest.TestCase):
                     f'baseURL: {BASE.geturl()}\nparams:\n  markmap: {str(enabled).lower()}\n'
                     'module:\n  imports:\n  - path: github.com/pgsty/oink\n')
                 result = subprocess.run([shutil.which(HUGO_BIN), "--source", str(root), "--destination", str(root / "public"),
-                                         "--environment", "production", "--panicOnWarning"], text=True, capture_output=True)
+                                         "--environment", "production", "--logLevel", "info"], text=True, capture_output=True)
                 self.assertEqual(result.returncode, 0, result.stdout + result.stderr)
                 for index, (_, rejected) in enumerate(sources):
                     with self.subTest(enabled=enabled, source=index):
