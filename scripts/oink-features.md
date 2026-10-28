@@ -207,9 +207,13 @@ The recorder is an authoring tool, not a build dependency.
   Sidebar persistence uses `OinkSidebar`; AI integration uses the public
   search-tail API. Keep HugeGraph consent, version/language scope and local
   availability behavior in their existing hooks/adapters.
-- Local search gains mixed Chinese/English matching and current-section filtering
-  in 1.4.0. Preserve accurate titles, descriptions and keywords, and run the
-  ranking checks for search-facing content changes.
+- Local search uses `params.offline_search_index: content` so configuration names,
+  error messages and other body-only terms are searchable in both languages.
+  OINK loads the current language's index on demand; full content increases its
+  size and first-search initialization cost. Keep accurate titles, descriptions
+  and keywords for ranking. Run `tests/e2e/search-ranking.spec.js`, which preserves
+  the 24 metadata cases and separately checks 11 body-only queries with real
+  result clicks. Do not add keywords or boosts merely to satisfy body queries.
 - Blog sections provide default covers and reading-time metadata; articles own
   their real tags, categories and series order. Confirm authorship before adding
   an author profile. `blog_index: cards` is a card index; it is distinct from
