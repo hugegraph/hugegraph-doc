@@ -43,7 +43,7 @@ async function query(page,q){
 const input=page.locator('.td-shell-search__input');
 await input.fill(q);
 await page.waitForTimeout(650);
-return page.locator('#td-shell-search-results .td-shell-search__group').first().locator('[role="option"]').evaluateAll(rows=>rows.slice(0,10).map(r=>({title:r.querySelector('.td-shell-search__item-title')?.textContent.trim(),href:r.getAttribute('href')||r.dataset.tdUrl||null})));
+return page.locator('#td-shell-search-results .td-shell-search__group').first().locator('[role="option"]').evaluateAll(rows=>rows.slice(0,10).map(r=>({title:r.querySelector('.td-shell-search__item-title')?.textContent.trim(),href:r.getAttribute('href')||r.dataset.tdUrl||null})).filter(r=>r.title));
 }
 for(const variant of ['summary','content']){
 for(const lang of ['en','cn']){
@@ -65,8 +65,15 @@ for(let sample=0;sample<5;sample++){
 const {page,context}=await open(variant,lang);
 const start=performance.now();
 await page.locator('[data-td-shell-search-open]').first().click();
-await page.locator('.td-shell-search__input').fill(lang==='cn'?'服务端':'server');
-await page.locator('#td-shell-search-results .td-shell-search__group').first().locator('[role="option"]').first().waitFor({timeout:15000});
+const coldQuery=lang==='cn'?'图计算':'placement driver';
+const targetCase=cases.find(c=>c.query.toLowerCase()===coldQuery.toLowerCase()&&c.expected_ref.startsWith('/cn/')===(lang==='cn'));
+const targetTitle=indexes[variant][lang].find(r=>r.ref===targetCase.expected_ref).title;
+await page.locator('.td-shell-search__input').fill(coldQuery);
+await page.waitForFunction(title=>{
+const list=document.querySelector('.td-shell-search__list');
+if(list?.getAttribute('aria-busy')==='true')return false;
+return Array.from(document.querySelectorAll('#td-shell-search-results .td-shell-search__group:first-child [role="option"] .td-shell-search__item-title')).some(r=>r.textContent.trim()===title||r.textContent.trim().startsWith(title+' › '));
+},targetTitle,{timeout:15000});
 report.variants[variant].coldFirstSearch.push({lang,sample,ms:performance.now()-start});
 await context.close();
 }
