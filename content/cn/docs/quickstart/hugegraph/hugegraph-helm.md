@@ -88,7 +88,8 @@ hugegraph-helm/
 
 默认 `mode: easy`，Server 和 Hubble 自动分配 NodePort，PD 保持 ClusterIP。可以直接使用 HTTP，无需域名、证书或额外确认参数。
 `mode: strict` 默认将 Server/Hubble 设为 ClusterIP，并开启完整 NetworkPolicy 隔离。
-SeaTunnel 和 Vermeer 的原生 Service 在两种模式下始终为私有 ClusterIP，访问始终需要登录。两个模式都保留鉴权和持久化。
+SeaTunnel HTTP 与 Vermeer Master HTTP 在 easy 模式下同样默认使用 NodePort，在 strict 模式下默认使用 ClusterIP。
+访问均需鉴权；引擎 RPC、成员通信与 Worker 端口保持内部访问。两个模式都保留鉴权和持久化。
 优先级是组件显式参数高于全局参数，全局参数高于模式默认值，显式 `false` 也会生效。
 全局参数包括 `persistence.enabled` 和 `global.imageRegistry`，严格预设为 `values-strict.yaml`。
 
@@ -122,10 +123,10 @@ Chart 默认仅部署核心图服务（PD + Store + Server + Hubble）。针对�
 | 可选引擎 | 默认状态 | 核心用途 | 运行模式 (`*.mode`) | 访问控制 |
 |---|---|---|---|---|
 | **Hubble** | 开启 (`true`) | 图数据可视化、多图空间与任务监控 | 单副本 Deployment | 跟随全局 `mode`（NodePort 或 ClusterIP） |
-| **SeaTunnel** | 关闭 (`false`) | 异构数据源批流导入与跨图整库迁移 | `standalone` / `cluster` | 私有 ClusterIP（HTTP Basic 鉴权） |
-| **Vermeer** | 关闭 (`false`) | 内存优先的高性能分布式图计算算法 | `standalone` / `cluster` | 私有 ClusterIP（Token 鉴权，Hubble 自动集成） |
+| **SeaTunnel** | 关闭 (`false`) | 异构数据源批流导入与跨图整库迁移 | `standalone` / `cluster` | HTTP：easy 为 NodePort，strict 为 ClusterIP（Basic 鉴权） |
+| **Vermeer** | 关闭 (`false`) | 内存优先的高性能分布式图计算算法 | `standalone` / `cluster` | Master HTTP：easy 为 NodePort，strict 为 ClusterIP（Token 鉴权） |
 
-在 values 中将对应引擎的 `enabled` 设为 `true` 即可启用。两款引擎的原生接口均保留为私有 ClusterIP，管理密码与 Server 独立生成。
+在 values 中将对应引擎的 `enabled` 设为 `true` 即可启用。两款引擎的 HTTP 入口遵循上述模式默认值，管理密码与 Server 独立生成。
 
 > [!DETAILS]- SeaTunnel：按需开启原生数据导入、导出与迁移
 > ```bash
@@ -158,7 +159,7 @@ Chart 默认仅部署核心图服务（PD + Store + Server + Hubble）。针对�
 >
 > - **运行模式**：`standalone` 单机模式在同一个 Pod 中运行 Master 协调与 Worker 计算容器；`cluster` 模式提供独立的 Master Pod 与可水平扩展的 Worker Pod 集群（默认 3 副本）。
 > - **Hubble 一键集成**：Hubble 会自动注入 Master 内部 Service 地址与访问令牌。管理员在 Hubble 控制台即可直接触发 15+ 种图算法，计算结果保留在内存副本中，不污染原图属性。
-> - **原生控制台直连**：原生 UI 默认以私有 ClusterIP 运行，可通过 `kubectl -n hugegraph port-forward svc/hugegraph-vermeer-master 6688:6688` 转发，并在 **Admin credential** 输入框中填入 `<release>-vermeer-admin` Secret 的 `password` 登录。
+> - **原生控制台直连**：原生 Master UI 遵循 HTTP Service 的模式默认值；无法直连节点时，可通过 `kubectl -n hugegraph port-forward svc/hugegraph-vermeer-master 6688:6688` 转发，并在 **Admin credential** 输入框中填入 `<release>-vermeer-admin` Secret 的 `password` 登录。
 > - 镜像固定策略与进阶凭据管理见 [Vermeer 部署指南](https://github.com/hugegraph/hugegraph/blob/master/helm/hugegraph/docs/vermeer.md)。
 
 ### PD 元数据命名空间 {#metadata-namespace}

@@ -32,6 +32,8 @@ Hubble 是 HugeGraph 的 Web 管理与图可视化界面。你可以在同一个
   准备 CSV，配置数据源、字段映射并验证导入结果。
 {.cards}
 
+HTTP 登录、Gremlin 别名、异步任务与 schema 请求体示例见 [HTTP API 示例](/docs/quickstart/toolchain/http-api/)。
+
 ## 启动单机组合
 
 直接使用主仓库提供的 [docker/docker-compose.yml](https://github.com/apache/hugegraph/blob/master/docker/docker-compose.yml) 即可，

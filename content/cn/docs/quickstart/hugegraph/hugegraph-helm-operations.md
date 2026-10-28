@@ -54,7 +54,7 @@ kubectl -n hugegraph annotate deployment hugegraph-server \
 并在 values 中将 `metadataCluster` 设为同一值。对于采用 `store.updateStrategy.type=OnDelete` 策略的 Store 节点，需按[受控滚动升级流程](#6-rolling-store-images-safely)逐个重建 Pod，新配置方可生效。
 
 > [!DETAILS]- 可选引擎运维：探针、凭据与拓扑切换
-> - **端口与健康状态**：SeaTunnel HTTP/UI 端口为 `8080`；Vermeer Master HTTP/gRPC 为 `6688/6689`，Worker 为 `6788/6789`。两款引擎的原生接口在两种模式下均保持私有 ClusterIP。
+> - **端口与健康状态**：SeaTunnel HTTP/UI 端口为 `8080`；Vermeer Master HTTP/gRPC 为 `6688/6689`，Worker 为 `6788/6789`。SeaTunnel HTTP 与 Vermeer Master HTTP 在 easy 模式默认使用 NodePort，在 strict 模式默认使用 ClusterIP；RPC 与 Worker 端口保持内部访问。
 > - **密码与会话**：初次部署生成的管理密码在 easy 模式下为 6 位字符，strict 模式下为 16 位；后续升级与模式切换均自动保留既有凭据。Vermeer 原生控制台直接在 **Admin credential** 填入 `<release>-vermeer-admin` Secret 的 `password` 即可登录；Hubble 内部服务凭据已自动注入。
 > - **拓扑与副本切换**：修改 `seatunnel.mode` 或 `vermeer.mode` 前，请确保所有计算与导入批任务已结束并卸载内存图副本。单机与集群使用独立的数据卷声明，拓扑切换不会自动迁移本地文件。
 > - 完整恢复指引与进阶参数详见 [Vermeer 部署指南](https://github.com/apache/hugegraph/blob/master/helm/hugegraph/docs/vermeer.md) 与 [SeaTunnel 部署指南](https://github.com/apache/hugegraph/blob/master/helm/hugegraph/docs/seatunnel.md)。
@@ -113,7 +113,8 @@ PD 会持久化分区设置，初始化后修改 chart 值不会覆盖已有元�
 ## 5 NetworkPolicy {#5-networkpolicy}
 
 基础服务的完整隔离在 easy 和普通集群预设下默认关闭，strict 下开启。
-SeaTunnel 和 Vermeer 的私有 ClusterIP、登录及原生 HTTP／RPC 入口限制始终生效，`networkPolicy.enabled=false` 也不例外。
+SeaTunnel 和 Vermeer 在 `networkPolicy.enabled=false` 时仍保留鉴权。管理 HTTP 入口在 easy 模式默认为 NodePort，在 strict 模式默认为 ClusterIP。
+仅 NodePort HTTP 允许外部调用；RPC、成员通信与 Worker 端口继续受限，关闭 NetworkPolicy 不会移除原生入口控制。
 集群网络插件必须支持策略执行，才有实际隔离效果。
 生成策略允许组件间通信和 DNS，外部客户端、Ingress 控制器需要适当的 `networkPolicy.<component>.extraIngress`，
 外部发现地址可能还需要 `extraEgress`。基础服务规则的空列表合法但可能阻止外部访问，并支持 Kubernetes 原生规则，包括允许全部的 `{}`。

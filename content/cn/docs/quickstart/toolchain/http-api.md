@@ -1,0 +1,122 @@
+---
+title: "Server 与 Hubble HTTP API 示例"
+linkTitle: "HTTP API 示例"
+description: "选择 GraphSpace Gremlin 绑定、提交异步任务、登录 Hubble 并通过 HTTP 创建 schema。"
+weight: 3
+---
+
+示例面向 Server 与 Toolchain `master`（1.8）。Server 与 Hubble 使用不同的 HTTP 监听地址和请求格式。
+请替换部署地址、凭据、图名与返回的 ID。Helm Service 的查找方法见 [Helm 指南](/docs/quickstart/hugegraph/hugegraph-helm/)。
+
+## Server 路径与图选择
+
+`GET /apis` 是资源索引。索引中的资源路径属于 Server 根地址，应使用 `/versions`、`/graphspaces` 与 `/gremlin`，不要再加 `/apis` 前缀。
+旧版索引没有前导斜杠，应相对 Server 根路径解析，不能拼到索引目录下面。网关另有公开路径前缀时，保留该前缀。
+
+```bash
+curl 'http://localhost:8080/versions'
+curl 'http://localhost:8080/graphspaces'
+curl 'http://localhost:8080/graphspaces/DEFAULT/graphs'
+```
+
+建图使用 `POST /graphspaces/{space}/graphs/{graph}`，并提供后端要求的图配置。`POST /graphs` 不是建图接口。
+旧形态 `/graphs` 能列出图，并不表示 GraphSpace API 不存在。运行 SeaTunnel 自带 sink 示例前，请按
+[SeaTunnel 指南](https://github.com/apache/hugegraph/blob/master/helm/hugegraph/docs/seatunnel.md) 先创建 `graph_a`。
+
+同步 Gremlin 请求通过 aliases 选择图。对于图空间 `DEFAULT` 中的图 `hugegraph`，使用以下准确名称：
+
+```bash
+curl -X POST 'http://localhost:8080/gremlin' \
+  -H 'Content-Type: application/json' \
+  -d '{"gremlin":"g.V().count()","aliases":{"graph":"DEFAULT-hugegraph","g":"__g_DEFAULT-hugegraph"}}'
+```
+
+绑定名区分大小写：`<space>-<graph>` 是图，`__g_<space>-<graph>` 是遍历源。多图 Server 没有隐含的全局 `g`。
+`bindings` 用于查询变量，不能注册图；alias 目标也不能写成 `graph.traversal()` 表达式。
+没有 GraphSpace 的旧版独立图使用 `<graph>` 与 `__g_<graph>`。Server 启用鉴权时，补充配置要求的 HTTP 凭据，例如 `-u "$HG_USER:$HG_PASSWORD"`。
+
+## 长查询使用异步任务
+
+同步 Gremlin 默认执行上限为 30000 毫秒，由 `gremlin-server.yaml` 的 `evaluationTimeout` 配置。
+全图计数与按标签过滤计数可能走不同执行路径，不能用 `g.V().count()` 的耗时推断标签扫描耗时。
+可能超过同步限制的查询应提交 Server 任务：
+
+```bash
+curl -X POST 'http://localhost:8080/graphspaces/DEFAULT/graphs/hugegraph/jobs/gremlin' \
+  -H 'Content-Type: application/json' \
+  -d '{"gremlin":"g.V().hasLabel(\"person\").count()"}'
+
+# 将 <task_id> 替换为提交响应中的 ID。
+curl 'http://localhost:8080/graphspaces/DEFAULT/graphs/hugegraph/tasks/<task_id>'
+```
+
+任务为 URL 中选定的图绑定 `graph` 与 `g`。轮询到 `task_status` 为终态后再读取 `task_result`。
+`running` 不表示计数已经完成。请求使用与其他 Server API 相同的鉴权。
+Hubble 客户端传输超时与 Server 执行超时是不同限制，仅调整其中一个不会移除另一个。
+
+## Hubble 登录与查询体
+
+鉴权模式下，登录字段使用 **snake_case**，并保存会话 cookie：
+
+```bash
+curl -c hubble.cookies -X POST 'http://localhost:8088/api/v1.3/auth/login' \
+  -H 'Content-Type: application/json' \
+  -d '{"user_name":"<username>","user_password":"<password>"}'
+```
+
+`userName` 与 `userPassword` 不会填入该登录模型。连续失败可能返回 HTTP 429，请修正字段与凭据后再重试。
+匿名模式不使用登录接口。
+
+集成用 Gremlin 接口当前除登录会话外，还要求请求体中的 `username` 与 `password`：
+
+```bash
+curl -b hubble.cookies -X POST \
+  'http://localhost:8088/api/v1.3/graphspaces/DEFAULT/graphs/hugegraph/gremlin' \
+  -H 'Content-Type: application/json' \
+  -d '{"query":"g.V().count()","username":"<username>","password":"<password>"}'
+```
+
+可信本地网络以外应使用 HTTPS；JSON 本身不会加密口令。这里的 `query` 不同于 Server 的 `gremlin` 字段，
+也不同于 Hubble 工作区 `gremlin-query` 请求格式。调用者身份由会话确定，请求体凭据不能替代登录 cookie。
+
+## Hubble schema 默认值
+
+使用 Hubble 的 schema 模型创建顶点类型：
+
+```bash
+curl -b hubble.cookies -X POST \
+  'http://localhost:8088/api/v1.3/graphspaces/DEFAULT/graphs/hugegraph/schema/vertexlabels' \
+  -H 'Content-Type: application/json' \
+  -d '{"name":"http_demo_person","id_strategy":"AUTOMATIC","properties":[]}'
+```
+
+缺少或为 null 的 `style` 使用标准样式并显示 `~id`；
+缺少或为 null 的 `open_label_index` 默认为 `true`，显式 `false` 保持不变。
+旧构建可显式提供 `"open_label_index":true,"style":{"display_fields":["~id"]}`，避免空值错误。
+样式字段使用 snake_case（`display_fields`、`join_symbols`），不能写成 `displayFields`。
+`PRIMARY_KEY` 类型还需要 `properties` 和 `primary_keys`；创建标签前应先创建属性。
+Server schema 使用不同的请求模型，不要求 Hubble 的视觉样式字段。
+
+## 图统计是近似值
+
+Hubble 概览使用有界扫描。响应包含 `approximate:true` 与 `scan_limit:100000` 时，即使实际有数千万条数据，
+顶点或边计数也可能停在 100000。这些值是扫描观测值，不能当作精确总量。
+字段名依接口而定，例如 `gremlin-query` 返回 `vertexcount` / `edgecount`。精确计数应读取已完成的异步计数任务结果。
+
+## Server 元素 ID 与更新
+
+Server 顶点 ID 在 URL 路径中使用 JSON 值。字符串 ID `1:marko` 需要 JSON 引号，编码为 `%221%3Amarko%22`；
+数值 ID 使用数值的 JSON 形式。边 ID 使用 Server 的原始边 ID 格式，转义 URL 保留字符时不要额外加 JSON 引号。
+不能把顶点 ID 编码规则直接套到边 ID 上。
+
+追加属性使用 `PUT .../vertices/{id}?action=append` 或 `PUT .../edges/{id}?action=append`，并提交对应 JSON 属性体。
+删除边时按后端要求提供 `DELETE .../edges/{id}?label={label}` 的标签参数。
+删除 Server 索引使用 `DELETE .../schema/indexlabels/{name}`，响应为任务 ID；当前 Server 接口没有 `delete_all` 查询参数。
+应查看任务结果后再判断删除是否完成。
+
+## Vermeer 服务 token 与原生 UI
+
+Vermeer Master HTTP 遵循 Helm 模式默认值：easy 为 NodePort，strict 为 ClusterIP；RPC 与 Worker 端口保持内部访问。
+原生 UI 管理员使用 `<release>-vermeer-admin` 中的密码。自动化 API 使用服务 token，放入 `Authorization: Bearer <token>`，
+UI 管理密码不能当作该 token。Chart 会自动为 Hubble 配置服务 token。
+原生管理与受控 token 生成步骤见 [Vermeer 指南](https://github.com/apache/hugegraph/blob/master/helm/hugegraph/docs/vermeer.md)。

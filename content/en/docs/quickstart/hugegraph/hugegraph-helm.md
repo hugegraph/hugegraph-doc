@@ -92,7 +92,8 @@ hugegraph-helm/
 
 `mode: easy` is the default. Server and Hubble use automatic NodePorts; PD stays ClusterIP. HTTP works without a domain, certificate or acknowledgement.
 `mode: strict` defaults Server/Hubble to ClusterIP and enables full NetworkPolicy isolation.
-SeaTunnel and Vermeer native Services stay private ClusterIP services and require login in both modes.
+SeaTunnel HTTP and Vermeer Master HTTP also default to NodePort in easy mode and ClusterIP in strict mode.
+Both require authentication; engine RPC, membership and Worker ports remain internal.
 Both modes keep authentication and persistence.
 Explicit component parameters take priority over global parameters, which take priority over mode defaults; explicit `false` remains an override.
 The global parameters are `persistence.enabled` and `global.imageRegistry`. Strict mode is also available through `values-strict.yaml`.
@@ -127,10 +128,10 @@ By default, the Chart provisions only the core graph services (PD + Store + Serv
 | Engine | Default | Purpose | Topologies (`*.mode`) | Access & Security |
 |---|---|---|---|---|
 | **Hubble** | Enabled (`true`) | Graph visualization, multi-graphspace management & metrics | Single-replica Deployment | Follows global `mode` (NodePort or ClusterIP) |
-| **SeaTunnel** | Disabled (`false`) | Heterogeneous data ingestion & full graph migration | `standalone` / `cluster` | Private ClusterIP (HTTP Basic auth) |
-| **Vermeer** | Disabled (`false`) | Memory-first high-performance distributed graph algorithms | `standalone` / `cluster` | Private ClusterIP (Token auth, auto-wired to Hubble) |
+| **SeaTunnel** | Disabled (`false`) | Heterogeneous data ingestion & full graph migration | `standalone` / `cluster` | HTTP: NodePort in easy, ClusterIP in strict (Basic auth) |
+| **Vermeer** | Disabled (`false`) | Memory-first high-performance distributed graph algorithms | `standalone` / `cluster` | Master HTTP: NodePort in easy, ClusterIP in strict (Token auth) |
 
-Enable either engine by setting its `enabled` key to `true` in values. Both engines maintain private ClusterIP services, and their administrative passwords are generated independently from Server.
+Enable either engine by setting its `enabled` key to `true` in values. Their HTTP entry follows the mode defaults above; their administrative passwords are generated independently from Server.
 
 > [!DETAILS]- SeaTunnel: On-demand Data Import, Export, and Migration
 > ```bash
@@ -163,7 +164,7 @@ Enable either engine by setting its `enabled` key to `true` in values. Both engi
 >
 > - **Topologies**: `standalone` runs Master and Worker in one Pod; `cluster` provides a separate Master coordinator Pod and scalable Worker computing Pods (default 3 replicas).
 > - **Hubble Integration**: Hubble automatically acquires the internal Master Service URL and service tokens. Operators can trigger 15+ graph algorithms directly from Hubble without manual token configuration.
-> - **Native Dashboard Access**: Forward the private Service via `kubectl -n hugegraph port-forward svc/hugegraph-vermeer-master 6688:6688` and sign in with the password from Secret `<release>-vermeer-admin` under **Admin credential**.
+> - **Native Dashboard Access**: Use the Master HTTP NodePort in easy mode, or forward the Service via `kubectl -n hugegraph port-forward svc/hugegraph-vermeer-master 6688:6688` and sign in with the password from Secret `<release>-vermeer-admin` under **Admin credential**.
 > - For image pinning and credentials management, see the [Vermeer Deployment Guide](https://github.com/hugegraph/hugegraph/blob/master/helm/hugegraph/docs/vermeer.md).
 
 ### PD metadata namespace {#metadata-namespace}

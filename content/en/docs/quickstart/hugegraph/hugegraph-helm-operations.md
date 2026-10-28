@@ -57,7 +57,7 @@ kubectl -n hugegraph annotate deployment hugegraph-server \
 and ensure `metadataCluster` matches this value in your values file. For Store nodes using `store.updateStrategy.type=OnDelete`, follow the [rolling upgrade procedure](#6-rolling-store-images-safely) to recreate Pods one by one so the new settings take effect.
 
 > [!DETAILS]- Optional Engines Operations: Probes, Credentials, and Topology Switching
-> - **Ports & Health**: SeaTunnel HTTP/UI runs on `8080`; Vermeer Master HTTP/gRPC listens on `6688/6689`, and Worker on `6788/6789`. Both engines stay behind private ClusterIP in both modes.
+> - **Ports & Health**: SeaTunnel HTTP/UI runs on `8080`; Vermeer Master HTTP/gRPC listens on `6688/6689`, and Worker on `6788/6789`. SeaTunnel HTTP and Vermeer Master HTTP default to NodePort in easy mode and ClusterIP in strict mode. RPC and Worker ports remain internal.
 > - **Credentials & Sessions**: Generated admin passwords use 6 characters in easy mode or 16 in strict mode, retained across upgrades and mode changes. In Vermeer native UI, enter the password from Secret `<release>-vermeer-admin` into **Admin credential**; Hubble internal service tokens are auto-wired.
 > - **Topology Changes**: Ensure active computations and batch ingestion jobs are complete and in-memory graphs are unloaded before changing `seatunnel.mode` or `vermeer.mode`. Standalone and cluster use separate PVC claims, so mode changes do not migrate local files.
 > - See the [Vermeer Guide](https://github.com/apache/hugegraph/blob/master/helm/hugegraph/docs/vermeer.md) and [SeaTunnel Guide](https://github.com/apache/hugegraph/blob/master/helm/hugegraph/docs/seatunnel.md) for full recovery and configuration details.
@@ -121,7 +121,8 @@ before changing a live cluster; the chart does not migrate existing shard metada
 ## 5 NetworkPolicy
 
 Easy mode and the ordinary cluster preset leave full base-service isolation disabled by default; strict enables it.
-SeaTunnel and Vermeer always keep private ClusterIP Services, login and native HTTP/RPC ingress restrictions, even with `networkPolicy.enabled=false`.
+SeaTunnel and Vermeer retain authentication even with `networkPolicy.enabled=false`. Easy mode defaults their administrative HTTP entries to NodePort; strict mode defaults them to ClusterIP.
+Only NodePort HTTP admits external callers. RPC, membership and Worker ports remain restricted; disabling NetworkPolicy does not remove the native ingress controls.
 The cluster network plugin must enforce NetworkPolicy for these resources to have an effect.
 The generated policies admit component traffic and DNS. External clients and Ingress controllers need suitable
 `networkPolicy.<component>.extraIngress` rules; external discovery addresses may need matching `extraEgress`.
