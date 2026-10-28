@@ -222,3 +222,6 @@ curl -b hubble.cookies -X PUT \
 这些路径及正数 ID 不同于 Hubble 封装接口。`POST /api/v1/tasks` 不提交任务：任务方法修复后返回 HTTP 405 和 `Allow: GET`；
 旧构建可能返回误导性的 `{"code":200}`，但没有创建任务。
 详见 [原生 API 示例](https://github.com/hugegraph/hugegraph-computer/blob/master/vermeer/README.md#api-overview)。
+
+通过 `PUT .../jobs/rebuild/{type}/{name}` 重建不存在的顶点、边或索引标签时，返回 HTTP 404。
+已有标签返回 HTTP 202 与任务 ID，应轮询任务结果后再判断重建完成。

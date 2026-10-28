@@ -240,3 +240,6 @@ The response contains a native `task.id`; query it at `GET /api/v1/task/{id}` an
 `POST /api/v1/tasks` does not submit work: after the task-method fix it returns HTTP 405 and `Allow: GET`;
 older builds can return a misleading `{"code":200}` without creating a task.
 See the [native API examples](https://github.com/hugegraph/hugegraph-computer/blob/master/vermeer/README.md#api-overview).
+
+Rebuilding a missing vertex, edge or index label through `PUT .../jobs/rebuild/{type}/{name}` returns HTTP 404.
+Existing labels return HTTP 202 with a task ID; poll that task before treating the rebuild as complete.
