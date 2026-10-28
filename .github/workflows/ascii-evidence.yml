@@ -27,6 +27,7 @@ jobs:
       - name: Validate source and build fixed site
         run: |
           bash dist/validate-links.sh
+          python3 scripts/update_oink.py --check-baseline
           python3 -m unittest discover -s scripts -p 'test_*.py'
           scripts/hugo.sh build --destination "$RUNNER_TEMP/ascii-after"
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1
