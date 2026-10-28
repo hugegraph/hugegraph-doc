@@ -16,6 +16,8 @@ use `/versions`, `/graphspaces` and `/gremlin`, without prepending `/apis`.
 Earlier indexes return paths without a leading slash; interpret those relative to the Server root, not the index directory.
 When a gateway adds a public prefix, retain that prefix.
 
+`GET /graphspaces` requires PD mode. In standalone mode, skip that step and use `GET /graphs` to list configured graphs.
+
 ```bash
 curl 'http://localhost:8080/versions'
 curl 'http://localhost:8080/graphspaces'

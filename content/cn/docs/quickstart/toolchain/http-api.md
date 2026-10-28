@@ -6,12 +6,14 @@ weight: 3
 ---
 
 示例面向 Server 与 Toolchain `master`（1.8）。Server 与 Hubble 使用不同的 HTTP 监听地址和请求格式。
-请替换部署地址、凭据、图名与返回的 ID。Helm Service 的查找方法见 [Helm 指南](/docs/quickstart/hugegraph/hugegraph-helm/)。
+请替换部署地址、凭据、图名与返回的 ID。Helm Service 的查找方法见 [Helm 指南](/cn/docs/quickstart/hugegraph/hugegraph-helm/)。
 
 ## Server 路径与图选择
 
 `GET /apis` 是资源索引。索引中的资源路径属于 Server 根地址，应使用 `/versions`、`/graphspaces` 与 `/gremlin`，不要再加 `/apis` 前缀。
 旧版索引没有前导斜杠，应相对 Server 根路径解析，不能拼到索引目录下面。网关另有公开路径前缀时，保留该前缀。
+
+`GET /graphspaces` 仅支持 PD 模式。独立模式应跳过此步骤，使用 `GET /graphs` 列出已配置的图。
 
 ```bash
 curl 'http://localhost:8080/versions'
