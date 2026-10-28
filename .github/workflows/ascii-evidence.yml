@@ -1,0 +1,120 @@
+name: ASCII bilingual browser evidence
+on:
+  push:
+    branches: [codex/ascii-evidence]
+permissions:
+  contents: read
+jobs:
+  evidence:
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1
+        with:
+          fetch-depth: 0
+          persist-credentials: false
+      - uses: actions/setup-python@ece7cb06caefa5fff74198d8649806c4678c61a1
+        with:
+          python-version: "3.13"
+      - uses: actions/setup-go@b7ad1dad31e06c5925ef5d2fc7ad053ef454303e
+        with:
+          go-version-file: go.mod
+      - uses: ./.github/actions/setup-site-tools
+        with:
+          hugo-version: "0.168.0"
+      - name: Install source validators
+        run: sudo apt-get update && sudo apt-get install --yes --no-install-recommends webp
+      - name: Validate source and build fixed site
+        run: |
+          bash dist/validate-links.sh
+          python3 -m unittest discover -s scripts -p 'test_*.py'
+          scripts/hugo.sh build --destination "$RUNNER_TEMP/ascii-after"
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1
+        with:
+          ref: b8a88f8c27844c32042c50ee2b43404b5ce95fb3
+          path: .ascii-before
+          persist-credentials: false
+      - name: Build matching baseline
+        working-directory: .ascii-before
+        run: scripts/hugo.sh build --destination "$RUNNER_TEMP/ascii-before"
+      - uses: actions/setup-node@820762786026740c76f36085b0efc47a31fe5020
+        with:
+          node-version: "24"
+      - name: Install browser
+        working-directory: tests/e2e
+        run: |
+          npm ci
+          npx playwright install --with-deps chromium
+      - name: Verify alignment and capture both languages
+        working-directory: tests/e2e
+        run: |
+          node <<'JS'
+          const { chromium } = require('@playwright/test');
+          const { spawn } = require('node:child_process');
+          const fs = require('node:fs');
+          (async () => {
+           const servers=[];let browser;
+           try {
+            for(const [port,dir] of [[4173,'ascii-after'],[4176,'ascii-before']]){
+             servers.push(spawn('python3',['serve.py',String(port),'--bind','127.0.0.1','--directory',process.env.RUNNER_TEMP+'/'+dir],{stdio:'ignore'}));
+             for(let i=0;i<60;i++){try{if((await fetch('http://127.0.0.1:'+port)).ok)break;}catch{} await new Promise(r=>setTimeout(r,250));}
+            }
+            browser=await chromium.launch();
+            const page=await browser.newPage({viewport:{width:1440,height:1000},deviceScaleFactor:1});
+            let origin='http://127.0.0.1:4173';
+            await page.route('**/*',async route=>{
+             const url=new URL(route.request().url());
+             if(url.origin!=='https://hugegraph.apache.org'){await route.continue();return;}
+             const response=await route.fetch({url:origin+url.pathname+url.search});
+             await route.fulfill({response,headers:{...response.headers(),'access-control-allow-origin':'*'}});
+            });
+            fs.mkdirSync('ascii-evidence',{recursive:true});
+            const shot=async(name,element)=>{
+             const bytes=await element.screenshot({type:'jpeg',quality:80,animations:'disabled'});
+             fs.writeFileSync('ascii-evidence/'+name+'.jpg',bytes);
+             console.log('ASCII_IMAGE_BEGIN '+name);console.log(bytes.toString('base64'));console.log('ASCII_IMAGE_END');
+            };
+            for(const phase of ['before','after']){
+             origin=phase==='before'?'http://127.0.0.1:4176':'http://127.0.0.1:4173';
+             for(const [language,prefix] of [['en',''],['cn','/cn']]){
+              for(const [kind,path] of [['intro','/docs/introduction/'],['landing','/docs/']]){
+               await page.setViewportSize({width:1440,height:1000});
+               await page.goto(origin+prefix+path,{waitUntil:'networkidle'});await page.evaluate(()=>document.fonts.ready);
+               const code=page.locator('pre code').filter({hasText:kind==='intro'?'Full-Stack Graph System':'Vermeer*'}).last();
+               const block=code.locator('xpath=ancestor::*[contains(@class,"highlight")][1]');
+               await block.scrollIntoViewIfNeeded();
+               if(phase==='after'){
+                const check=await code.evaluate(el=>{
+                 const nodes=[];const walk=document.createTreeWalker(el,NodeFilter.SHOW_TEXT);while(walk.nextNode())nodes.push(walk.currentNode);
+                 const text=nodes.map(n=>n.textContent).join('');let offset=0;const points=[];const widths=[];
+                 for(const line of text.split('\n')){
+                  if(!line){offset++;continue;}widths.push(Array.from(line).length);
+                  const i=line.length-1;let target=offset+i,total=0;
+                  for(const n of nodes){if(target<total+n.length){const range=document.createRange();range.setStart(n,target-total);range.setEnd(n,target-total+1);points.push(range.getBoundingClientRect().x);break;}total+=n.length;}offset+=line.length+1;
+                 }
+                 return {widths,points,delta:Math.max(...points)-Math.min(...points),font:getComputedStyle(el).fontFamily};
+                });
+                console.log('ASCII_ALIGNMENT '+JSON.stringify({language,kind,...check}));
+                if(new Set(check.widths).size!==1||check.delta>0.6)throw Error('Misaligned '+language+kind);
+               }
+               await shot(phase+'-'+language+'-'+kind,block);
+               if(phase==='after'){
+                await page.setViewportSize({width:390,height:844});await page.evaluate(()=>document.fonts.ready);
+                await block.scrollIntoViewIfNeeded();
+                const viewport=await page.evaluate(()=>({width:innerWidth,document:document.documentElement.scrollWidth}));
+                if(viewport.document>viewport.width+1)throw Error('Page overflow '+JSON.stringify(viewport));
+                await shot('mobile-'+language+'-'+kind,page);
+               }
+              }
+             }
+            }
+           }finally{if(browser)await browser.close();servers.forEach(s=>s.kill());}
+          })().catch(e=>{console.error(e);process.exitCode=1;});
+          JS
+      - name: Upload screenshots
+        if: ${{ !cancelled() }}
+        uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a
+        with:
+          name: ascii-bilingual-screenshots
+          path: tests/e2e/ascii-evidence
+          if-no-files-found: error
