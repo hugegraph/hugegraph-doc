@@ -98,11 +98,15 @@ test("old manual candidate sources receive the trusted compiler action via prepa
     fs.mkdirSync(source, {recursive: true});
     const action = fs.readFileSync(path.resolve(__dirname, "../../.github/actions/setup-site-tools/action.yml"));
     fs.writeFileSync(path.join(source, "action.yml"), action);
+    const helper = fs.readFileSync(path.resolve(__dirname, "../../scripts/hugo_build.py"));
+    fs.mkdirSync(path.join(directory, "scripts"));
+    fs.writeFileSync(path.join(directory, "scripts/hugo_build.py"), helper);
     const result = spawnSync("bash", ["-e", "-c", stepScript("Package trusted compiler setup for candidate builds")], {
       cwd: directory, env: {...process.env, BASH_ENV: ""}
     });
     assert.equal(result.status, 0, result.stderr.toString());
     assert.deepEqual(fs.readFileSync(path.join(directory, "setup-site-tools/action.yml")), action);
+    assert.deepEqual(fs.readFileSync(path.join(directory, "setup-site-tools/hugo_build.py")), helper);
     assert.match(stepBody("Upload resolved version manifest"), /path: \|[\s\S]*^            setup-site-tools\//m);
     // Consumers download the trusted bundle after checking out the candidate;
     // setup therefore works even when its source has no local action directory.
@@ -113,6 +117,14 @@ test("old manual candidate sources receive the trusted compiler action via prepa
     }
   } finally {
     fs.rmSync(directory, {recursive: true, force: true});
+  }
+});
+
+test("AI fixtures retain strict warning checks from the trusted artifact", () => {
+  for (const name of ["Build manifest-derived AI fixture", "Build AI-disabled rollback fixture"]) {
+    const body = stepBody(name);
+    assert.match(body, /python3 resolved\/setup-site-tools\/hugo_build\.py hugo/);
+    assert.match(body, /--printPathWarnings --printI18nWarnings --logLevel info/);
   }
 });
 

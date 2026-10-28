@@ -18,7 +18,10 @@ Set `HUGO_BIN` / `PYTHON_BIN` for task-local tools.
 Read the target release notes and the [official upgrade guide](https://oink.pgsty.com/zh/docs/admin/upgrade/).
 For [1.4.0](https://oink.pgsty.com/zh/blog/release/1.4.0/), keep LibSass deprecation
 warnings visible: do not add `--panicOnWarning` or suppress the warning through
-`ignoreLogs`. Builds retain path/i18n warnings and info logs; build errors,
+`ignoreLogs`. The shared `scripts/hugo_build.py` runner streams the full output
+and permits only that exact LibSass warning; every other Hugo `WARN`, including
+missing translations and duplicate target paths, fails production builds. The
+same gate covers local, versioned and AI fixture builds. Build errors,
 source/output validation and browser contracts remain blocking.
 
 The official Module sequence is `hugo mod get`, `hugo mod tidy`, `hugo mod graph`

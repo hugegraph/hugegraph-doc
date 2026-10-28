@@ -224,7 +224,7 @@ class UpgradeInventoryTest(unittest.TestCase):
                 self.assertNotEqual((contaminated / name).read_bytes(), contents)
             scripts = root / "scripts"
             scripts.mkdir()
-            for name in ("update_oink.py", "oink_module.py", "oink-overrides.json"):
+            for name in ("update_oink.py", "hugo_build.py", "oink_module.py", "oink-overrides.json"):
                 shutil.copy2(update_oink.ROOT / "scripts" / name, scripts / name)
             failed = subprocess.run([sys.executable, scripts / "update_oink.py", "--check-baseline"],
                                     cwd=root, env=env, text=True, capture_output=True)
@@ -333,7 +333,7 @@ class UpgradeInventoryTest(unittest.TestCase):
                  patch.object(update_oink, "run", side_effect=run):
                 update_oink.validate(work)
             self.assertTrue(any("scripts/build_versions.py" in argv and "--force-rebuild" not in argv for argv in observations))
-            self.assertTrue(any(argv[0] == "/resolved/hugo" for argv in observations))
+            self.assertTrue(any(argv[1:3] == ["scripts/hugo_build.py", "/resolved/hugo"] for argv in observations))
             self.assertTrue(any("discover" in argv for argv in observations))
             prepare = next(argv for argv in observations if "prepare" in argv)
             self.assertEqual(prepare[prepare.index("--latest-sha") + 1], "local-snapshot")
@@ -359,6 +359,9 @@ class UpgradeInventoryTest(unittest.TestCase):
                           and call.args[0][call.args[0].index("--destination") + 1] == work / name]
                 self.assertEqual(len(builds), 1)
                 self.assertIn(f"tests/e2e/{config}.yaml", str(builds[0].args[0]))
+                self.assertEqual(builds[0].args[0][1], "scripts/hugo_build.py")
+                self.assertIn("--printPathWarnings", builds[0].args[0])
+                self.assertIn("--printI18nWarnings", builds[0].args[0])
                 self.assertLess(calls.index(builds[0]), calls.index(browser))
             plan = next(call.args[0] for call in calls if "scripts/version_cache.py" in call.args[0])
             self.assertNotIn("--sass-version", plan)

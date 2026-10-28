@@ -67,8 +67,11 @@ origin (the flag wins when both are set); a server `--port` is reflected in
 the generated local origin.
 
 OINK 1.4 uses Hugo's built-in LibSass. Its deprecation warning must remain visible;
-do not add `--panicOnWarning` or suppress it with `ignoreLogs`. Build errors and
-the source, output and browser validators remain blocking.
+do not add `--panicOnWarning` or suppress it with `ignoreLogs`. The shared
+`scripts/hugo_build.py` gate permits only that exact warning and fails builds on
+all other Hugo warnings, including missing translations and duplicate target
+paths. Full output and Hugo failure status are preserved. The source, output
+and browser validators also remain blocking.
 
 A successful command proves that Hugo rendered the configured outputs. It does not replace browser checks for navigation, search, language switching, accessibility, mobile layout, print, or Content Security Policy behavior.
 

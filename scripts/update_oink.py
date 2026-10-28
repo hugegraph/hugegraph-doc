@@ -19,6 +19,7 @@ import subprocess
 import sys
 import tempfile
 
+from hugo_build import is_unexpected_warning
 from oink_module import MODULE, SITE_MODULE, VERSION, command, download_locked, locked_version
 
 ROOT = Path(__file__).resolve().parents[1]
@@ -230,7 +231,8 @@ def check_toolchain(root, target):
         except subprocess.TimeoutExpired:
             raise ValueError("Hugo → LibSass smoke compilation timed out; locks are unchanged") from None
         rendered = fixture / "public/index.html"
-        if result.returncode or not rendered.is_file() or "width: 4px" not in rendered.read_text():
+        unexpected = any(is_unexpected_warning(line) for line in (result.stdout + result.stderr).splitlines())
+        if result.returncode or unexpected or not rendered.is_file() or "width: 4px" not in rendered.read_text():
             raise ValueError(f"Hugo → LibSass smoke compilation failed with {versions['hugo']}: "
                              f"{result.stdout}{result.stderr}. "
                              "Prepare tools using scripts/oink-upgrade.md; locks are unchanged")
@@ -347,10 +349,10 @@ def _validate(work):
     for name, port, config in [("ai", 4174, "ai-enabled"), ("ai-disabled", 4175, "ai-disabled")]:
         run([*cli, "config", "--version", "latest", "--site-origin", f"http://127.0.0.1:{port}/",
              "--historical-origin", historical, "--output", work / f"{name}.json"])
-        run([os.environ.get("HUGO_BIN", "hugo"), "--config",
+        run([py, "scripts/hugo_build.py", os.environ.get("HUGO_BIN", "hugo"), "--config",
              f"hugo.yaml,{work / f'{name}.json'},tests/e2e/{config}.yaml",
              "--destination", work / name, "--cleanDestinationDir", "--gc", "--minify",
-             "--environment", "production", "--logLevel", "info"])
+             "--environment", "production", "--printPathWarnings", "--printI18nWarnings", "--logLevel", "info"])
     env = dict(os.environ, SITE_ROOT=str(work / "site"), AI_SITE_ROOT=str(work / "ai"),
                AI_DISABLED_SITE_ROOT=str(work / "ai-disabled"), VISUAL_RESULTS_DIR=str(work / "after"))
     run(["npm", "ci"], cwd=ROOT / "tests/e2e")
