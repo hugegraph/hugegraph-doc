@@ -312,7 +312,7 @@ test("manual candidates build and validate every immutable selected version usin
   }
 });
 
-test("manual candidate planning blocks only the two external-Sass releases", () => {
+test("manual candidate planning distinguishes unsupported pins from external-Sass requirements", () => {
   const { spawnSync } = require("node:child_process");
   const os = require("node:os");
   const directory = fs.mkdtempSync(path.join(os.tmpdir(), "candidate-theme-plan-"));
@@ -353,7 +353,12 @@ test("manual candidate planning blocks only the two external-Sass releases", () 
       });
       if (rejected) {
         assert.notEqual(result.status, 0, pin);
-        assert.ok(result.stdout.includes(`OINK ${pin} needs standalone Dart Sass`), result.stdout);
+        if (pin === "v1.3.0") {
+          assert.match(result.stdout, /OINK v1\.3\.0 manual candidates are not supported/);
+          assert.doesNotMatch(result.stdout, /needs standalone Dart Sass/);
+        } else {
+          assert.ok(result.stdout.includes(`OINK ${pin} needs standalone Dart Sass`), result.stdout);
+        }
         assert.match(result.stdout, /upgrade the candidate to OINK v1\.4\.0/);
         assert.equal(fs.existsSync(output), false);
       } else {

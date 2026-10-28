@@ -88,9 +88,10 @@ Historical artifacts are reused only when both the complete build-input fingerpr
 and artifact digest match. Missing or invalid cache entries rebuild automatically;
 manual dispatches start without the artifact cache and use the original build and
 validate commands so older candidate branches do not need the new CI helpers.
-Candidates pinned to OINK 1.3.0 or 1.3.1 are rejected before scheduling builds:
-those themes require standalone Dart Sass, while this workflow installs native
-LibSass only. Upgrade such a candidate to OINK 1.4.0 before dispatching it.
+Candidates pinned to OINK 1.3.0 are outside this workflow's supported scope.
+OINK 1.3.1 requires standalone Dart Sass, while this workflow installs native
+LibSass only. Both pins are rejected before scheduling builds; upgrade such a
+candidate to OINK 1.4.0 before dispatching it.
 Historical documentation versions still use the current site's shell and are
 unaffected by this candidate-theme restriction. Cache hits still run the full
 version validator, and aggregation validates every selected version again.

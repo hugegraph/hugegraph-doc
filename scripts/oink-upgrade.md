@@ -102,8 +102,9 @@ initialization cannot rewrite the checkout; the parent directory must be writabl
 Normal preview commands retain local-development capabilities.
 
 Manual CI dispatches inspect the immutable candidate's theme pin before scheduling
-builds. OINK 1.3.0 and 1.3.1 require standalone Dart Sass and are rejected by the
-current native-LibSass workflow; upgrade such a candidate to OINK 1.4.0 first.
+builds. OINK 1.3.0 manual candidates are outside this workflow's supported scope;
+OINK 1.3.1 requires standalone Dart Sass. Both pins are rejected by the current
+workflow; upgrade such a candidate to OINK 1.4.0 first.
 This restriction concerns the candidate's theme, not historical documentation:
 archived content continues to use the current site shell.
 

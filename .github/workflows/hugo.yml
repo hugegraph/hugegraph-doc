@@ -133,7 +133,11 @@ jobs:
                 jq -er '.Require[] | select(.Path == "github.com/pgsty/oink") | .Version'
             )"
             case "$candidate_theme" in
-              v1.3.0|v1.3.1)
+              v1.3.0)
+                echo "::error::OINK v1.3.0 manual candidates are not supported by this workflow; upgrade the candidate to OINK v1.4.0 before dispatching again."
+                exit 1
+                ;;
+              v1.3.1)
                 echo "::error::OINK $candidate_theme needs standalone Dart Sass. This workflow uses Hugo's built-in LibSass; upgrade the candidate to OINK v1.4.0 before dispatching again."
                 exit 1
                 ;;
