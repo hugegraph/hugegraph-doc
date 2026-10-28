@@ -132,3 +132,39 @@ Automated Vermeer API requests use a service token with `Authorization: Bearer <
 the UI administrator password is not that token. Hubble's service token is wired by the chart.
 Follow the [Vermeer guide](https://github.com/apache/hugegraph/blob/master/helm/hugegraph/docs/vermeer.md)
 for native administration and controlled token generation.
+
+### Submit a Vermeer computation through Hubble
+
+With the chart-managed native integration, `POST /api/v1.3/vermeer/task` loads or reloads a graph; it is not the computation endpoint.
+Use `graphspace`, `graph`, `task_type:"load"` and optional loader tuning there, then wait until the graph is loaded.
+Submit an algorithm using the graph-scoped computation endpoint and the Hubble login cookie:
+
+```bash
+curl -b hubble.cookies -X POST \
+  'http://localhost:8088/api/v1.3/graphspaces/DEFAULT/graphs/hugegraph/algorithms/vermeer' \
+  -H 'Content-Type: application/json' \
+  -d '{"params":{"compute.algorithm":"pagerank","compute.parallel":1,"compute.max_step":10,"pagerank.damping":0.85,"pagerank.diff_threshold":0.00001}}'
+```
+
+These parameter names and initial values match the current Hubble PageRank form:
+
+| Parameter | Meaning | Example |
+|---|---|---|
+| `compute.algorithm` | Supported algorithm name | `pagerank` |
+| `compute.parallel` | Compute parallelism | `1` |
+| `compute.max_step` | Maximum iteration steps | `10` |
+| `pagerank.damping` | PageRank damping factor | `0.85` |
+| `pagerank.diff_threshold` | Convergence threshold | `0.00001` |
+
+Current Hubble accepts `pagerank`, `wcc`, `lpa`, `degree`, `closeness_centrality`, `betweenness_centrality`, `triangle_count`, `kcore`, and `sssp`.
+Use the selected algorithm's form for its own parameters; PageRank keys do not apply to another algorithm.
+The direct adapter accepts `compute.*`, the selected algorithm's `<algorithm>.*` keys and `output.need_statistics`.
+Vermeer still validates the actual values. Hubble controls output storage and does not accept arbitrary output paths or Server credentials.
+
+The response contains `data.task_id` inside the Hubble response envelope. Preserve the returned sign:
+Hubble maps native Vermeer task IDs to negative IDs. Poll the same graph's
+`GET /api/v1.3/graphspaces/DEFAULT/graphs/hugegraph/async-tasks/{id}`;
+read result pages through `GET .../async-tasks/{id}/values?cursor=0&limit=100` after successful completion.
+Do not send that Hubble ID to Server's native `/tasks/{id}` endpoint.
+A graph state of `loaded` confirms loading only. An HTTP 400 on computation requires the exact rejected request and response
+before attributing it to an engine defect; the request format above is verified against current source, not a large-dataset benchmark.
