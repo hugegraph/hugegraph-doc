@@ -154,3 +154,71 @@ Hubble 响应封装的 `data.task_id` 是任务 ID，请保留正负号：原生
 不要把 Hubble ID 直接传给 Server 原生 `/tasks/{id}`。
 图状态 `loaded` 只表示加载成功。计算返回 HTTP 400 时，应结合被拒绝的完整请求与响应定位，不能直接归因为引擎缺陷。
 上述格式已核对当前源码，不代表完成了大规模数据的算法性能验证。
+
+## Hubble 的 Cypher 与任务路由
+
+Hubble Cypher 使用工作区查询模型，不使用集成 Gremlin 的请求模型：
+
+```bash
+curl -b hubble.cookies -X POST \
+  'http://localhost:8088/api/v1.3/graphspaces/DEFAULT/graphs/hugegraph/cypher' \
+  -H 'Content-Type: application/json' \
+  -d '{"content":"MATCH (n) RETURN count(n)","preview":false}'
+```
+
+查询字段是 `content`，`query` 或嵌套的 `gremlin-query` 对象不会填入该字段；鉴权来自登录会话。
+Server 必须声明支持 Cypher。`/asyncTasks` 等路径是 UI 导航路由，任务 API 使用前文所述
+`/api/v1.3/graphspaces/{space}/graphs/{graph}/async-tasks` 前缀。
+
+## 通过 Hubble 导入图元素
+
+`POST /api/v1.3/graphspaces/{space}/graphs/{graph}/import` 接收 multipart 字段 `file`，内容是图元素 JSON。
+上传内容不是 CSV，也不是 Loader 作业规格；请先创建所引用的 schema。
+例如，已有使用 `CUSTOMIZE_STRING` ID、带 `name` 属性的 `person` 顶点类型，以及连接两个 `person` 的 `knows` 边类型时，
+将以下内容保存为 `graph.json`：
+
+```json
+{
+  "vertices": [
+    {"id": "alice", "label": "person", "properties": {"name": "Alice"}},
+    {"id": "bob", "label": "person", "properties": {"name": "Bob"}}
+  ],
+  "edges": [
+    {"label": "knows", "source": "alice", "target": "bob", "properties": {}}
+  ]
+}
+```
+
+```bash
+curl -b hubble.cookies -X POST \
+  'http://localhost:8088/api/v1.3/graphspaces/DEFAULT/graphs/hugegraph/import' \
+  -F 'file=@graph.json;type=application/json'
+```
+
+两个数组都必须存在；空数组只执行空导入。请提供 schema 要求的所有非空属性，顶点 ID 必须匹配对应 ID 策略。
+边端点使用 `source` 与 `target`；顶点条目中的 `file` 键不是数据源定义。该接口返回图视图，CSV 请使用独立的数据源/Loader 流程。
+
+## 使用图空间权限预设
+
+Server 禁用自定义图空间角色分配时，旧图空间用户 POST 会被策略拒绝。该接口为已有账号分配角色，不是注册账号。
+请使用 Hubble 提供的权限预设，不要自行构造角色 ID 或关闭 Server 策略。
+对于已有账号，具备授权权限的图空间管理者可这样设置预设：
+
+```bash
+curl -b hubble.cookies -X PUT \
+  'http://localhost:8088/api/v1.3/graphspaces/DEFAULT/auth/users/<user_id>/preset' \
+  -H 'Content-Type: application/json' \
+  -d '{"user_id":"<user_id>","username":"<username>","permission_preset":"GS_READ_ONLY"}'
+```
+
+支持 `GS_READ_ONLY`、`GS_READ_WRITE` 与 `GS_ADMIN`，具体授权仍受调用者权限约束。
+路径与请求体中的账号身份必须匹配；匿名模式不提供账号管理能力。
+
+### 原生 Vermeer 任务提交
+
+原生客户端使用 `POST /api/v1/tasks/create`，请求包含 `graph`、`task_type`（`load`、`reload` 或 `compute`）
+及扁平的字符串 `params` 映射。计算算法名填写 `params["compute.algorithm"]`，不是顶层 `algorithm`。
+响应中的原生 `task.id` 通过 `GET /api/v1/task/{id}` 查询状态，通过 `GET /api/v1/tasks/value/{id}` 查询保留结果。
+这些路径及正数 ID 不同于 Hubble 封装接口。`POST /api/v1/tasks` 不提交任务：任务方法修复后返回 HTTP 405 和 `Allow: GET`；
+旧构建可能返回误导性的 `{"code":200}`，但没有创建任务。
+详见 [原生 API 示例](https://github.com/hugegraph/hugegraph-computer/blob/master/vermeer/README.md#api-overview)。

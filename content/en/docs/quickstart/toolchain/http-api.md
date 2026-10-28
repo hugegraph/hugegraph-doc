@@ -168,3 +168,75 @@ read result pages through `GET .../async-tasks/{id}/values?cursor=0&limit=100` a
 Do not send that Hubble ID to Server's native `/tasks/{id}` endpoint.
 A graph state of `loaded` confirms loading only. An HTTP 400 on computation requires the exact rejected request and response
 before attributing it to an engine defect; the request format above is verified against current source, not a large-dataset benchmark.
+
+## Cypher and task routes in Hubble
+
+Hubble's Cypher endpoint uses the workspace query model, not the integration Gremlin model:
+
+```bash
+curl -b hubble.cookies -X POST \
+  'http://localhost:8088/api/v1.3/graphspaces/DEFAULT/graphs/hugegraph/cypher' \
+  -H 'Content-Type: application/json' \
+  -d '{"content":"MATCH (n) RETURN count(n)","preview":false}'
+```
+
+The query field is `content`; a `query` field or a nested `gremlin-query` object does not populate it.
+The session supplies authentication. Server must advertise Cypher support.
+Hubble UI routes such as `/asyncTasks` are browser navigation routes. Task API requests use the
+`/api/v1.3/graphspaces/{space}/graphs/{graph}/async-tasks` prefix documented above.
+
+## Import graph elements through Hubble
+
+`POST /api/v1.3/graphspaces/{space}/graphs/{graph}/import` accepts multipart field `file` containing JSON graph elements.
+It does not accept raw CSV or a Loader job specification. Create the referenced schema first.
+For example, with a `person` vertex label using `CUSTOMIZE_STRING` IDs and a `name` property,
+and a `knows` edge label linking two `person` vertices, save this as `graph.json`:
+
+```json
+{
+  "vertices": [
+    {"id": "alice", "label": "person", "properties": {"name": "Alice"}},
+    {"id": "bob", "label": "person", "properties": {"name": "Bob"}}
+  ],
+  "edges": [
+    {"label": "knows", "source": "alice", "target": "bob", "properties": {}}
+  ]
+}
+```
+
+```bash
+curl -b hubble.cookies -X POST \
+  'http://localhost:8088/api/v1.3/graphspaces/DEFAULT/graphs/hugegraph/import' \
+  -F 'file=@graph.json;type=application/json'
+```
+
+Both arrays are required; empty arrays perform an empty import. Supply all non-nullable schema properties.
+Vertex IDs must match the schema ID strategy. Edge endpoints use `source` and `target`; a `file` key inside a vertex is not a data source.
+This endpoint returns a graph view. Use the separate data-source/Loader workflow for CSV ingestion.
+
+## Use GraphSpace permission presets
+
+When Server disables custom GraphSpace role assignments, the legacy GraphSpace user POST is rejected by policy.
+That endpoint assigns roles to an existing account; it is not account registration.
+Use the permission presets exposed by Hubble, rather than inventing role IDs or disabling the Server policy.
+For an existing account, an authorized GraphSpace manager can assign a preset using:
+
+```bash
+curl -b hubble.cookies -X PUT \
+  'http://localhost:8088/api/v1.3/graphspaces/DEFAULT/auth/users/<user_id>/preset' \
+  -H 'Content-Type: application/json' \
+  -d '{"user_id":"<user_id>","username":"<username>","permission_preset":"GS_READ_ONLY"}'
+```
+
+Supported presets are `GS_READ_ONLY`, `GS_READ_WRITE` and `GS_ADMIN`, subject to the caller's grant permissions.
+The account identity in the path and body must match. Anonymous mode has no account-management capability.
+
+### Native Vermeer task submission
+
+Native clients submit `POST /api/v1/tasks/create` with `graph`, `task_type` (`load`, `reload` or `compute`),
+and a flat string-valued `params` map. For computation, set `params["compute.algorithm"]`, not a top-level `algorithm`.
+The response contains a native `task.id`; query it at `GET /api/v1/task/{id}` and read retained values at
+`GET /api/v1/tasks/value/{id}`. These paths and positive IDs differ from Hubble's wrapper.
+`POST /api/v1/tasks` does not submit work: after the task-method fix it returns HTTP 405 and `Allow: GET`;
+older builds can return a misleading `{"code":200}` without creating a task.
+See the [native API examples](https://github.com/hugegraph/hugegraph-computer/blob/master/vermeer/README.md#api-overview).
