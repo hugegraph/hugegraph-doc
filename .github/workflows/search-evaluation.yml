@@ -1,0 +1,69 @@
+name: Isolated search index evaluation
+on:
+  push:
+    branches: [codex/search-index-evaluation]
+permissions:
+  contents: read
+jobs:
+  evaluate:
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    env:
+      SOURCE_SHA: 38a97a7bbc2b7066292b1e2c093bb25b0689c496
+      GOWORK: "off"
+      HUGO_MODULE_WORKSPACE: "off"
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1
+        with: {fetch-depth: 0, persist-credentials: false}
+      - uses: actions/setup-python@ece7cb06caefa5fff74198d8649806c4678c61a1
+        with: {python-version: "3.13"}
+      - uses: actions/setup-go@b7ad1dad31e06c5925ef5d2fc7ad053ef454303e
+        with: {go-version-file: go.mod, cache: true}
+      - uses: ./.github/actions/setup-site-tools
+        with: {hugo-version: "0.168.0"}
+      - uses: actions/setup-node@820762786026740c76f36085b0efc47a31fe5020
+        with: {node-version: "24", cache: npm, cache-dependency-path: tests/e2e/package-lock.json}
+      - name: Build summary baseline
+        run: scripts/hugo.sh build --destination "$RUNNER_TEMP/search-summary"
+      - name: Build content experiment without changing tracked configuration
+        run: |
+          python3 - <<'PY'
+          from pathlib import Path
+          p=Path('hugo.yaml')
+          s=p.read_text()
+          assert 'offline_search_index: summary' in s
+          p.write_text(s.replace('offline_search_index: summary', 'offline_search_index: content'))
+          PY
+          scripts/hugo.sh build --destination "$RUNNER_TEMP/search-content"
+          git restore hugo.yaml
+          git diff --exit-code -- hugo.yaml
+      - name: Install Chromium
+        working-directory: tests/e2e
+        run: |
+          npm ci
+          npx playwright install --with-deps chromium
+          mkdir -p search-evaluation
+      - name: Baseline existing ranking contracts
+        id: summary-ranking
+        continue-on-error: true
+        working-directory: tests/e2e
+        env: {SITE_ROOT: "${{ runner.temp }}/search-summary"}
+        run: npx playwright test search-ranking.spec.js --retries=0 --reporter=json > search-evaluation/summary-ranking.json
+      - name: Content existing ranking contracts
+        id: content-ranking
+        continue-on-error: true
+        working-directory: tests/e2e
+        env: {SITE_ROOT: "${{ runner.temp }}/search-content"}
+        run: npx playwright test search-ranking.spec.js --retries=0 --reporter=json > search-evaluation/content-ranking.json
+      - name: Measure indexes and controlled browser samples
+        working-directory: tests/e2e
+        run: node search-evaluation.cjs
+      - name: Upload reproducible evaluation report
+        if: ${{ !cancelled() }}
+        uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a
+        with:
+          name: search-index-evaluation
+          path: |
+            tests/e2e/search-evaluation
+            tests/e2e/test-results
+          if-no-files-found: error
