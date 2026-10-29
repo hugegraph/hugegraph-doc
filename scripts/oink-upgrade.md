@@ -1,114 +1,149 @@
 # OINK upgrade SOP
 
-The theme version and its two checksums live only in `go.mod` / `go.sum`.
-The historical builder and CI resolve the same module through `oink_module.py`:
-site identity, sole theme dependency, no replacement/exclusion, resolved identity,
-and downloaded checksums are all checked. Do not run `go mod tidy`: Hugo uses
-this dependency without Go source imports.
+OINK is the site's sole theme module. Its version and two checksums live in
+`go.mod` / `go.sum`; CI and historical builds use the same locks through
+`oink_module.py`. Keep site changes in configuration, data, hooks and public APIs.
+Do not edit the module cache, vendor a fork or run `go mod tidy` (there are no Go
+source imports, so it can remove the theme).
 
-## Upstream reference
+## Toolchain and upstream guidance
 
-The [OINK v1.1.0 release notes](https://github.com/pgsty/oink/releases/tag/v1.1.0)
-introduce the public [sidebar state API (#41)](https://github.com/pgsty/oink/issues/41)
-and [search-tail API (#40)](https://github.com/pgsty/oink/issues/40).
-HugeGraph uses these instead of its previous DOM/state workarounds. The local
-Print override follows the 1.1 plain/book return contract; generic Chinese UI
-labels come from OINK, while site-owned labels remain in `i18n/`.
-Use the tagged source when checking API details; issue proposals are background.
+Use the Hugo Extended version pinned in `.github/workflows/hugo.yml`, the Go
+version in `go.mod`, Python 3.13, WebP's `cwebp` / `dwebp`, and Node satisfying
+`tests/e2e/package.json`. Node is only for browser tests. OINK 1.4.0 requires
+Hugo Extended 0.168.0 and Go 1.27.3; Hugo's built-in LibSass compiles the site,
+so no standalone Dart Sass or npm site-build dependencies are needed.
+Set `HUGO_BIN` / `PYTHON_BIN` for task-local tools.
 
-## Normal upgrade
+Read the target release notes and the [official upgrade guide](https://oink.pgsty.com/zh/docs/admin/upgrade/).
+For [1.4.0](https://oink.pgsty.com/zh/blog/release/1.4.0/), keep LibSass deprecation
+warnings visible: do not add `--panicOnWarning` or suppress the warning through
+`ignoreLogs`. The shared `scripts/hugo_build.py` runner streams the full output
+and permits only that exact LibSass warning; every other Hugo `WARN`, including
+missing translations and duplicate target paths, fails production builds. The
+same gate covers local, versioned and AI fixture builds. Build errors,
+source/output validation and browser contracts remain blocking.
 
-Start from a clean worktree with the Go and Hugo versions documented in
-[contribution.md](../contribution.md), Python 3, and Node.js satisfying
-`tests/e2e/package.json`. Network access is needed for modules, archived content,
-npm and Chromium. Local ports 4173, 4174 and 4175 must be available.
+The official Module sequence is `hugo mod get`, `hugo mod tidy`, `hugo mod graph`
+and a production build. Our runner adds HugeGraph's module identity, historical
+navigation, search, consent and browser checks to that workflow. Its `go get`
+and checksum cleanup preserve the site's sole-theme contract. Use the existing
+runner; the upstream multi-consumer updater is unnecessary for this one site.
 
-```sh
-scripts/update-oink.sh v1.1.0
-```
+## Upgrade and review
 
-Use an explicit release tag. The command updates the lock files, removes old-version
-checksums from `go.sum`, validates module
-identity, reports upstream changes affecting customizations, then reuses the
-strict build, Python/link tests, all historical builds, aggregate validation
-(which validates each version artifact once),
-blocking Chromium suite and visual captures. It installs the locked browser test
-dependencies. It does not commit, push or publish.
-
-A temporary `hugegraph-oink-*` directory printed at startup holds the review
-report and build artifacts, including on failure. Browser failures keep the
-existing Playwright report and traces. No automatic reset is performed.
-A same-version run is valid. After a failed or interrupted run, retain the target
-pin and resume explicitly; this accepts a dirty worktree for manual adaptations:
+Start with a clean worktree and capture the current site with its matching
+toolchain. Network access is needed for modules, archived content, npm and
+Chromium; ports 4173–4175 must be free.
 
 ```sh
-scripts/update-oink.sh v1.1.0 --resume
+upgrade_dir=$(mktemp -d "${TMPDIR:-/tmp}/hugegraph-oink-review.XXXXXX")
+scripts/hugo.sh build --destination "$upgrade_dir/before-site"
+(
+  cd tests/e2e
+  npm ci
+  npx playwright install chromium
+  SITE_ROOT="$upgrade_dir/before-site" VISUAL_RESULTS_DIR="$upgrade_dir/before" npm run test:visual
+)
+# Select the target toolchain, then use an explicit release tag.
+scripts/update-oink.sh v1.4.0 --work-dir "$upgrade_dir"
 ```
 
-## Compatibility review and breaking changes
+The single command checks target tool requirements and a real Hugo/LibSass
+compilation before changing locks. It then updates the pin, removes old
+checksums, verifies Go/Hugo module identity and reports watched upstream changes
+in `review.json`. With no review impacts it runs all checks and records the
+new override baseline. It never installs tools, commits, pushes or publishes.
 
-1. Read the release notes and the printed `review.json`. Its `from` version is
-   the last reviewed baseline, not necessarily the previous command's target.
-2. Compare each reported file in the two downloaded module directories. For
-   templates, compare old upstream, new upstream, and the corresponding local
-   override. Absorb upstream changes while retaining the site behavior.
-3. Prefer documented configuration, hooks and public JavaScript APIs. Adapt the
-   relevant integration and its behavior tests together. Do not patch module
-   cache files or add a second DOM/state controller alongside the theme.
-4. After reviewing every reported change, rerun the full verification:
-
-   ```sh
-   scripts/update-oink.sh v1.1.0 --resume --accept-reviewed
-   ```
-
-   This acknowledges review; it does not bypass any tests. The baseline advances
-   only after every command succeeds. If a test fails, fix its cause and rerun.
-5. Inspect the visual captures under `tests/e2e/visual-results`, compare before
-   and after desktop/mobile in both languages, and independently review the final
-   diff before release. Automated success is not a visual approval or a promise
-   of compatibility with every untested upstream change.
-
-Get upstream directories for comparison without changing the site pin:
+When upstream changes affect local integrations, compare the old upstream, new
+upstream and local override. Adapt only affected behavior, then resume:
 
 ```sh
-go mod download -json github.com/pgsty/oink@v1.0.0
-go mod download -json github.com/pgsty/oink@v1.1.0
-git diff --check
-git diff -- go.mod go.sum layouts assets scripts .github/workflows/hugo.yml
+scripts/update-oink.sh v1.4.0 --resume --accept-reviewed --work-dir "$upgrade_dir"
 ```
 
-## Customization map
+`--accept-reviewed` acknowledges the reported compatibility review; it skips no
+validation. A failed run retains the target pin, artifacts, Playwright report and
+traces. Fix the cause and resume in the same directory. A same-version run also
+validates changes to local overrides. The baseline advances only after all
+checks pass. Inspect bilingual desktop/mobile before/after captures and obtain
+an independent combined-diff review before publishing.
 
-| Customization | Local entry | Review evidence |
+## Validation and reuse
+
+The runner reuses existing link checks, Python source tests, production build,
+bounded two-worker version builder, aggregate validator, blocking Chromium suite
+and visual harness. It checks every selected version. Latest always rebuilds;
+archived artifacts can be reused only when source, shared shell, toolchain,
+origins and year fingerprints plus file digests match. Restored artifacts are
+validated again. A theme or shell change invalidates those receipts automatically;
+a browser-only repair can resume without recompiling unchanged archives.
+
+CI derives build groups from `versions.json`: adding a version needs no copied
+job/action. A compatible historical bundle uses one warm group even when only
+some per-version keys match; a fully cold shell uses at most three groups of
+two workers. Compatibility lookup uses a shared-input prefix, while each
+artifact still needs its exact version key, digest and validation before reuse.
+Theme, Hugo, branding or version-menu changes correctly rebuild archives:
+their static HTML shares the current shell. Updating ordinary latest Docs
+content or browser/source tests leaves historical content reusable.
+
+Validation includes current `content/` and `static/` changes, including
+non-ignored new files and deletions, using a temporary index and (if needed) an
+unreferenced validation commit. It does not stage files or move HEAD/branches.
+`validation-snapshot.json` records that scope; historical sources remain pinned
+by `versions.json`.
+
+Release checks disable inherited Hugo replacements and preview themes, set
+`GOWORK=off` / `HUGO_MODULE_WORKSPACE=off`, and reject `_vendor`. A correct
+`go.mod` alone cannot prove Hugo used the selected theme. Read-only
+`--check-baseline` uses disposable locks in a sibling workspace so Hugo's graph
+initialization cannot rewrite the checkout; the parent directory must be writable.
+Normal preview commands retain local-development capabilities.
+
+Manual CI dispatches inspect the immutable candidate's theme pin before scheduling
+builds. OINK 1.3.0 manual candidates are outside this workflow's supported scope;
+OINK 1.3.1 requires standalone Dart Sass. Both pins are rejected by the current
+workflow; upgrade such a candidate to OINK 1.4.0 first.
+This restriction concerns the candidate's theme, not historical documentation:
+archived content continues to use the current site shell.
+
+Reuse the same external work directory to preserve the first lock/inventory
+backup, `review.json`, `toolchain.json`, build artifacts and captures. Initial
+runs reject reserved outputs instead of overwriting user files; existing
+`before/` captures and `before-site/` are allowed. Resume never regenerates
+baseline screenshots. A fresh `--resume` directory backs up the already-pinned
+target, which `review.json` explicitly records.
+
+## Customization review map
+
+| Integration | Local entry | Required evidence |
 | --- | --- | --- |
-| Version/language navigation and historical shell | `layouts/`, `scripts/versioning.py` | All-version aggregate, versioning and platform browser tests |
-| Browser language default and manual preference | `assets/js/language-preference.js`, `hooks/head-end.html` | Homepage, explicit links, storage, palette and keyboard browser tests |
-| Sidebar expansion memory | `assets/js/hugegraph-shell.js` | Public OinkSidebar API, storage/focus/keyboard browser tests |
-| Authorized Ask AI, remembered consent/dismissal, withdrawal and community entry | `assets/js/kapa-adapter.js`, `layouts/_partials/hooks/body-end.html`, `layouts/_partials/footer.html` | Public search-tail API, adapter tests and AI browser contracts |
-| Brand and layout | `assets/scss/`, `data/`, `i18n/` | Bilingual desktop/mobile, dark/light and print captures |
+| Version/language navigation, historical shell | `layouts/`, `scripts/versioning.py` | All-version aggregate and navigation/browser contracts |
+| Language preference and sidebar memory | `language-preference.js`, `hugegraph-shell.js`, head hook | Storage, focus, keyboard and public OinkSidebar API |
+| Ask AI consent and community entry | `hugo.yaml`, AI config partial, `kapa-adapter.js`, body/footer hooks | Enabled/disabled AI fixtures, public search-tail API |
+| Branding and appearance | `assets/scss/`, `data/`, `i18n/` | Four presets, light/dark, bilingual desktop/mobile and Print |
+| Native content | `content/`, output validator | Component behavior, actual payload sinks, Print/Markdown fallbacks |
 
-`scripts/oink-overrides.json` records upstream hashes, not copies of upstream
-code. The generated inventory covers same-name local layouts/assets/translations/data,
-the sidebar/search/surface interface files and upstream SCSS used by local CSS.
-New, removed or changed upstream files in that inventory require review. Site-only
-hooks are listed above; their behavior is checked by tests rather than inferred
-from matching filenames. Template hashes alone never prove full compatibility.
-
-Adding or removing a same-name local override changes the inventory even without
-a theme upgrade. The read-only `--check-baseline` diagnostic names added, removed,
-and changed paths. Review those changes, then run
+`scripts/oink-overrides.json` stores upstream hashes, not copied source. The
+inventory covers same-name local layouts/assets/translations/data, watched
+sidebar/search/surface/appearance interfaces and upstream SCSS selectors used
+locally. Added/removed/changed entries require review; unchanged hashes do not
+prove interaction compatibility. After adding/removing an override, use
 `scripts/update-oink.sh <pinned-version> --resume --accept-reviewed` to validate
-and record the revised inventory; use the version currently pinned in `go.mod`.
+and record the inventory.
 
-For this initial 1.1 migration the baseline is generated after manual review and
-is accepted with the repository's full migration verification. Future runs update
-it only after the same automated gates pass.
+Use [OINK features](oink-features.md) for native component selection and real
+site examples. Prefer native configuration/components over a copied template,
+CSS patch or second DOM controller. When removing shared styles, also check
+archived content in its temporary assembly; do not rewrite release branches.
+Visible virtual Docs groups must omit `toc_hide`, which hides whole subtrees.
 
-## Rollback
+## Recovery
 
-Keep the upgrade in a dedicated commit. To undo an already committed upgrade,
-revert that commit (including adaptations and the baseline), then rerun the
-restored target with `--resume`. For an uncommitted attempt, inspect `git diff`
-and restore only the upgrade files from the known pre-upgrade revision; do not
-reset the whole worktree or remove unrelated changes. The script never performs
-either rollback automatically. Publishing remains the existing release workflow.
+Keep upgrade/adaptations/baseline in a dedicated commit. Revert that commit to
+undo a committed upgrade, then validate the restored version with `--resume`.
+For an uncommitted run, inspect the diff and restore only upgrade files from the
+known pre-upgrade revision or the first work-directory backup. Do not reset
+unrelated work. The runner does not roll back automatically. Publication uses
+the existing release workflow.

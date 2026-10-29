@@ -1,381 +1,207 @@
 ---
-title: "在 Kubernetes 上运维 HugeGraph"
-linkTitle: "Kubernetes 运维 (Helm)"
+title: "HugeGraph Kubernetes 运维"
+linkTitle: "Kubernetes 运维"
 weight: 5
-search_keywords:
-  - helm
-  - kubernetes
-  - operations
-  - disaster recovery
-  - networkpolicy
+search_keywords: [HugeGraph Helm 运维, local PV, NetworkPolicy, PD, Store]
 ---
 
-### 1 适用范围
+本文配合 [Helm 部署](./hugegraph-helm.md)使用。生命周期检查和恢复说明见
+[运维参考](https://github.com/apache/hugegraph/blob/master/helm/hugegraph/docs/operations.md)，所有参数说明见 chart 的 `values.yaml`。
+命令假设 release 和 namespace 都是 `hugegraph`，覆盖名称时请替换实际工作负载名。
 
-本页面向已经用 Helm chart 部署好 HugeGraph 集群的运维场景。安装、升级、卸载见
-[部署页](/cn/docs/quickstart/hugegraph/hugegraph-helm/)；完整参数参考仍在
-[chart README](https://github.com/apache/hugegraph/tree/master/helm/hugegraph#configuration)。
+## 1 存储和内网镜像 {#1-storage-and-private-images}
 
-下文命令假定 release 名为 `hugegraph`、namespace 为 `hugegraph`，请按需替换。两个凭据会反复用到，都从
-chart 管理的 Secret 读取：
-
-```bash
-PASSWORD="$(kubectl get secret -n hugegraph hugegraph-admin \
-  -o jsonpath='{.data.password}' | base64 --decode)"
-PD_SECRET="$(kubectl get secret -n hugegraph hugegraph-pd-auth \
-  -o jsonpath='{.data.secret-key}' | base64 --decode)"
-```
-
-### 2 端口与健康
-
-| 组件 | 端口 | 用途 |
-|------|------|------|
-| PD | `8686` | gRPC（Store 与 Server 客户端） |
-| PD | `8620` | REST / 健康探测 |
-| PD | `8610` | Raft |
-| Store | `8500` | gRPC |
-| Store | `8510` | Raft |
-| Store | `8520` | REST / 健康探测 |
-| Server | `8080` | Gremlin 与 REST API |
-
-所有端口都可以通过 values 配置；修改 `server.port` 会同时更新监听、容器端口和 Service。进程存活但停止响应的组件由
-存活探测终结：默认 20 秒周期、3 次失败阈值把一个卡死 Store 的影响时间限制在约一分钟内，重启后 raft 几秒内就会转移
-它持有的分区 leader。
-
-通过 port-forward 访问 API。forward 在前台运行，请让它留在一个终端里：
+基础安装需要七个持久卷。动态存储需要正常的 provisioner，静态 local 存储需要预建目录和绑定节点的匹配 PV。
+[完整例子](https://github.com/apache/hugegraph/tree/master/helm/hugegraph/examples)包含七个 local PV、`WaitForFirstConsumer`、镜像仓库和 GitOps Secret。
+`WaitForFirstConsumer` 的 PVC 初期 Pending 可以是正常等待；持续 Pending 应检查 PVC/Pod 事件和 PV 匹配。
+PVC 已绑定但目录不存在或权限不匹配时可能挂载失败，不能把故障 PVC 静默替换成临时目录。
 
 ```bash
-kubectl port-forward -n hugegraph svc/hugegraph-server 8080:8080
+kubectl -n hugegraph get pvc,pods
+kubectl -n hugegraph describe pvc <claim-name>
+kubectl -n hugegraph describe pod <pod-name>
+kubectl get pv,storageclass
 ```
 
-再在第二个终端里调用 API（`PASSWORD` 按上文设置）：
+出现 `ImagePullBackOff` 时检查 Pod 事件、仓库连通性和拉取凭据。默认只需四个组件镜像，等待 Store/Helm test 复用已包含 curl 的组件镜像。
+如显式覆盖 helper 镜像，该镜像也需要同步到内网仓库。
+启用 SeaTunnel 还需配置的 `apache/seatunnel` 镜像；启用 Vermeer 使用按 digest 固定的 `hugegraph/vermeer:helm-30b67d93e7d0`，
+Master、Worker 和令牌初始化共用它。官方发布运行记录源码与镜像 digest，
+详见 [Vermeer 部署指南](https://github.com/apache/hugegraph/blob/e886e9a669cdfd47c9f83392f86fc47940167960/helm/hugegraph/docs/vermeer.md)。
+自定义镜像覆盖还需同步更新 `vermeer.image.digest`，或显式清空以按标签选择；非空 digest 优先。
+基础 local PV 示例不包含 Vermeer 卷：单机增加两个，集群增加一个 Master 卷及每 Worker 一个卷，默认增加四个。
+
+## 2 端口和健康检查 {#2-ports-and-health}
+
+PD 端口为 REST 8620、gRPC 8686、Raft 8610；Store 为 REST 8520、gRPC 8500、Raft 8510；Server HTTP 为 8080；Hubble HTTP 为 8088。
+客户端 Service 隐藏 Pod 地址，NodePort 是节点上另外分配的端口，与应用监听端口不同。
+PD `/v1/ready` 需要 Raft leader，`/v1/health` 只说明监听器已启动，Store 等待多数 PD peer ready 后启动。
+Server 等待存储的默认上限为 300 秒，可以用 `server.storageWaitTimeoutSeconds` 调整。
+本地模板渲染不能验证集群连通性、卷挂载或 JVM 运行容量。
+
+### 保留元数据命名空间 {#metadata-namespace}
+
+`metadataCluster: hg-test` 用于声明 Server 和 Store 访问 PD 时的元数据前缀（注入至 Server 的 `HG_SERVER_CLUSTER` 与 Store 的 `PD_CLUSTER`）。
+它并非 Raft 分组名，修改该值不会自动迁移历史元数据。**切勿**为了启用 Vermeer 将已有集群的前缀随意变更。若遇到 Server 查询正常但 Vermeer 扫描 Store 报 `Schema missing` 或 `no such vertex label`，应优先核查各组件的元数据前缀是否完全一致。
+
+若历史自建环境使用了非默认前缀，升级前需在 Server Deployment 显式标注确认：
 
 ```bash
-curl --user "admin:${PASSWORD}" http://127.0.0.1:8080/versions
-curl --user "admin:${PASSWORD}" http://127.0.0.1:8080/graphs
+kubectl -n hugegraph annotate deployment hugegraph-server \
+  hugegraph.apache.org/metadata-cluster='<已核准的历史前缀>'
 ```
 
-### 3 调度
+并在 values 中将 `metadataCluster` 设为同一值。对于采用 `store.updateStrategy.type=OnDelete` 策略的 Store 节点，需按[受控滚动升级流程](#6-rolling-store-images-safely)逐个重建 Pod，新配置方可生效。
 
-每个组件（`pd`、`store`、`server`、`hubble`）都提供 `nodeSelector`、`tolerations`、`affinity`、
-`topologySpreadConstraints` 和 `priorityClassName`。例如把 Store 固定到打了标签的节点：
+> [!DETAILS]- 可选引擎运维：探针、凭据与拓扑切换
+> - **端口与健康状态**：SeaTunnel HTTP/UI 端口为 `8080`；Vermeer Master HTTP/gRPC 为 `6688/6689`，Worker 为 `6788/6789`。
+>   原生 HTTP/UI 在 easy 下默认 NodePort，strict 下默认 ClusterIP，两者均需登录；内部 RPC、Worker HTTP 与 SeaTunnel `5801` 保持私有。
+>   `service.type: null` 继承模式默认值，显式 `ClusterIP` 保持私有，显式 `NodePort` 则开放需要登录的 HTTP/UI。
+>   使用 `hugegraph-seatunnel` 或 `hugegraph-vermeer-master` Service 分配的 HTTP NodePort 与可达节点 IP 访问。
+>   查询命令见[原生入口说明](/cn/docs/quickstart/hugegraph/hugegraph-helm/#optional-engines)；ClusterIP 可使用 port-forward。
+> - **密码与会话**：初次部署生成的管理密码在 easy 模式下为 6 位字符，strict 模式下为 16 位；后续升级与模式切换均自动保留既有凭据。
+>   Vermeer 原生控制台直接在 **Admin credential** 填入 `<release>-vermeer-admin` Secret 的 `password` 即可登录；Hubble 内部服务凭据已自动注入。
+> - **拓扑与副本切换**：修改 `seatunnel.mode` 或 `vermeer.mode` 前，请确保所有计算与导入批任务已结束并卸载内存图副本。单机与集群使用独立的数据卷声明，拓扑切换不会自动迁移本地文件。
+> - 完整恢复指引与进阶参数详见 [Vermeer 部署指南](https://github.com/apache/hugegraph/blob/e886e9a669cdfd47c9f83392f86fc47940167960/helm/hugegraph/docs/vermeer.md)
+>   与 [SeaTunnel 部署指南](https://github.com/apache/hugegraph/blob/master/helm/hugegraph/docs/seatunnel.md)。
 
-```yaml
-store:
-  nodeSelector:
-    hugegraph/role: storage
+### Helm test 检查范围 {#helm-test-coverage}
+
+`helm test` 逐 Server Pod 检查图绑定（默认检查 `DEFAULT-hugegraph`，可通过 `server.testGraphAlias` 指定图别名），并要求当前可见关联索引处于 `CREATED` 状态。
+请在索引创建／重建任务结束后执行，检查期间不要并发修改 schema。
+在 HStore 上，读取尚未完成的索引可能将临时状态缓存到其他 Pod；重试不会刷新该状态。
+即使任务随后成功，这些 Pod 的索引查询也可能继续失败；应在任务结束后再替换受影响的 Server Pod。
+hook 不修复跨 Server 的 schema 缓存一致性。内部 150 秒重试窗口用于等待短暂选举等状态恢复，
+Helm 的 `--timeout` 不会修改这个窗口。
+它按 ID 读取索引，不刷新全量索引缓存；不证明索引查询结果或完整 schema 一致性。
+对已有数据，可在 Helm 升级时用 `--set-file server.testGremlin=assertions.groovy` 添加逐 Pod 的只读业务断言。
+脚本必须用 `assert` 或抛异常表示结果不符，仅返回 `false` 不会让请求失败。
+[业务查询断言](https://github.com/apache/hugegraph/blob/master/helm/hugegraph/docs/operations.md#business-query-assertions)
+给出了示例与检查边界。未配置脚本时明确显示业务断言已跳过，默认 hook 不创建 schema 或数据。
+自定义脚本使用 hook 的 Server 凭据执行（开启鉴权时为 `admin`），不强制只读；请提供可信的只读断言。
+
+Server API 根据 `Accept-Encoding` 协商响应压缩。支持 gzip 的客户端可请求 `gzip` 或使用 `curl --compressed`；
+`identity` 或未请求压缩时返回未压缩内容。需从更新后的源码重新构建 Server 镜像才能包含该行为，仅更新 chart 不会改变现有镜像。
+
+### PD REST 鉴权 {#pd-rest-authentication}
+
+PD REST 使用 HTTP Basic 鉴权，`hg`、`store`、`hubble` 和 `vermeer` 共用 PD REST Secret 密码。
+Server 的 `admin` 不是 PD REST 账户，使用它会返回 401。默认 release/Secret 的查询示例，地址应为可达的 PD REST 地址：
+
+```bash
+PD_SECRET=$(kubectl -n hugegraph get secret hugegraph-pd-auth \
+  -o jsonpath='{.data.secret-key}' | base64 --decode)
+curl --user "hg:${PD_SECRET}" "http://<pd-rest-address>:8620/v1/stores"
 ```
 
-`antiAffinity`（`required` | `preferred` | `disabled`）为 `pd`、`store`、`server` 渲染按主机名的
-pod 反亲和预设；Hubble 设计为单副本，没有这个配置项。设置原生 `affinity` 会整体替换预设。三者默认都是
-`preferred`，因此节点数少于副本数的集群也能调度。代价是：节点资源紧张时调度器可能把副本放到同一节点，单个节点
-故障就可能同时带走多个 PD 或 Store 副本。节点足够的生产集群应把 `pd.antiAffinity` 和 `store.antiAffinity`
-固定为 `required`，`values-cluster.yaml` 即如此。
+以上 HTTP 示例适用于可信内网。其他访问路径可使用 HTTPS 网关，或按需执行
+`kubectl -n hugegraph port-forward service/hugegraph-pd-client 8620:8620`，再访问 `http://127.0.0.1:8620`。
 
-### 4 分区分片
+使用 `pd.auth.existingSecret` 或自定义 `pd.auth.key` 时读取实际 Secret 和 key，不使用 Server 管理员密码。
+变量式示例避免将密码字面值写入 shell 历史，但展开后的凭据可能短暂出现在进程参数中。
+共享终端可选用 `curl --user hg` 提示输入密码，或权限为 `600` 的私有 curl 配置文件；
+[凭据操作说明](https://github.com/apache/hugegraph/blob/master/helm/hugegraph/docs/operations.md#credentials)
+也包含改密请求体的处理方式。不要记录或提交凭据文件。
 
-全新安装会在 `store.replicas` 不低于 3 时把 PD 的分片数种子设为 3，否则设为 1；没有这个种子，PD 镜像会把
-`partition.default-shard-count` 固定为 1，chart 部署的集群就没有 Store 级高可用。chart 通过 PD 的
-`JAVA_OPTS` 传入 `-Dpartition.default-shard-count`，不影响镜像的 JVM 自动调优。
+## 3 调度 {#3-scheduling}
 
-**种子只在首次引导时生效。** PD 第一次以空存储启动时把分片数持久化到自己的元数据里，此后存储的值才是权威：之后修改
-`pd.partition.defaultShardCount` 或跨过推导边界地伸缩 `store.replicas`，对已初始化的集群都没有效果。要修改运行中
-集群的分片数，请使用 PD 自己的配置 API（只接受不超过存活 Store 数的奇数），然后触发
-`GET /v1/task/patrolPartitions`，并预期分片组会发生再分配。
+默认 `preferred` 反亲和允许节点少于副本数时调度；`values-cluster.yaml` 对 PD/Store 设置 required 反亲和，因此需要至少三个可调度节点。
+显式 affinity 优先于预设。local PV 节点亲和必须匹配工作负载位置约束，PV 容量声明不等于文件系统配额。
+持久化 PD/Store 的 Raft 主机名和端口会记录为成员身份，不能作为普通配置随意变更。
 
-分片数还决定初始分区数：`store.replicas x storeMaxShardCount / shardCount`，只在引导时计算一次。按镜像默认的
-`store-max-shard-count`（12），默认 3 Store 安装得到 12 个分区；需要更多分区时调大
-`pd.partition.storeMaxShardCount`（同样只在首次引导时生效）。
+## 4 分区副本 {#4-partition-sharding}
 
-显式设置的 `pd.partition.defaultShardCount` 必须是奇数且不超过 `store.replicas`；其他值会在渲染时被 chart
-拒绝，因为 PD 会悄悄钳制或拒绝它们，渲染通过并不等于设置生效。
+首次初始化时，Store 至少三个则默认每个分区三副本，否则一副本。
+PD 会持久化分区设置，初始化后修改 chart 值不会覆盖已有元数据，应使用 PD 配置 API 并协调分区巡检。
+显式 shard 数必须为奇数且不超过 Store 数，操作在线集群前先核对
+[拓扑约束](https://github.com/apache/hugegraph/blob/master/helm/hugegraph/docs/operations.md#topology-and-scheduling)；chart 不负责迁移已有 shard 元数据。
 
-### 5 NetworkPolicy
+## 5 NetworkPolicy {#5-networkpolicy}
 
-`networkPolicy.enabled` 为每个组件（PD、Store、Server，启用时还有 Hubble）渲染一个 NetworkPolicy。每个策略
-都对自己的 Pod 做双向隔离并列出所需流量，因此应用顺序无关紧要。`values.yaml` 默认关闭（基础配置无法预知你的
-客户端是谁），`values-cluster.yaml` 默认开启。
-
-它只在集群网络插件强制执行 NetworkPolicy 时才生效（kind v0.25 及以上、k3s、Calico、Cilium）；其他插件会接受
-对象但不执行。验证方法：在另一个 namespace 起一个不带 chart 标签的 Pod，`curl` PD 客户端 Service 的 REST
-端口，必须超时。
-
-策略开启后，release 只放行自己的流量：
-
-| 目标 | 来源与端口 |
-|---|---|
-| PD | PD：raft、gRPC。Store、Server、`pd` 模式的 Hubble：gRPC、REST |
-| Store | Store：raft。Server：gRPC、REST。`pd` 模式的 Hubble：REST |
-| Server | Hubble 和 `helm test` Pod：`server.port` |
-| Hubble | 无（port-forward 走回环，不需要规则） |
-
-每个组件还可以走 53 端口解析 DNS。release 之外的任何来源都必须列入
-`networkPolicy.<component>.extraIngress` 才被放行，包括 Ingress 控制器和 NodePort / LoadBalancer Service
-的客户端。在 `extraIngress` 为空时暴露 PD、Server 或 Hubble，或设置 `server.advertiseUrl`，渲染会直接失败
-而不是打开端口。该检查只看 chart 自己创建的暴露；你自行添加的 Service、Gateway 路由或代理需要自己的条目。集群内
-`pd` 模式的 Hubble 与 `server.advertiseUrl` 同时使用时，在 `networkPolicy.hubble.extraEgress` 放行该对外地址之前，
-渲染同样会失败：PD 会把这个 URL 交给 Hubble 用于发现，而 Hubble 的出向策略默认只能访问本 release 的 Pod。
-
-两个出向事实需要规划。PD、Store、Server 除 DNS 外不访问 release 以外的任何地址，因此需要外呼的功能在策略开启时
-不可用；默认唯一的外呼方是 Store 镜像，它每次启动都从 github.com 下载 `libjemalloc.so`。策略开启时该连接约两分
-钟后超时，Store 不带 jemalloc 继续启动（kind 上实测：就绪时间从 11 秒变为 151 秒）；无外网的集群同理。另外
-`helm test` Pod 不被任何 chart 策略选中，因此在你自己的 namespace 级默认拒绝策略下，要给它放行到 `server.port`
-和 DNS 的出向流量。
-
-**放行其他工作负载。** 每条规则的 `from` 必须指明对端；要放行任意地址，请显式写 `0.0.0.0/0` 这样的
-`ipBlock`。同一个对端里的 `namespaceSelector` 和 `podSelector` 必须同时匹配；写成两个对端则满足其一即可。
-NodePort / LoadBalancer 客户端在 Pod 看来是什么地址，取决于网络插件、`externalTrafficPolicy` 和请求到达的
-节点。在双节点 kind 集群上用 NodePort Server 实测：
-
-- kindnet，以及开 kube-proxy replacement 的 Cilium：请求发到 Server 所在节点时带客户端地址；经另一节点转发时
-  带那个节点的地址。
-- Calico：经另一节点转发的请求来自该节点在 Pod CIDR 里的隧道地址。
-- 用 kube-proxy 的 Cilium：任何 `ipBlock` 规则都放行不了 NodePort 流量，因为 Cilium 用自己的节点身份而不是
-  CIDR 识别节点地址。
-
-请用你实际运行的插件测试，并按看到的来源地址写 CIDR。放行 Ingress 控制器、应用 namespace 和 Prometheus 的
-完整示例：
+基础服务的完整隔离在 easy 和普通集群预设下默认关闭，strict 下开启。
+SeaTunnel 和 Vermeer 始终需要登录。原生策略仅在最终 Service 类型为 NodePort 时允许外部 HTTP，
+内部 RPC、Worker HTTP 与 SeaTunnel 成员端口仍限制为相应 release 调用方，`networkPolicy.enabled=false` 也不例外。
+集群网络插件必须支持策略执行，才有实际隔离效果。
+生成策略允许组件间通信和 DNS，基础服务的外部客户端、Ingress 控制器需要适当的 `networkPolicy.<component>.extraIngress`，
+外部发现地址可能还需要 `extraEgress`。基础服务规则的空列表合法但可能阻止外部访问，并支持 Kubernetes 原生规则，包括允许全部的 `{}`。
+按实际来源地址或 selector 配置，并考虑 NodePort SNAT 和控制器行为。
 
 ```yaml
 networkPolicy:
+  enabled: true
   server:
     extraIngress:
       - from:
-          - namespaceSelector:
-              matchLabels:
-                kubernetes.io/metadata.name: ingress-nginx
-            podSelector:
-              matchLabels:
-                app.kubernetes.io/name: ingress-nginx
+          - ipBlock:
+              cidr: 10.20.0.0/16
         ports:
-          - port: 8080
-      - from:
-          - namespaceSelector:
-              matchLabels:
-                kubernetes.io/metadata.name: apps
-        ports:
-          - port: 8080
-  pd:
+          - protocol: TCP
+            port: 8080
+  hubble:
     extraIngress:
       - from:
-          - namespaceSelector:
-              matchLabels:
-                kubernetes.io/metadata.name: monitoring
+          - ipBlock:
+              cidr: 10.20.0.0/16
         ports:
-          - port: 8620
+          - protocol: TCP
+            port: 8088
 ```
 
-### 6 安全地滚动 Store 镜像
+原生引擎的 extraIngress 只接受显式内部 Pod／namespace selector，拒绝 IP block 和通配规则。
+NodePort HTTP 访问已由生成的策略直接放行，无需额外的 extraIngress 规则。
+上面的基础服务示例用于 Server。外部数据源可按需配置引擎 extraEgress，strict 进一步限制出站流量。
 
-Store 的滚动更新以监听检查推进，而不是以分片恢复推进，控制器可能在上一个 Store 尚未重新加入分片组时就替换下一
-个。`values-cluster.yaml` 因此设置了 `store.updateStrategy.type=OnDelete`（其他生产 values 请自行设置）：升级只更新
-StatefulSet，不替换任何 Store Pod，由你逐个删除 Store Pod，并在两次删除之间做检查。`OnDelete` 只是停止自动推进；
-删除 Pod 时不做下面的检查，风险相同。
+## 6 逐个升级 Store {#6-rolling-store-images-safely}
 
-PD 里的 `Up` 不是这个检查。PD 在注册时就把 Store 标为 `Up`，此时它还没恢复任何分区；已停止的 Store 也会在
-keep-alive 记录过期前（当前镜像为 300 秒）一直保持 `Up` 并留在所有分片组里：窗口内删除又回来的 Pod 根本不会离开
-`Up` 状态。检查要从 Pod 开始：
+集群预设使用 `store.updateStrategy.type=OnDelete` 便于维护时控制逐个替换。
+每次只删除一个 Store Pod，下一次删除前确认上一个 Pod Ready、Store 心跳新鲜，并从 PD leader 查询每个 shard group 都有完整成员及唯一 leader。
+PD 的 `Up` 状态本身不证明 shard 恢复完成。PDB 限制主动驱逐，不限制 StatefulSet 控制器更新。
+发现缺成员或无 leader 时停止继续替换。
+[运维参考](https://github.com/apache/hugegraph/blob/master/helm/hugegraph/docs/operations.md#rolling-store-updates-and-recovery)说明这些升级条件，
+但不提供完整的逐组诊断或丢盘恢复步骤。
 
-```bash
-kubectl -n hugegraph wait --for=condition=Ready \
-  pod/hugegraph-store-<ordinal> --timeout=10m
-```
+即使副本完整，替换单个 Store 时，Raft leader 和客户端路由收敛期间仍可能出现请求失败或超时，不保证零错误。
+继续维护前同时观察应用错误和 shard 恢复状态，不要盲目重试写请求。
 
-然后从 PD leader 逐组检查分片成员与 leader（找 leader 的方法见下文"灾难恢复"）：
+### PD 巡检和 leader 均衡 {#pd-patrol-and-leader-balance}
 
-```bash
-curl -s -u "hg:${PD_SECRET}" http://127.0.0.1:8620/v1/shardGroups | jq '
-  .shardGroups[] | {id: (.id // 0),
-                    shards: [.shards[] | {storeId, role}],
-                    leaders: [.shards[] | select(.role=="Leader")] | length}'
-```
+分区巡检修复 shard 成员关系；leader 均衡是单独的手动任务，不会自动定时执行。
+执行前通过鉴权的 `/v1/members` 查询 `data.pdLeader.restUrl`，并确认该 PD 的 `/v1/ready` 返回 `isLeader: true`。
+GET 任务 `/v1/task/patrolPartitions` 和 `/v1/task/balanceLeaders` 会改变集群状态，应携带 PD REST 凭据请求已确认的 leader。
+成员恢复和 split/move 任务完成后才能执行 leader 均衡；Store 心跳需新鲜，各组成员需完整、健康。
+忙碌任务返回 body `status: 1001`。follower 可能返回空成功，leader 转移是异步的，HTTP 200 或转移计划不代表执行完成。
+继续维护前重新检查 `/v1/partitions`、`/v1/stores` 和应用错误。
+[任务操作步骤](https://github.com/apache/hugegraph/blob/master/helm/hugegraph/docs/operations.md#pd-patrol-and-leader-balance)
+说明巡检和均衡的独立操作；维护忙碌时不要循环请求任务。
 
-只有当被替换的 Pod 已 `Ready`、它的 Store id 在 `/v1/stores` 里显示新的 `lastHeartBeat`、且每个分片组都报告
-完整分片数和恰好一个 `Leader` 时，才删除下一个 Store。
+## 7 灾难恢复 {#7-disaster-recovery}
 
-要清楚这证明不了什么：分片列表是 PD 的成员记录，不代表该 Store 已追上 raft 日志。当前镜像没有任何端点报告"恢复
-完成"。想看得更近，port-forward 被替换的 Store，读它自己对某个分片组的视图：`GET :8520/v1/partition/<groupId>`
-返回该 Store 持有的 raft 角色、leader 和已提交 index（`logIndex`），Store 停机时会失败；index 要与对端 Store 上的
-同一组对比着看，不要单独读。这个路由从不填写 `term` 字段，所以这里的 `term` 总是 0。
-复数形式的 `GET :8520/v1/partitions` 在
-[apache/hugegraph#3232](https://github.com/apache/hugegraph/pull/3232)（2026-09-24 合入）之前构建的镜像上，
-对任何跟随分片组的 Store 返回 500；之后的镜像对每个 Store 都返回 200，被跟随分组的 `conf` 和 `peers` 为
-null。逐组路径在两类镜像上都可用。
+保留原卷、claim 身份和 PD 成员关系，不通过删除 RocksDB lock 文件恢复，也不把持久化成员配置替换为全新的节点。
+Store 丢盘后，新建空 PVC 并不能恢复原有数据。
+local 磁盘不能在节点故障时自动迁移文件。备份应放在这些 PV 之外，并单独验证恢复；chart 不提供自动备份和自动恢复。
+[恢复说明](https://github.com/apache/hugegraph/blob/master/helm/hugegraph/docs/operations.md#rolling-store-updates-and-recovery)列出恢复约束，不是完整的恢复操作顺序。
+破坏性变更前，应结合部署版本、剩余副本或备份制定并验证恢复方案。
 
-成员检查通过后留出余量再删下一个 Pod，把 `store.pdb.minAvailable` 保持在 `replicas - 1`，意外的第二次驱逐会被
-拒绝；任何缺分片或没有 leader 的分组都应视为停止信号。真正的"分区恢复完成"信号是上游工作，在
-[apache/hugegraph#3229](https://github.com/apache/hugegraph/issues/3229) 跟踪。
+## 8 扩缩容 {#8-scaling}
 
-### 7 灾难恢复
+Server 副本可以常规变更，HPA 还需要 CPU requests。Store 扩容需要协调存储和 shard。
+PD 扩缩容及 Store 缩容不能仅修改副本数，需要先更新持久化 Raft/shard 成员关系。
+chart 对已初始化 StatefulSet 检查不支持的身份和成员变更，首次安装不执行升级专用查询。
+按生命周期流程扩缩容，避免直接 `kubectl scale` 使 Hubble 的 Store metrics 配置过期。
 
-当前版本 PD 自动做的事很少：60 秒一次的巡检只把停止心跳的 Store 标为 `Offline`。没有自动副本重建；丢失 Store
-的副本重新放置、按分片数校正分片组、处理 Tombstone Store，都只在显式触发分区巡检时执行。
+## 9 集群外的 Hubble {#9-running-hubble-outside-the-cluster}
 
-任务端点在收到请求的那台 PD 上本地执行，follower 会返回空的成功响应但什么也不做。port-forward 客户端 Service
-选中的 PD 是任意的，所以先找 leader，再 port-forward 那个 Pod（forward 在前台运行，需要第二个终端）：
+direct 模式只需要可达的 Server URL；PD discovery 还需要集群外可达的 PD gRPC，PD 注册的 Server 地址也必须可达。
+必要时用 `server.advertiseUrl` 注册共享 Server 地址，这会影响所有 discovery 客户端，包括集群内 Hubble。
+chart 内置 Hubble 已配置内部服务发现，不需要公开 PD 入口。
+HTTP 可以直接使用，TLS 终止可选。Hubble 仍是单副本，当前登录依赖 Server 鉴权。
 
-```bash
-kubectl port-forward -n hugegraph svc/hugegraph-pd-client 8620:8620
-# 读 .data.pdLeader.raftUrl，其主机名即 leader Pod。
-curl -su "hg:${PD_SECRET}" http://127.0.0.1:8620/v1/members
-# 停掉 Service 的 forward，改为 forward leader Pod。
-kubectl port-forward -n hugegraph pod/<leader-pod> 8620:8620
-# 校正分片组并处理 Tombstone Store。
-curl -u "hg:${PD_SECRET}" http://127.0.0.1:8620/v1/task/patrolPartitions
-# 如果巡检修复了分片组，先等 180 秒（见下文）。
-# 先摊平 Raft leader，再摊平分区数据。
-curl -u "hg:${PD_SECRET}" http://127.0.0.1:8620/v1/task/balanceLeaders
-curl -u "hg:${PD_SECRET}" http://127.0.0.1:8620/v1/task/balancePartitions
-```
+## 10 Gremlin 报 Could not rebind {#10-when-gremlin-fails-with-could-not-rebind}
 
-任务跑完后再读一次 `/v1/members`：如果中途 leader 迁移，后面的任务其实跑在 follower 上、什么也没做。
-PD 在两种情况下设置 180 秒的 balance-shard 标志：`patrolPartitions` 每次重新分配分片数不对的分片组时都会设置，
-`balancePartitions` 即使什么都没搬也会设置。窗口内 `balanceLeaders` 会被拒绝，`balancePartitions` 什么也不做就返回，
-因此在修复了分片组的巡检之后、以及 `balancePartitions` 之后，至少等 180 秒再执行下一次均衡。在
-[apache/hugegraph#3233](https://github.com/apache/hugegraph/pull/3233)（2026-09-24 合入）之前构建的镜像上，
-拒绝表现为裸的 HTTP 500，原因只在 PD 日志里；之后的镜像把原因放进响应体：
-`{"status":1001,"error":"balance shard is processing, please try later!"}`。
+PD 滚动更新期间，Server 可能 Ready、能响应 REST，但 Gremlin binding 失败。
+执行 `helm test hugegraph -n hugegraph --logs --timeout 5m` 检查每个 Server Pod 的鉴权图查询；PD 稳定后替换失败 Pod 并再次验证。
+只查询 `/versions` 不证明图绑定成功，还应检查 Hubble 新登录和图查询。
 
-要分辨"真的执行了"和"空跑"，得看 PD leader 的日志，响应本身分辨不了：`patrolPartitions` 无论有没有修复、在
-leader 还是 follower 上，都返回同样的空成功（看日志里的 `reallocShards`、`shardOffline`、`storeTurnoff`，或
-对比前后的 `/v1/shardGroups`）；`balancePartitions` 在 leader 上返回 `{}`，在 follower 上返回空响应体。只有
-`balanceLeaders` 的响应体携带工作内容。可区分的任务响应是上游工作，在
-[apache/hugegraph#3231](https://github.com/apache/hugegraph/issues/3231) 跟踪。
-
-替换一个回不来的 Store 之后执行 `patrolPartitions`，集群稳定后执行 `balancePartitions`，重启导致 leader 分布
-倾斜后执行 `balanceLeaders`。
-
-**丢失 Store 卷。** 带着空 PVC 重建的 Store，在携带
-[apache/hugegraph#3234](https://github.com/apache/hugegraph/pull/3234)（2026-09-24 合入）的镜像上可以原地
-恢复；更早的镜像，包括所有已发布版本的镜像，都不行。两种情况下替换者都会以**新的 Store ID** 注册，而 Pod 名、
-DNS 名、raft 地址不变，`/v1/stores` 会在同一地址下列出两个 ID。
-
-在含 #3234 的镜像上，退役流程是可用的：在 `/v1/stores` 里找到旧 ID（被替换 Pod 地址下不是新注册的那一行），在
-PD leader 上 `POST /v1/store/<oldId>` 并携带 `{"storeState":"Tombstone"}`，执行
-`GET /v1/task/patrolPartitions`，然后等待；确认每个分片组都恢复到完整分片数且恰好一个 leader、没有分组再引用
-旧 ID、被替换 Store 自己的 `:8520/v1/partition/<groupId>` 对每个分组都返回 200；最后
-`DELETE /v1/store/<oldId>` 清除退役记录。在 3+3+3 安装上用 `master` `dbb6663a` 构建的镜像实测：替换者 156 秒
-就绪，Tombstone 加巡检之后 1 秒内 12 个分组全部收敛到新 ID（空 Store 通过 raft 快照安装追平数据），持续写入
-没有丢失任何已确认的写。
-
-在不含 #3234 的镜像上，同样的退役流程会执行但修不好分组：PD 发起配置变更，但分组 leader 看到该地址已在组内，
-jraft 无可添加，分组继续记录旧 ID。实测：20 分钟、三次巡检之后，12 个分组仍全部引用退役 ID，替换 Store 不持有
-任何分区。健康面板完全看不出这个故障：`/v1/stores`、集群状态、Hubble、Pod 就绪全部显示健康，而每个分片组实际
-只运行在两个存活副本上。唯一能看出问题的检查是被替换 Store 自己的 `:8520/v1/partition/<groupId>`。
-
-因此默认做法不变：替换 Store Pod 时保留它的 PVC（Store id 存在数据目录里，Pod 会以同一 id 回来）。空 PVC 替换
-只作为含 #3234 镜像上的恢复手段；在已发布镜像上，卷真的丢了就当集群已降级处理，准备重建而不是原地恢复。
-
-周期性 leader 均衡在 [apache/hugegraph#3135](https://github.com/apache/hugegraph/issues/3135) 跟踪；
-灾难恢复指标在 [apache/hugegraph#3136](https://github.com/apache/hugegraph/issues/3136) 跟踪。
-
-### 8 伸缩
-
-PD 和 Store 在资源名里为最大 StatefulSet 序号预留了空间，伸缩不会改名 PersistentVolumeClaim、不会移动 Pod
-身份；两者上限都是 99 副本。Server 通过 `server.replicas` 或 `server.hpa` 自由伸缩（HPA 开启时 Deployment
-省略 `spec.replicas`，升级不会覆盖自动扩缩的副本数）。
-
-分阶段上线没法写进 values 文件（schema 要求每个组件至少一个副本）；用 `kubectl scale statefulset
-hugegraph-store --replicas=0` 分阶段，准备好后再扩回来。Server 会保持未就绪等待 Store 注册，下一次
-`helm upgrade` 会按 values 恢复完整拓扑。
-
-修改线上 release 的 PD 或 Store 副本数不是普通的 values 变更：raft 与分片成员关系是持久化的，Pod 本身不会
-重新配置它们。chart 通过读取线上 StatefulSet 拒绝 PD 的双向变更和 Store 的缩容，全新安装不受影响。
-
-**PD，双向。** chart 渲染的对端列表只作为 raft 的引导配置生效，已初始化的组会忽略它：3 扩到 5 只是多起两个
-PD，投票配置仍是三个；3 缩到 1 直接失去多数派。成员变更走 PD 的对端列表变更，PD 客户端 API 和 PD REST 路由
-`POST /v1/members/change` 都提供它；该路由与其他 PD REST 路由一样需要 Basic 认证，chart 两者都不封装。
-先通过 PD 改成员、在 `/v1/members` 确认新配置、`kubectl scale` 线上 StatefulSet、再用匹配的 values 执行
-`helm upgrade`；在你自己的构建上验证过这套流程之前，请按打算长期保留的 PD 数量安装。
-
-**Store，缩容。** 迁出是状态转换，不是均衡：`patrolPartitions` 和 `balancePartitions` 都不会退役健康的
-Store。像灾难恢复退役被替换 Store 那样退役要下线的 Store：
-
-1. 确认剩余 Store 仍能承载持久化的分片数（`pd.partition.defaultShardCount`；留空时 `store.replicas` 不低于
-   3 推导为 3）。
-2. 通过 `/v1/stores` 按 Pod 地址把要删除的序号（最大的几个）映射到 Store id。
-3. 对每个要下线的 id `POST /v1/store/<id>`，携带 `{"storeState":"Tombstone"}`。
-4. 等到 `/v1/shardGroups` 不再列出这些 id，且每个分组都报告完整分片数和一个 leader。
-5. `kubectl scale` 线上 StatefulSet，再用匹配的 values 执行 `helm upgrade`。
-
-chart 会保留被移除序号的 PVC（`store.persistentVolumeClaimRetentionPolicy.whenScaled: Retain`），保留下来的 PVC
-里仍是已退役的 Store id。PD 拒绝注册处于 Tombstone 或已删除的 Store id，所以之后在这个 PVC 上启动的 Store（例如把
-同一序号重新扩容回来）无法加入。请在第 4 步确认数据已迁走之后、复用这些序号之前删除它们的 PVC；删除不可逆。
-
-### 9 在集群外运行 Hubble
-
-集群内 Hubble（`hubble.enabled=true` 加 port-forward）是推荐路径，部署页已覆盖。Hubble 必须在集群外运行时有
-两条路径。
-
-**直连 Server URL**（图、schema、数据、Gremlin；不需要 PD 发现）：关闭 chart 内的 Hubble，通过做 HTTPS 终结的
-Ingress 或 NodePort/LoadBalancer 类型的 `server.service.type` 暴露 Server，并运行独立的 Hubble 镜像。这类 Service
-承载明文 HTTP API，chart 因此要求设置 `server.service.allowInsecureExposure=true`；请先限制谁能访问它。Hubble 配置如下：
-
-```properties
-pd.enabled=false
-server.direct_url=https://<reachable-server-host>:<port>
-```
-
-配置文件挂载到镜像内的 `/hubble/conf/hugegraph-hubble.properties`（工作目录是 `/hubble`）。
-`server.direct_url` 要用 HTTPS 或可信通道：登录会把 Server 凭据发到这个 URL。
-
-**PD 发现**（集群外的 Hubble 向 PD 询问 Server 地址）：`*.svc` 这类集群内名字在外部不可解析，chart 提供两个
-配置项。把 `server.advertiseUrl` 设为外部 Hubble 发现后要使用的绝对 `http(s)://` URL，chart 会用它替代集群内
-Service URL 注册到 PD。再暴露 PD 客户端 Service（`pd.service.type` NodePort/LoadBalancer），这需要
-`pd.service.allowInsecureExposure=true`，因为 PD gRPC 没有认证；先限制谁能访问它（chart 的 NetworkPolicy
-开启时，调用方没有列入 `networkPolicy.pd.extraIngress` 前渲染会拒绝这种暴露）。然后用如下配置运行独立
-Hubble：
-
-```properties
-pd.enabled=true
-pd.peers=<reachable-pd-host>:<grpc-port>
-pd.server=<reachable-pd-host>:<rest-port>
-```
-
-取舍：设置 `server.advertiseUrl` 后，每个 Server 副本注册的都是同一个逻辑 URL，PD 会把它返回给所有发现客户
-端，包括集群内的 Hubble（开启 chart 的 NetworkPolicy 时，它还需要 `networkPolicy.hubble.extraEgress`，见上文
-NetworkPolicy 一节）。留空则走默认的集群内路径，每个 Server Pod 注册自己的 IP。
-
-本机快速验证（集群和 Hubble 在同一台机器）：port-forward Server `8080` 和 PD 客户端 `8620`/`8686`，设置
-`server.advertiseUrl=http://127.0.0.1:8080`，用 `--network host` 和上面的 PD 配置运行独立 Hubble，再打开
-`8088` 端口。
-
-### 10 Gremlin 报 "Could not rebind" 时
-
-这个报错有两个成因，持续时间不同。
-
-**建图后的收敛窗口。** 处理 `CreateGraph` 的 Server 会等自己的 Gremlin 绑定完成才返回 HTTP 200
-（[#3138](https://github.com/apache/hugegraph/pull/3138)），所以在同一个 Server 上建图后立即查询是可靠的。
-其他副本独立收敛，在完成之前，经负载均衡 Service 路由到未收敛副本的 Gremlin 查询可能报 400，如
-`Could not rebind [g]`。带退避重试（窗口通常几秒内关闭），对"建图后立即验证"的流程用会话粘滞或
-port-forward，或先在每个副本上轮询 `/graphs` 再放开查询流量。集群级就绪在
-[#3137](https://github.com/apache/hugegraph/issues/3137) 跟踪。
-
-**在 PD 滚动期间启动的 Server Pod。** Gremlin Server 只在启动时实例化一次图；那一刻 PD 客户端连不上的话，
-这个 Pod 会终身通过就绪探测、正常提供 REST，而每个发到它的 Gremlin 请求都报 `Could not rebind [graph]`
-（[apache/hugegraph#3228](https://github.com/apache/hugegraph/issues/3228)）。它的 `hugegraph-server.log` 会写明：
-
-```
-Graph [DEFAULT-hugegraph] configured at [...] could not be instantiated and
-will not be available in Gremlin Server
-```
-
-任何同时滚动了 PD 和 Server 的升级或回滚之后，运行
-`helm test hugegraph --namespace hugegraph --logs --timeout 5m`：它通过 headless Service `hugegraph-server-headless` 向每个
-Ready 的 Server Pod 发送下面这条绑定图的 Gremlin 查询，最多重试 150 秒，遇到处于这种状态的 Pod 会以
-`Gremlin failed on <Pod IP>` 失败。手工检查单个 Pod 时，在一个终端里对它做 port-forward（forward 在前台运行）：
-
-```bash
-kubectl port-forward -n hugegraph pod/<server-pod> 8080:8080
-```
-
-再在第二个终端里发送查询：
-
-```bash
-curl -s --compressed -u "admin:${PASSWORD}" -H 'Content-Type: application/json' \
-  -X POST http://127.0.0.1:8080/gremlin \
-  -d '{"gremlin":"graph.traversal().V().limit(1).count()","aliases":{"graph":"DEFAULT-hugegraph"}}'
-```
-
-健康的 Pod 返回 `result.data`。PD 稳定后，删除受影响的 Pod，并重新运行测试 hook 验证替换副本。
-若启用了 Hubble，还需验证新会话登录和图查询。
+出现 `ERROR: missing required env 'HG_PD_AUTH_SECRET_KEY'` 时，检查 PD Pod 的 Secret 引用和对应 key，不要把 Secret 值输出到日志。
+chart 正常情况下自动注入共享 PD REST 凭据，自定义容器或 manifest 必须向 PD 和客户端提供同一值。
+GitOps 先创建外部 Secret 再调谐工作负载，普通 Helm 保留自动创建的 release Secret。

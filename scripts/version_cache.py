@@ -30,7 +30,7 @@ import tempfile
 import versioning
 
 
-SCHEMA = 1
+SCHEMA = 2
 
 
 def digest_json(value):
@@ -64,10 +64,12 @@ def snapshot(path):
 
 def shared_digest(root):
     paths = {*versioning.SHELL_FILES, *versioning.SHELL_DIRS,
-             *versioning.SHELL_CONTENT_DIRS, "versions.json", "dist", ".htaccess", ".asf.yaml"}
+             *versioning.SHELL_CONTENT_DIRS, "versions.json", "dist", ".htaccess", ".asf.yaml",
+             ".github/actions/setup-site-tools"}
     paths.update(p for p in versioning.SHELL_CONTENT if p.endswith("docs/SUMMARY.md"))
     paths.update("static/" + p for p in (*versioning.SHELL_STATIC_FILES, *versioning.SHELL_STATIC_DIRS))
-    paths.update(p.relative_to(root).as_posix() for p in (root / "scripts").glob("*.py"))
+    paths.update(p.relative_to(root).as_posix() for p in (root / "scripts").glob("*.py")
+                 if not p.name.startswith("test_"))
     paths.update(p.relative_to(root).as_posix() for p in (root / "scripts").glob("*.sh"))
     return digest_json([[p, snapshot(root / p)] for p in sorted(paths)])
 
@@ -113,13 +115,17 @@ def make_plan(root, manifest, cache_dir, *, site_origin, historical_origin,
                                          "repository": manifest["repository"]})
         entry["reusable"] = reusable(cache_dir, entry)
         entries.append(entry)
-    return {"schemaVersion": SCHEMA, "cacheKey": "history-v1-" + digest_json(
+    # A compatible bundle can supply unchanged versions even when one archived
+    # source SHA changes. This prefix only schedules transport; exact receipts
+    # and current validation still decide whether each version is reusable.
+    cache_prefix = "history-v2-" + digest_json(common) + "-"
+    return {"schemaVersion": SCHEMA, "cachePrefix": cache_prefix, "cacheKey": cache_prefix + digest_json(
         [[e["id"], e["buildKey"]] for e in entries if e["archived"]]),
         "versions": entries, "include": [e for e in entries if not e["reusable"]]}
 
 
 def build_groups(manifest, cache_hit):
-    """Bound cold-build jobs while keeping a warm bundle in one job."""
+    """Bound cold jobs; a compatible bundle keeps partial hits in one job."""
     selected = [entry["id"] for entry in manifest.get("include", manifest["versions"])]
     for version in selected:
         validate_version_id(version)
@@ -179,7 +185,7 @@ def main():
     plan.add_argument("--resolved-manifest", type=pathlib.Path, required=True)
     plan.add_argument("--site-origin", required=True)
     plan.add_argument("--historical-origin", required=True)
-    plan.add_argument("--hugo-version", default="0.165.0")
+    plan.add_argument("--hugo-version", required=True)
     plan.add_argument("--go-version", required=True)
     plan.add_argument("--webp-version", default="unspecified")
     plan.add_argument("--output", type=pathlib.Path, required=True)

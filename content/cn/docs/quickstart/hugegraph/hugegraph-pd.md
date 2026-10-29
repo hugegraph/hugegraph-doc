@@ -25,8 +25,8 @@ PD 监听三个端口：
 #### 2.1 前置条件
 
 - 操作系统：Linux 或 macOS（Windows 尚未经过完整测试）
-- Java 版本：≥ 11
-- Maven 版本：≥ 3.5.0
+- Java 版本：HugeGraph 1.8.0+ 使用 Java 17（Maven 源码构建仅接受 JDK 17；启动脚本拒绝低于 17 的运行时；1.7.0 是最后一个支持 Java 11 的版本）
+- Maven 版本：≥ 3.6.3（从源码编译时）
 
 ### 3 部署
 
@@ -41,7 +41,7 @@ Apache 下载页目前提供 1.7.0 的完整二进制包，其中包含 PD、Sto
 
 ```bash
 # 1.7.0 是项目孵化期发布的历史版本，因此文件名和目录名仍带 incubating
-wget https://downloads.apache.org/hugegraph/1.7.0/apache-hugegraph-incubating-1.7.0.tar.gz
+curl -fLO --connect-timeout 10 --max-time 1800 https://downloads.apache.org/hugegraph/1.7.0/apache-hugegraph-incubating-1.7.0.tar.gz
 tar zxf apache-hugegraph-incubating-1.7.0.tar.gz
 cd apache-hugegraph-incubating-1.7.0/apache-hugegraph-pd-incubating-1.7.0
 ```
@@ -81,8 +81,13 @@ docker build -f hugegraph-pd/Dockerfile -t hugegraph/pd:local .
 
 单独运行当前主线构建的 PD 时，先设置部署专用密钥，并把示例地址替换为容器可达的真实地址：
 
+下面的 `mkdir -p` 和非递归 `chown` 仅适用于新建空目录。复用旧 root 镜像写入的数据时，先停止 PD，
+执行一次 `sudo chown -R 10001:10001 /path/to/data`，再启动 UID 10001 镜像。
+
 ```bash
 export HG_PD_AUTH_SECRET_KEY="$(openssl rand -hex 24)"
+# master 构建的镜像以 UID 10001 运行，宿主机数据目录必须对该用户可写
+mkdir -p /path/to/data && sudo chown 10001:10001 /path/to/data
 docker run -d \
   -p 8620:8620 -p 8686:8686 -p 8610:8610 \
   -e HG_PD_GRPC_HOST=192.168.1.10 \
@@ -107,6 +112,7 @@ docker run -d \
 | `HG_PD_DATA_PATH` | 否 | `/hugegraph-pd/pd_data` | `pd.data-path` | 元数据存储路径。 |
 | `HG_PD_INITIAL_STORE_COUNT` | 否 | `1` | `pd.initial-store-count` | 集群可用所需的最小 Store 数量。 |
 | `HG_PD_ACTUATOR_EXPOSURE` | 否 | `health,metrics,prometheus` | `management.endpoints.web.exposure.include` | 公开的 Actuator 端点白名单；不允许设置为 `*`。 |
+{.td-table--wide}
 
 当前主线 entrypoint 要求以上五个必填变量，生成 `SPRING_APPLICATION_JSON` 覆盖项后再启动 PD；其他配置继续从镜像内的 `conf/application.yml` 读取。`JAVA_OPTS` 会透传给 JVM。旧变量 `GRPC_HOST`、`RAFT_ADDRESS`、`RAFT_PEERS`、`PD_INITIAL_STORE_LIST` 仍可用，但会输出弃用警告。
 
@@ -120,7 +126,7 @@ PD 启动脚本读取安装目录中的 `conf/application.yml`。请使用与安
 
 #### 4.1 配置项参考
 
-以下表格核对的是 server 主线提交 `2f827d6e8c9c62ae858f2fc122b3a192d015e2f4` 中的 `hg-pd-dist` 配置和 Java 默认注入值，不是 1.7.0 发布标签的全部行为。1.7.0 二进制包请使用其标签对应的原始配置；主线源码构建包则以 [主线配置文件](https://github.com/apache/hugegraph/blob/master/hugegraph-pd/hg-pd-dist/src/assembly/static/conf/application.yml) 为准。
+以下表格列出主线配置及代码默认值，Raft 超时设置可参阅 [PDConfig 实现](https://github.com/apache/hugegraph/blob/master/hugegraph-pd/hg-pd-core/src/main/java/org/apache/hugegraph/pd/config/PDConfig.java)。1.7.0 二进制包请使用对应标签的原始配置；主线源码构建包则以 [主线配置文件](https://github.com/apache/hugegraph/blob/master/hugegraph-pd/hg-pd-dist/src/assembly/static/conf/application.yml) 为准。下文会单独说明与 1.7.0 的差异。
 
 **gRPC 与 REST**
 
@@ -129,6 +135,7 @@ PD 启动脚本读取安装目录中的 `conf/application.yml`。请使用与安
 | `grpc.host` | `127.0.0.1` | 无，必填 | 本 PD 对外公布的 gRPC 地址。Store 和 Server 会连到这个地址，因此分布式部署时必须填可访问的 IPv4 地址或主机名，不能用 `127.0.0.1` 或 `0.0.0.0`。 |
 | `grpc.port` | `8686` | 无，必填 | gRPC 端口。 |
 | `server.port` | `8620` | 无，必填 | REST API 端口，同时也是 Raft 成员信息中公布的 REST 端口。 |
+{.td-table--wide}
 
 `application.yml.template` 中还有 `grpc.netty-server.max-inbound-message-size: 100MB`，但 PD 在代码中把 gRPC 服务端的入站消息上限固定为 1 GB，该配置项实际不生效。
 
@@ -141,7 +148,12 @@ PD 启动脚本读取安装目录中的 `conf/application.yml`。请使用与安
 | `raft.enable` | 未设置 | `true` | 为 true 时元数据写入经过 Raft 状态机；为 false 时 PD 直接写本地存储，不做复制。 |
 | `raft.ip-whitelist.enabled` | 未设置 | `true` | 为 true 时 Raft RPC 端口只接受由 `raft.peers-list` 解析出的地址的连接，其他连接会被断开并记录 `Blocked connection from <ip>`。peer 列表变更时白名单会重新解析，但主机名不变而 IP 变化的情况（例如容器重启）仍需重启 PD。 |
 | `raft.snapshotInterval` | 未设置 | `300` | Raft 快照生成间隔（秒）。 |
-| `raft.rpc-timeout` | 未设置 | `10000` | Raft RPC 的连接、请求和安装快照超时时间（毫秒）。 |
+| `raft.rpc-timeout` | 未设置 | `10000` | PD 节点之间 Raft RPC 的超时时间（毫秒）。PD 读取 id 计数器前等待 ReadIndex 的时限也是这个值，超过时限则 id 分配失败。 |
+| `raft.rpc-connect-timeout` | 未设置 | `1000` | 与 peer 建立 Raft 连接时 Ping 的超时时间（毫秒）。候选节点逐个连接 peer，某个 peer 接受了 TCP 连接却不应答时，选举会为它等待这么久。已建立连接上的请求使用 `raft.rpc-timeout`。 |
+| `raft.rpc-install-snapshot-timeout` | 未设置 | `0` | 向落后于日志的 follower 发送快照的超时时间（毫秒）。`0` 表示使用 `raft.rpc-timeout`。快照较大而超时时可调大。 |
+{.td-table--wide}
+
+`raft.rpc-connect-timeout` 和 `raft.rpc-install-snapshot-timeout` 仅在 1.7.0 之后的版本中提供。1.7.0 中 `raft.rpc-timeout` 同时也是连接超时和安装快照超时，id 分配也不等待 ReadIndex。
 
 **PD 核心**
 
@@ -152,6 +164,7 @@ PD 启动脚本读取安装目录中的 `conf/application.yml`。请使用与安
 | `pd.initial-store-count` | `1` | `3` | 活跃 Store 节点的最小数量。低于该值时集群状态变为 `Cluster_Not_Ready`，整个集群视为不可用。建议设为实际部署的 Store 数量。 |
 | `pd.initial-store-list` | `127.0.0.1:8500` | 空 | 逗号分隔的 Store gRPC 地址（`ip:port`），列表中的 Store 注册后自动激活。条目也可以带分组 id，写作 `store_address/group_id`。 |
 | `pd.cluster_id` | 未设置 | `1` | 集群 id，用于区分不同的 PD 集群。 |
+{.td-table--wide}
 
 **Store 管理**
 
@@ -162,6 +175,7 @@ PD 启动脚本读取安装目录中的 `conf/application.yml`。请使用与安
 | `store.monitor_data_enabled` | `true` | `false` | 是否持久化 Store 监控采样数据。 |
 | `store.monitor_data_interval` | `1 minute` | `1 minute` | 采样间隔，格式为 `<数字> <单位>`，单位为 `second`、`minute`、`hour`、`day`、`month`、`year` 之一；省略数字时按 1 计。 |
 | `store.monitor_data_retention` | `1 day` | `1 day` | 监控数据保留时长，格式同上。 |
+{.td-table--wide}
 
 **分区**
 
@@ -169,6 +183,7 @@ PD 启动脚本读取安装目录中的 `conf/application.yml`。请使用与安
 |--------|--------------|------------|------|
 | `partition.default-shard-count` | `1` | `3` | 每个分区的副本数。生产集群建议设为 `3`。 |
 | `partition.store-max-shard-count` | `12` | `24` | 单个 Store 最多承载的分区副本数。 |
+{.td-table--wide}
 
 初始分区数由这两个配置项和 `pd.initial-store-list` 的长度推导得出：
 
@@ -187,6 +202,7 @@ PD 启动脚本读取安装目录中的 `conf/application.yml`。请使用与安
 | `management.metrics.export.prometheus.enabled` | `true` | Spring Boot 默认值 | 是否暴露 `/actuator/prometheus`。 |
 | `management.endpoints.web.exposure.include` | `health,metrics,prometheus` | Spring Boot 默认只暴露 `health` | Actuator 暴露白名单；这些端点不经过 PD REST Basic 拦截器。 |
 | `logging.config` | `file:./conf/log4j2.xml` | 无 | Log4j2 配置文件，会写出 `logs/hugegraph-pd.log`、`logs/hugegraph-pd_raft.log` 和 `logs/audit-hugegraph-pd.log`。 |
+{.td-table--wide}
 
 **线程池**
 
@@ -198,6 +214,7 @@ PD 启动脚本读取安装目录中的 `conf/application.yml`。请使用与安
 | `job.uninterruptibleThreadPool.core` | `0` | 元数据后台任务线程池的核心线程数。小于等于 0 时取可用处理器数的一半。 |
 | `job.uninterruptibleThreadPool.max` | `256` | 该线程池的最大线程数。 |
 | `job.uninterruptibleThreadPool.queue` | 无上限 | 该线程池的队列容量。 |
+{.td-table--wide}
 
 #### 4.2 单节点配置
 
@@ -301,16 +318,21 @@ HG_PD_RAFT_PEERS_LIST: pd0:8610,pd1:8610,pd2:8610
 ./bin/start-hugegraph-pd.sh
 ```
 
-脚本要求 `PATH` 或 `JAVA_HOME` 中有 11 及以上版本的 JDK；如果发现已有 Java 进程在使用本安装目录的 `conf` 目录，脚本会直接退出，不做任何事。
+脚本要求 `PATH` 或 `JAVA_HOME` 中有 17 及以上版本的 JDK（1.7.0 要求 11 及以上）；如果发现已有 Java 进程在使用本安装目录的 `conf` 目录，脚本会直接退出，不做任何事。
 
-支持的参数：
+下文的生命周期说明适用于当前主线构建；上文下载的 1.7.0 启动脚本不包含这些修复。
+支持的参数如下，GC 的版本限制见下文：
 
 | 参数 | 取值 | 默认值 | 描述 |
 |------|------|--------|------|
 | `-d` | `true`、`false` | `true` | 守护进程模式，详见下文。 |
-| `-g` | `zgc`、`ZGC` | 不设置 | 垃圾回收器。不带该参数即使用默认的 G1GC；填其他值（包括 `g1`）会导致启动中止。 |
+| `-g` | 见下文版本限制 | 不设置 | 选择垃圾回收器；不支持的参数会中止启动。 |
 | `-j` | JVM 参数 | 空 | 额外的 JVM 参数，例如 `-j "-Xmx8g -Xms8g"`。 |
 | `-y` | `true`、`false` | `false` | 挂载 OpenTelemetry Java agent。首次使用时会把 agent 下载到 `plugins/` 并校验 MD5，trace 通过 gRPC 上报到 `http://127.0.0.1:4317`。 |
+
+master 构建接受 `g1`、`G1`、`zgc` 和 `ZGC`。
+上文下载的 1.7.0 启动脚本仅接受显式指定 `zgc` 或 `ZGC`；`-g g1`、`-g G1` 和其他参数会中止启动。
+默认路径请省略 `-g`；参数被拒绝时，查看 `logs/hugegraph-pd-stdout.log`。
 
 `-d` 参数控制守护进程模式：
 
@@ -321,7 +343,7 @@ HG_PD_RAFT_PEERS_LIST: pd0:8610,pd1:8610,pd2:8610
 
 启动成功后，可以在 `logs/hugegraph-pd-stdout.log` 中看到类似以下的日志：
 
-```
+```text
 YYYY-mm-dd xx:xx:xx [main] [INFO] o.a.h.p.b.HugePDServer - Started HugePDServer in x.xxx seconds (JVM running for x.xxx)
 ```
 
@@ -528,3 +550,5 @@ curl -u "store:${HG_PD_AUTH_SECRET_KEY:?请先设置 PD 部署密钥}" \
 两个 `log` 接口接受形如 `{"startTime": "...", "endTime": "..."}` 的时间范围，`yyyy-MM-dd HH:mm:ss` 和 `yyyy-MM-dd` 都是可接受的格式。
 
 PD 以 `hg` 前缀注册自己的指标，因此 `/actuator/prometheus` 除标准 JVM 指标外还会暴露 `hg_up`、`hg_graphs`、`hg_stores` 和 `hg_terms`，在存在图之后还会有按图统计的分区和大小指标。
+
+在 1.7.0 之后的版本中，PD 还会为每个已注册的 Store 导出 `hg_store_state{store="<id>",state="<state>"}`：Store 当前状态（`Unknown`、`Pending`、`Up`、`Offline`、`Exiting` 或 `Tombstone`）对应的序列为 `1`，其余为 `0`；以及 `hg_store_leader_count{store="<id>"}`，即 leader 位于该 Store 上的分片组数量。重建后的 Store 在 leader 迁回之前会报告 `0`。所有 PD 成员读取的是同一份复制的元数据，因此聚合这些序列前请先只选取一个实例。

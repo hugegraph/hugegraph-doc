@@ -11,6 +11,10 @@ SeaTunnel connects data sources such as databases and Kafka to HugeGraph. The co
 > **Version requirement: This guide targets SeaTunnel [3.0+](https://seatunnel.apache.org/download/).**
 > All examples use the `mappings` configuration available in SeaTunnel 3.0+.
 
+With HugeGraph Helm, you can directly [enable the built-in SeaTunnel engine](/docs/quickstart/hugegraph/hugegraph-helm/#6-start-seatunnel).
+That path includes the pre-configured connector, runtime environment, and same-release credential references.
+This page covers job mappings for external data sources.
+
 [![Loader imports data directly with graph mappings; SeaTunnel 3.0+ combines Source, Transform, and Sink, and both support JDBC, Kafka, and graph data](/docs/images/seatunnel/seatunnel-vs-loader-en.png)](/docs/images/seatunnel/seatunnel-vs-loader-en.png)
 
 Click a diagram to view the original size.
@@ -316,6 +320,7 @@ The following table applies to the SeaTunnel 3.0+ version used by this guide:
 | `check_vertex` | Check edge endpoints; the edge job in this guide sets it to `true` |
 | [`batch_failure_fallback`](https://seatunnel.apache.org/docs/connectors/sink/HugeGraph/)<sup>[2]</sup> | Defaults to `true`, so a failed batch falls back to record-by-record retries, capped by `max_insert_errors`; the examples explicitly set `false` so a batch failure stops the job |
 | `max_insert_errors` | Number of failed records that record-by-record fallback may skip; default `500`, `-1` for unlimited, and only applies when `batch_failure_fallback` is enabled |
+{.td-table--wide}
 
 Use these checks when a job fails:
 

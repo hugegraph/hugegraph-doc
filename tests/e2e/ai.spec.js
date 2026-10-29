@@ -57,6 +57,8 @@ for (const [locale, route, source, language] of [
     const script = page.locator("script[data-hg-kapa-widget]");
     await expect(script).toHaveAttribute("data-language", language);
     const config = await page.locator("#hg-ai-config").evaluate(node => JSON.parse(node.textContent));
+    expect(config.version).toBe("latest");
+    expect(config.labels.version).toContain("latest");
     expect(config.exampleQuestions).toHaveLength(36);
     const displayed = (await script.getAttribute("data-example-questions")).split(",");
     expect(displayed).toHaveLength(3);
@@ -585,5 +587,117 @@ for (const viewport of [{ width: 1440, height: 900 }, { width: 390, height: 844 
     await action.click();
     await expect(page.locator("[data-hg-ai-consent]")).toBeVisible();
     expect(requests).toEqual([]);
+  });
+}
+
+// This content is mounted only in ai-enabled.yaml. Exercise Expo's native
+// shell contract without publishing an example album on the production site.
+for (const locale of ['en', 'cn']) {
+  for (const width of [1440, 390]) {
+    test(`${locale} Expo fixture keeps native shell navigation and gallery controls at ${width}px`, async ({ page }) => {
+      const prefix = locale === 'cn' ? '/cn' : '';
+      await page.setViewportSize({ width, height: 1000 });
+      await page.goto(`${AI_ORIGIN}${prefix}/e2e-expo/album/`);
+      await expect(page.locator('body')).toHaveClass(/td-expo-shell/);
+      await expect(page.locator('.td-nav-brand')).toHaveAttribute('aria-label', /HugeGraph/);
+      const manifest = await page.locator('#td-action-manifest').evaluate(node => JSON.parse(node.textContent));
+      // An explicitly empty list must disable defaults instead of restoring them.
+      expect(manifest.quickLinks).toEqual([]);
+      const sidebar = page.locator('#td-shell-sidebar');
+      if (width < 768) {
+        const opener = page.locator('[data-td-shell-drawer-open]');
+        await expect(opener).toBeVisible();
+        await opener.click();
+        await expect(page.locator('html')).toHaveAttribute('data-td-shell-drawer', 'open');
+        await expect(sidebar).toBeVisible();
+        await expect(sidebar.locator('.td-shell-tree__link[aria-current="page"]')).toBeVisible();
+        await page.locator('button[data-td-shell-drawer-close]').click();
+      } else {
+        await expect(sidebar).toBeVisible();
+        await expect(sidebar.locator('.td-shell-tree__link[aria-current="page"]')).toBeVisible();
+      }
+      await page.locator('[data-td-shell-search-open]').first().click();
+      const search = page.locator('#td-shell-search');
+      await expect(search).toBeVisible();
+      await page.locator('.td-shell-search__input').fill('RocksDB');
+      const pageResult = search.getByRole('option').filter({ has: page.locator('.td-shell-search__item-excerpt') })
+        .filter({ hasText: /RocksDB/i }).first();
+      await expect(pageResult).toBeVisible();
+      await page.keyboard.press('Escape');
+      await expect(search).toBeHidden();
+      const expo = page.locator('[data-td-expo]');
+      const image = expo.locator('[data-td-expo-image] img');
+      await expect(image).toHaveCount(1);
+      await expect.poll(() => image.evaluate(node => node.complete && node.naturalWidth > 0)).toBe(true);
+      await expect(expo.locator('[data-td-expo-controls]')).toBeVisible();
+      await expo.locator('input[data-td-expo-mode="cards"]').locator('..').click();
+      await expect(expo).toHaveAttribute('data-td-expo-mode', 'cards');
+      const opener = expo.locator('[data-td-expo-image]');
+      await opener.click();
+      const viewer = page.locator('[data-td-expo-viewer]');
+      await expect(viewer).toBeVisible();
+      await expect.poll(() => viewer.locator('[data-td-expo-full]')
+        .evaluate(node => node.complete && node.naturalWidth > 0)).toBe(true);
+      await page.keyboard.press('Escape');
+      await expect(viewer).toBeHidden();
+      await expect(opener).toBeFocused();
+      expect(await page.evaluate(() => document.documentElement.scrollWidth <= innerWidth + 1)).toBe(true);
+    });
+  }
+}
+
+test('Expo example content is absent from production and AI-disabled artifacts', async ({ request }) => {
+  for (const prefix of ['', '/cn']) {
+    expect((await request.get(`${prefix}/e2e-expo/album/`)).status()).toBe(404);
+    if (process.env.AI_DISABLED_SITE_ROOT) {
+      expect((await request.get(`http://127.0.0.1:4175${prefix}/e2e-expo/album/`)).status()).toBe(404);
+    }
+  }
+});
+
+
+// Hugo's exact version/group selection is covered by ai-version-config.test.cjs.
+// Exercise the browser handoff at the adapter boundary without an external index.
+for (const rememberedConsent of [false, true]) {
+  test(`an unindexed version keeps Ask AI local with consent=${rememberedConsent}`, async ({ page }) => {
+    const externalRequests = [];
+    await page.route(/https:\/\/[^/]*(?:kapa\.ai|hcaptcha\.com)\//, route => {
+      externalRequests.push(route.request().url());
+      return route.abort();
+    });
+    await page.route(AI_ORIGIN + "/docs/", async route => {
+      const response = await route.fetch();
+      const body = (await response.text()).replace(
+        /(<script[^>]+id="?hg-ai-config"?[^>]*>)([\s\S]*?)(<\/script>)/,
+        (_, open, value, close) => {
+          const config = JSON.parse(value);
+          config.version = '1.3';
+          config.sourceGroupId = '';
+          config.labels.version = 'Answers use the 1.3 documentation';
+          config.labels.unavailable = 'Ask AI has no documentation index for 1.3 yet. Please use local search.';
+          return open + JSON.stringify(config) + close;
+        },
+      );
+      await route.fulfill({ response, body });
+    });
+    if (rememberedConsent) {
+      await page.addInitScript(() => localStorage.setItem(
+        'hg-ai-consent:v2:0b277570-4740-451e-96fa-1e4ac1ac5e88', 'granted',
+      ));
+    }
+    await page.goto(AI_ORIGIN + "/docs/");
+    const launcher = page.locator('.hg-ask-ai-launcher');
+    await expect(launcher).toBeVisible();
+    await launcher.click();
+    await expect(page.locator('[data-hg-ai-status]')).toContainText('no documentation index for 1.3');
+    await expect(page.locator('[data-hg-ai-consent]')).toBeHidden();
+    await page.locator('[data-td-shell-search-open]').first().click();
+    await page.locator('.td-shell-search__input').fill('auth');
+    await page.getByRole('option').filter({ hasText: 'Ask AI:' }).click();
+    await expect(page.locator('[data-hg-ai-status]')).toBeVisible();
+    await expect(launcher).toBeFocused();
+    await expect(page.locator('script[data-hg-kapa-widget]')).toHaveCount(0);
+    expect(await page.evaluate(() => typeof window.Kapa)).toBe('undefined');
+    expect(externalRequests).toEqual([]);
   });
 }

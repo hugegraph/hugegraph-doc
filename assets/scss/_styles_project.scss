@@ -83,7 +83,7 @@
   .td-nav-search-box,
   .td-nav-version-menu > .td-nav-util,
   .td-site-nav__language > .td-language-selector__trigger,
-  .td-nav-theme-menu > .td-nav-util,
+  .td-nav-appearance > .td-nav-util,
   .td-shell-keyboard__trigger,
   .td-nav-github,
   .td-site-drawer-toggle {
@@ -167,6 +167,9 @@
     > .td-landing-hero__actions {
       order: 1;
       margin: 18px 0 28px;
+      display: inline-grid;
+      grid-template-columns: repeat(2, minmax(0, 1fr));
+      max-width: 100%;
     }
 
     > .td-landing-hero__lead {
@@ -225,9 +228,11 @@
 
   .td-landing-button--primary {
     background: #5930b8;
+    color: #fff;
 
     &:hover {
       background: #48239e;
+      color: #fff;
     }
   }
 
@@ -285,7 +290,7 @@
   .td-nav-menu-zone .td-nav-menu > .nav-link,
   .td-nav-version-menu > .td-nav-util,
   .td-site-nav__language > .td-language-selector__trigger,
-  .td-nav-theme-menu > .td-nav-util,
+  .td-nav-appearance > .td-nav-util,
   .td-shell-keyboard__trigger,
   .td-nav-github,
   .td-site-drawer-toggle {
@@ -320,6 +325,21 @@
   .td-site-drawer-toggle:focus-visible {
     background: rgba(20, 17, 73, 0.24);
     color: #fff;
+  }
+}
+
+// The header uses white controls on purple, but the language popover uses
+// OINK's theme-colored surface. Keep its text independent of the header and
+// let the outer utility provide the trigger's hover background.
+.td-home > .td-site-header,
+.td-shell-chrome .td-site-header {
+  .td-site-nav__language > ul {
+    color: var(--bs-body-color);
+  }
+
+  .td-site-nav__language > .td-language-selector__trigger:hover,
+  .td-site-nav__language > .td-language-selector__trigger:focus-visible {
+    background: transparent;
   }
 }
 
@@ -706,16 +726,6 @@
   }
 }
 
-@media screen and (max-width: 575.98px) {
-  // Keep technical tokens readable and let OINK's labelled, focusable wrapper
-  // own mobile overflow instead of collapsing identifiers one letter per line.
-  .td-content .td-table-scroll > table :is(th, td),
-  .td-content .td-table-scroll > table :is(th, td) :is(a, code) {
-    overflow-wrap: normal;
-    word-break: normal;
-  }
-}
-
 @media (max-width: 575.98px) {
   .td-default main .td-landing-hero.hg-home-hero {
     min-height: 760px;
@@ -916,4 +926,8 @@
     gap: .5rem;
     .btn { font-size: inherit; }
   }
+}
+.hg-toolchain-recording {
+  width: 100%;
+  max-width: 36rem;
 }

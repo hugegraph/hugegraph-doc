@@ -33,7 +33,7 @@ test('theme color and social fallback have one configuration authority', () => {
   const hook = read('layouts/_partials/hooks/body-end.html');
   const adapter = read('assets/js/kapa-adapter.js');
   assert.match(config, /theme_color: '#532fc9'/);
-  assert.match(config, /images: \[\/img\/social\/hugegraph-default\.png\]/);
+  assert.match(config, /images: \[\/img\/social\/hugegraph-apache\.png\]/);
   assert.equal(css.includes('$hg-navbar-purple'), false);
   assert.equal(css.includes('#532fc9'), false);
   assert.match(hook, /"themeColor"\s+\$themeColor/);
@@ -47,7 +47,6 @@ test('theme color and social fallback have one configuration authority', () => {
 
 test('documentation menu has five groups and no duplicate version panel', () => {
   const config = read('hugo.yaml');
-  const navbarItem = read('layouts/_partials/navbar-item.html');
   for (const id of [
     'docs-start',
     'docs-components',
@@ -57,7 +56,10 @@ test('documentation menu has five groups and no duplicate version panel', () => 
   ]) {
     assert.match(config, new RegExp(`identifier: ${id}`));
   }
-  assert.equal(navbarItem.includes('$hasVersionLinks'), false);
+  // An absent override inherits OINK; guard any local reintroduction.
+  if (fs.existsSync(path.join(root, 'layouts/_partials/navbar-item.html'))) {
+    assert.equal(read('layouts/_partials/navbar-item.html').includes('$hasVersionLinks'), false);
+  }
 });
 
 test('backlinks are limited to latest documentation', () => {
@@ -114,15 +116,15 @@ test('all three version selector surfaces expose one stable route contract', () 
   );
 });
 
-test('social fallback asset is exactly 1200 by 630 pixels', () => {
+test('social fallback preserves the supplied HugeGraph and Apache image dimensions', () => {
   const image = fs.readFileSync(
-    path.join(root, 'static/img/social/hugegraph-default.png'),
+    path.join(root, 'static/img/social/hugegraph-apache.png'),
   );
   assert.deepEqual(
     [...image.subarray(12, 16)],
     [0x49, 0x48, 0x44, 0x52],
     'PNG must start with an IHDR chunk',
   );
-  assert.equal(image.readUInt32BE(16), 1200);
-  assert.equal(image.readUInt32BE(20), 630);
+  assert.equal(image.readUInt32BE(16), 1681);
+  assert.equal(image.readUInt32BE(20), 936);
 });

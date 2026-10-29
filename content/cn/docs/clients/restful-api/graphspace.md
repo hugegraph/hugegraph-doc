@@ -26,7 +26,7 @@ description: "Graphspace（图空间）REST 接口：多租户与资源隔离的
 
 ##### Method & Url
 
-```
+```text
 POST http://localhost:8080/graphspaces
 ```
 
@@ -53,6 +53,7 @@ POST http://localhost:8080/graphspaces
 | max_role_number              | 否       | Int     | 0         |                                                                 | 图空间的角色数目的上限                                                                               |
 | auth                         | 否       | Boolean | false     | true, false                                                     | 图空间是否支持权限认证                                                                               |
 | configs                      | 否       | Map     |           |                                                                 | 其他配置信息                                                                                         |
+{.td-table--wide}
 
 ```json
 {
@@ -110,7 +111,7 @@ POST http://localhost:8080/graphspaces
 
 ##### Method & Url
 
-```
+```text
 GET http://localhost:8080/graphspaces
 ```
 
@@ -141,7 +142,7 @@ GET http://localhost:8080/graphspaces
 
 ##### Method & Url
 
-```
+```text
 GET http://localhost:8080/graphspaces/gs1
 ```
 
@@ -219,10 +220,11 @@ GET http://localhost:8080/graphspaces/gs1
 | internal_algorithm_image_url | 否       | String |        |                            | 图计算的算法镜像地址：在更新图空间时，允许指定图计算的算法镜像并交由 K8S 进行统一管理                |
 | max_graph_number             | 是       | Int    |        | > 0                        | 图空间的图数目的上限                                                                                 |
 | max_role_number              | 否       | Int    |        |                            | 图空间的角色数目的上限                                                                               |
+{.td-table--wide}
 
 ##### Method & Url
 
-```
+```text
 PUT http://localhost:8080/graphspaces/gs1
 ```
 
@@ -295,7 +297,7 @@ PUT http://localhost:8080/graphspaces/gs1
 
 ##### Method & Url
 
-```
+```text
 DELETE http://localhost:8080/graphspaces/gs1
 ```
 
@@ -317,7 +319,7 @@ DELETE http://localhost:8080/graphspaces/gs1
 
 ##### Method & Url
 
-```
+```text
 GET http://localhost:8080/graphspaces/profile
 ```
 
@@ -390,7 +392,7 @@ GET http://localhost:8080/graphspaces/profile
 
 ##### Method & Url
 
-```
+```text
 POST http://localhost:8080/graphspaces/gs1/role
 ```
 
@@ -437,7 +439,7 @@ POST http://localhost:8080/graphspaces/gs1/role
 
 ##### Method & Url
 
-```
+```text
 GET http://localhost:8080/graphspaces/gs1/role?user=boss&role=analyst
 ```
 
@@ -471,7 +473,7 @@ GET http://localhost:8080/graphspaces/gs1/role?user=boss&role=analyst
 
 ##### Method & Url
 
-```
+```text
 DELETE http://localhost:8080/graphspaces/gs1/role?user=boss&role=analyst
 ```
 
@@ -500,7 +502,7 @@ Schema 模板把一段 Gremlin schema 脚本以名称保存下来，创建图时
 
 ##### Method & Url
 
-```
+```text
 POST http://localhost:8080/graphspaces/gs1/schematemplates
 ```
 
@@ -537,7 +539,7 @@ POST http://localhost:8080/graphspaces/gs1/schematemplates
 
 ##### Method & Url
 
-```
+```text
 GET http://localhost:8080/graphspaces/gs1/schematemplates
 ```
 
@@ -561,7 +563,7 @@ GET http://localhost:8080/graphspaces/gs1/schematemplates
 
 ##### Method & Url
 
-```
+```text
 GET http://localhost:8080/graphspaces/gs1/schematemplates/template1
 ```
 
@@ -577,7 +579,7 @@ GET http://localhost:8080/graphspaces/gs1/schematemplates/template1
 
 ##### Method & Url
 
-```
+```text
 PUT http://localhost:8080/graphspaces/gs1/schematemplates/template1
 ```
 
@@ -599,7 +601,7 @@ PUT http://localhost:8080/graphspaces/gs1/schematemplates/template1
 
 ##### Method & Url
 
-```
+```text
 DELETE http://localhost:8080/graphspaces/gs1/schematemplates/template1
 ```
 

@@ -26,7 +26,7 @@ HugeGraph implements multi-tenancy through graph spaces, which isolate compute/s
 
 ##### Method & Url
 
-```
+```text
 POST http://localhost:8080/graphspaces
 ```
 
@@ -53,6 +53,7 @@ Note: CPU/memory and Kubernetes-related capabilities are not publicly available 
 | max_role_number              | No       | Int     | 0       |                                                                                | Maximum number of roles that can be created inside the graphspace                 |
 | auth                         | No       | Boolean | false   | true / false                                                                   | Whether to enable authentication for the graphspace                               |
 | configs                      | No       | Map     |         |                                                                                | Additional configuration                                                          |
+{.td-table--wide}
 
 ```json
 {
@@ -110,7 +111,7 @@ Note: CPU/memory and Kubernetes-related capabilities are not publicly available 
 
 ##### Method & Url
 
-```
+```text
 GET http://localhost:8080/graphspaces
 ```
 
@@ -141,7 +142,7 @@ GET http://localhost:8080/graphspaces
 
 ##### Method & Url
 
-```
+```text
 GET http://localhost:8080/graphspaces/gs1
 ```
 
@@ -219,10 +220,11 @@ GET http://localhost:8080/graphspaces/gs1
 | internal_algorithm_image_url | No       | String |                                                         | HugeGraph-Computer algorithm image registry                                       |
 | max_graph_number             | Yes      | Int    | > 0                                                     | Maximum number of graphs                                                          |
 | max_role_number              | Yes      | Int    | > 0                                                     | Maximum number of roles                                                           |
+{.td-table--wide}
 
 ##### Method & Url
 
-```
+```text
 PUT http://localhost:8080/graphspaces/gs1
 ```
 
@@ -295,7 +297,7 @@ PUT http://localhost:8080/graphspaces/gs1
 
 ##### Method & Url
 
-```
+```text
 DELETE http://localhost:8080/graphspaces/gs1
 ```
 
@@ -317,7 +319,7 @@ DELETE http://localhost:8080/graphspaces/gs1
 
 ##### Method & Url
 
-```
+```text
 GET http://localhost:8080/graphspaces/profile
 ```
 
@@ -390,7 +392,7 @@ Every graphspace carries four built-in roles, so that a user or a group can be g
 
 ##### Method & Url
 
-```
+```text
 POST http://localhost:8080/graphspaces/gs1/role
 ```
 
@@ -437,7 +439,7 @@ POST http://localhost:8080/graphspaces/gs1/role
 
 ##### Method & Url
 
-```
+```text
 GET http://localhost:8080/graphspaces/gs1/role?user=boss&role=analyst
 ```
 
@@ -471,7 +473,7 @@ GET http://localhost:8080/graphspaces/gs1/role?user=boss&role=analyst
 
 ##### Method & Url
 
-```
+```text
 DELETE http://localhost:8080/graphspaces/gs1/role?user=boss&role=analyst
 ```
 
@@ -500,7 +502,7 @@ A schema template stores a Gremlin schema script under a name, so that a new gra
 
 ##### Method & Url
 
-```
+```text
 POST http://localhost:8080/graphspaces/gs1/schematemplates
 ```
 
@@ -537,7 +539,7 @@ POST http://localhost:8080/graphspaces/gs1/schematemplates
 
 ##### Method & Url
 
-```
+```text
 GET http://localhost:8080/graphspaces/gs1/schematemplates
 ```
 
@@ -561,7 +563,7 @@ GET http://localhost:8080/graphspaces/gs1/schematemplates
 
 ##### Method & Url
 
-```
+```text
 GET http://localhost:8080/graphspaces/gs1/schematemplates/template1
 ```
 
@@ -577,7 +579,7 @@ Only `schema` can be updated, the name of a template is fixed.
 
 ##### Method & Url
 
-```
+```text
 PUT http://localhost:8080/graphspaces/gs1/schematemplates/template1
 ```
 
@@ -599,7 +601,7 @@ PUT http://localhost:8080/graphspaces/gs1/schematemplates/template1
 
 ##### Method & Url
 
-```
+```text
 DELETE http://localhost:8080/graphspaces/gs1/schematemplates/template1
 ```
 

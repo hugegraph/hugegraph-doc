@@ -48,7 +48,7 @@ capabilities:
 
 tlp:
   class: hg-home-band hg-home-tlp
-  title: The First Apache Foundation Top-Level Graph Project
+  title: The First Apache Foundation Top-Level Graph System
 
 community:
   class: hg-home-community
@@ -58,7 +58,7 @@ community:
       icon: fa-solid fa-screwdriver-wrench
       url: /docs/quickstart/toolchain/
       desc: Explore graph loading, visualization, backup, restore, and migration tools.
-    - title: Efficient
+    - title: Contribute on **GitHub**
       icon: fa-brands fa-github
       url: https://github.com/apache/hugegraph
       external: true

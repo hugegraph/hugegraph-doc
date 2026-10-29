@@ -73,6 +73,89 @@ function jobBody(name) {
   return body[1];
 }
 
+test("all Hugo jobs share the pinned native Hugo compiler setup", () => {
+  const action = fs.readFileSync(path.resolve(__dirname, "../../.github/actions/setup-site-tools/action.yml"), "utf8");
+  assert.match(workflow, /HUGO_VERSION: 0\.168\.0/);
+  for (const job of ["prepare", "build", "aggregate"]) {
+    const body = jobBody(job);
+    const setupPath = job === "prepare" ? "./.github/actions/setup-site-tools" : "./resolved/setup-site-tools";
+    assert.equal(body.split(`uses: ${setupPath}\n`).length - 1, 1);
+    assert.match(body, /hugo-version: \$\{\{ env\.HUGO_VERSION \}\}/);
+    if (job !== "aggregate") assert.doesNotMatch(body, /actions\/setup-node/);
+  }
+  assert.match(action, /uses: peaceiris\/actions-hugo@[a-f0-9]{40}/);
+  assert.match(action, /extended: true/);
+  assert.doesNotMatch(action, /dart-sass|npm|setup-node/);
+  assert.doesNotMatch(workflow, /DART_SASS_VERSION|dart-sass-version|sass --version/);
+});
+
+test("old manual candidate sources receive the trusted compiler action via prepared artifacts", () => {
+  const { spawnSync } = require("node:child_process");
+  const os = require("node:os");
+  const directory = fs.mkdtempSync(path.join(os.tmpdir(), "trusted-site-tools-"));
+  try {
+    const source = path.join(directory, ".github/actions/setup-site-tools");
+    fs.mkdirSync(source, {recursive: true});
+    const action = fs.readFileSync(path.resolve(__dirname, "../../.github/actions/setup-site-tools/action.yml"));
+    fs.writeFileSync(path.join(source, "action.yml"), action);
+    const helper = fs.readFileSync(path.resolve(__dirname, "../../scripts/hugo_build.py"));
+    fs.mkdirSync(path.join(directory, "scripts"));
+    fs.writeFileSync(path.join(directory, "scripts/hugo_build.py"), helper);
+    const result = spawnSync("bash", ["-e", "-c", stepScript("Package trusted compiler setup for candidate builds")], {
+      cwd: directory, env: {...process.env, BASH_ENV: ""}
+    });
+    assert.equal(result.status, 0, result.stderr.toString());
+    assert.deepEqual(fs.readFileSync(path.join(directory, "setup-site-tools/action.yml")), action);
+    assert.deepEqual(fs.readFileSync(path.join(directory, "setup-site-tools/hugo_build.py")), helper);
+    assert.match(stepBody("Upload resolved version manifest"), /path: \|[\s\S]*^            setup-site-tools\//m);
+    // Consumers download the trusted bundle after checking out the candidate;
+    // setup therefore works even when its source has no local action directory.
+    for (const job of ["build", "aggregate"]) {
+      const body = jobBody(job);
+      assert.ok(body.indexOf("path: resolved") < body.indexOf("uses: ./resolved/setup-site-tools"));
+      assert.doesNotMatch(body, /uses: \.\/\.github\/actions\/setup-site-tools/);
+    }
+  } finally {
+    fs.rmSync(directory, {recursive: true, force: true});
+  }
+});
+
+test("AI fixtures retain strict warning checks from the trusted artifact", () => {
+  for (const name of ["Build manifest-derived AI fixture", "Build AI-disabled rollback fixture"]) {
+    const body = stepBody(name);
+    assert.match(body, /python3 resolved\/setup-site-tools\/hugo_build\.py hugo/);
+    assert.match(body, /--printPathWarnings --printI18nWarnings --logLevel info/);
+  }
+});
+
+test("historical and Hugo resource caches follow the native Hugo toolchain", () => {
+  for (const job of ["prepare", "build"]) {
+    const body = jobBody(job);
+    assert.match(body, /--hugo-version "\$\(hugo version\)"/);
+    assert.match(body, /--go-version "\$\(go version\)"/);
+    assert.doesNotMatch(body, /--sass-version/);
+  }
+  const resourceCache = jobBody("build").split("      - name: Cache Hugo resources\n")[1]
+    .split("      - name:")[0];
+  assert.equal((resourceCache.match(/env\.HUGO_VERSION/g) ?? []).length, 2);
+  assert.equal((resourceCache.match(/hashFiles\('resolved\/setup-site-tools\/action\.yml'\)/g) ?? []).length, 2);
+});
+
+test("partial historical hits schedule one group without downloading a bundle in prepare", () => {
+  const prepare = jobBody("prepare");
+  const lookup = stepBody("Look up a compatible historical bundle");
+  assert.match(lookup, /restore-keys: \$\{\{ runner\.os \}\}-\$\{\{ steps\.history-plan\.outputs\.prefix \}\}/);
+  assert.match(lookup, /lookup-only: true/);
+  const groups = stepBody("Select bounded build groups");
+  assert.match(groups, /history-lookup\.outputs\.cache-matched-key != ''/);
+  assert.doesNotMatch(groups, /outputs\.cache-hit/);
+  assert.match(prepare, /echo "prefix=\$\(jq -r \.cachePrefix cache-plan\.json\)"/);
+  assert.match(jobBody("build"), /restore-keys: \$\{\{ runner\.os \}\}-\$\{\{ needs\.prepare\.outputs\.cache_prefix \}\}/);
+  // Only an exact complete hit skips recording a new complete bundle.
+  assert.match(prepare, /history_hit:.*history-lookup\.outputs\.cache-hit/);
+  assert.match(jobBody("aggregate"), /needs\.prepare\.outputs\.history_hit != 'true'/);
+});
+
 test("superseded runs can cancel reporting and the required gate", () => {
   assert.match(workflow, /group:.*format\('pr-\{0\}', github.event.pull_request.number\)/);
   assert.match(workflow, /cancel-in-progress: true/);
@@ -224,6 +307,66 @@ test("manual candidates build and validate every immutable selected version usin
     fs.writeFileSync(path.join(directory, "selected-versions.json"), JSON.stringify({include: [{id: "latest", sha: "HEAD"}]}));
     assert.notEqual(run().status, 0);
     assert.equal(fs.readFileSync(path.join(directory, "python.log"), "utf8").trim().split("\n").length, 4);
+  } finally {
+    fs.rmSync(directory, {recursive: true, force: true});
+  }
+});
+
+test("manual candidate planning distinguishes unsupported pins from external-Sass requirements", () => {
+  const { spawnSync } = require("node:child_process");
+  const os = require("node:os");
+  const directory = fs.mkdtempSync(path.join(os.tmpdir(), "candidate-theme-plan-"));
+  const env = {...process.env, BASH_ENV: "", GOTOOLCHAIN: "local",
+    GIT_AUTHOR_NAME: "Workflow contract", GIT_AUTHOR_EMAIL: "workflow@localhost",
+    GIT_COMMITTER_NAME: "Workflow contract", GIT_COMMITTER_EMAIL: "workflow@localhost"};
+  const git = (...args) => {
+    const result = spawnSync("git", args, {cwd: directory, env, encoding: "utf8"});
+    assert.equal(result.status, 0, result.stderr);
+    return result.stdout.trim();
+  };
+  try {
+    git("init", "--quiet", "--initial-branch=master");
+    git("remote", "add", "origin", directory);
+    fs.writeFileSync(path.join(directory, "versions.json"), JSON.stringify({
+      versions: [{id: "latest", archived: false, ref: "master"}]
+    }));
+    for (const [pin, rejected] of [["v1.2.0", false], ["v1.3.0", true], ["v1.3.1", true], ["v1.4.0", false]]) {
+      // Exercise both valid go.mod require forms through the real Go parser.
+      const requirement = pin === "v1.3.1"
+        ? `require (\n\tgithub.com/pgsty/oink ${pin}\n)\n`
+        : `require github.com/pgsty/oink ${pin}\n`;
+      const source = `module github.com/apache/hugegraph-doc\n\ngo 1.20\n\n${requirement}`;
+      fs.writeFileSync(path.join(directory, "go.mod"), source);
+      git("add", "go.mod");
+      git("-c", "core.hooksPath=/dev/null", "commit", "--quiet", "-m", pin);
+      git("branch", "--force", "candidate");
+      const sha = git("rev-parse", "HEAD");
+      const output = path.join(directory, `outputs-${pin}`);
+      const result = spawnSync("bash", ["--noprofile", "--norc", "-p", "-e", "-c",
+        stepScript("Resolve trusted event plan")], {
+        cwd: directory, encoding: "utf8",
+        env: {...env, EVENT_NAME: "workflow_dispatch", EVENT_SHA: sha,
+          OPERATION: "staging-next", SCOPE: "latest", CANDIDATE_BRANCH: "candidate",
+          CONFIRMATION: "publish asf-staging-oink", GITHUB_REF: "refs/heads/master",
+          PRODUCTION_ORIGIN: "https://production.example/", STAGING_ORIGIN: "https://staging.example/",
+          GITHUB_OUTPUT: output, RUNNER_TEMP: directory}
+      });
+      if (rejected) {
+        assert.notEqual(result.status, 0, pin);
+        if (pin === "v1.3.0") {
+          assert.match(result.stdout, /OINK v1\.3\.0 manual candidates are not supported/);
+          assert.doesNotMatch(result.stdout, /needs standalone Dart Sass/);
+        } else {
+          assert.ok(result.stdout.includes(`OINK ${pin} needs standalone Dart Sass`), result.stdout);
+        }
+        assert.match(result.stdout, /upgrade the candidate to OINK v1\.4\.0/);
+        assert.equal(fs.existsSync(output), false);
+      } else {
+        assert.equal(result.status, 0, result.stderr);
+        assert.ok(fs.readFileSync(output, "utf8").includes(`source_sha=${sha}\n`));
+      }
+      assert.equal(fs.readFileSync(path.join(directory, "go.mod"), "utf8"), source);
+    }
   } finally {
     fs.rmSync(directory, {recursive: true, force: true});
   }

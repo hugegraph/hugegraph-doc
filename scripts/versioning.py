@@ -37,6 +37,7 @@ import urllib.parse
 import xml.etree.ElementTree as ET
 from typing import NoReturn
 
+from hugo_build import run_hugo
 from oink_module import download_locked
 
 
@@ -52,7 +53,7 @@ SHELL_CONTENT_DIRS = (
 )
 SHELL_STATIC_FILES = (
     "favicon.svg",
-    "img/social/hugegraph-default.png",
+    "img/social/hugegraph-apache.png",
 )
 SHELL_STATIC_DIRS = (
     "img/bootstrap-controls",
@@ -133,36 +134,36 @@ DOCS_NAV_GROUP_TITLES = {
 DOCS_NAV_EXPECTED_STATS = {
     "latest": {
         "groups": 5,
-        "pages": 94,
+        "pages": 95,
         "removed": 4,
         "scopedLinks": 0,
-        "treeSha256": "c610cc9128f26a85e0f60843f9e5255f95daa8ba7d1d3a62d19a07a799a3e520",
+        "treeSha256": "b33f771f77fc376121902fee37d66235d2920a450320620400320925f985c86a",
     },
     "1.7": {
         "groups": 5,
         "pages": 85,
-        "removed": 7,
+        "removed": 8,
         "scopedLinks": 10,
         "treeSha256": "c87538b82b0e3506eef59417411686ddc188e0f33d0e3a1cda687de8d6f88747",
     },
     "1.5": {
         "groups": 5,
         "pages": 77,
-        "removed": 15,
+        "removed": 16,
         "scopedLinks": 10,
         "treeSha256": "ac29ab8f0e7020496a3a1afe480687043d751e32c93ffb848e2210e3500cd483",
     },
     "1.3": {
         "groups": 5,
         "pages": 68,
-        "removed": 24,
+        "removed": 25,
         "scopedLinks": 10,
         "treeSha256": "e8c9b0a64dac6dd3e47827ec5072697eb7d3ed79659e0b5c4a9c5df8e1408d38",
     },
     "1.0": {
         "groups": 5,
         "pages": 59,
-        "removed": 23,
+        "removed": 24,
         "scopedLinks": 10,
         "treeSha256": "bd45db511d9b6728e1523bd3c5ebd9d18912ee85aeabf79c77bcca7e511f977a",
     },
@@ -1499,6 +1500,74 @@ def first_existing_path(assembly: pathlib.Path, candidates: tuple[str, ...]) -> 
     return matches[0]
 
 
+def ensure_legacy_config_tables_wide(
+    path: pathlib.Path,
+    headers: tuple[tuple[str, ...], ...] = (("config option", "default value", "description"),),
+    required_row: str | None = None,
+) -> int:
+    """Opt frozen technical catalogs into OINK's native horizontal table layout."""
+    source = path.read_text(encoding="utf-8")
+    lines = source.splitlines(keepends=True)
+    allowed_headers = {tuple(cell.lower() for cell in header) for header in headers}
+    result: list[str] = []
+    fence: str | None = None
+    fixed = 0
+    index = 0
+
+    def parts(line: str) -> tuple[str, str]:
+        # Consume only Markdown's permitted table/fence indentation. Residual
+        # whitespace belongs to an indented code example, including in quotes.
+        match = re.match(r"^( {0,3}(?:>[ \t]? {0,3})?)(.*)$", line.rstrip("\r\n"))
+        assert match
+        return match[1], match[2]
+
+    while index < len(lines):
+        prefix, body = parts(lines[index])
+        if fence is not None:
+            if re.fullmatch(rf"{re.escape(fence[0])}{{{len(fence)},}}[ \t]*", body):
+                fence = None
+        else:
+            opening = MARKDOWN_FENCE_OPEN_RE.match(body) if body.startswith(("```", "~~~")) else None
+            if opening:
+                fence = opening.group("marker")
+            elif (body.startswith("|")
+                  and tuple(cell.strip().lower() for cell in body.strip().strip("|").split("|"))
+                  in allowed_headers
+                  and index + 1 < len(lines)
+                  and parts(lines[index + 1])[0].strip() == prefix.strip()
+                  and re.fullmatch(r"\|(?:[ \t]*:?-{3,}:?[ \t]*\|){"
+                                   + str(len(body.strip().strip("|").split("|"))) + "}",
+                                   parts(lines[index + 1])[1].strip())):
+                end = index + 2
+                while end < len(lines) and parts(lines[end])[0].strip() == prefix.strip() and parts(lines[end])[1].startswith("|"):
+                    end += 1
+                result.extend(lines[index:end])
+                if required_row and not any(required_row in line for line in lines[index + 2:end]):
+                    index = end
+                    continue
+                attribute = parts(lines[end])[1].strip() if end < len(lines) and parts(lines[end])[0].strip() == prefix.strip() else ""
+                if attribute.startswith("{") and attribute.endswith("}"):
+                    if not re.search(r"(?<![\w-])td-table--wide(?![\w-])", attribute):
+                        closing = lines[end].rfind("}")
+                        result.append(lines[end][:closing] + " .td-table--wide" + lines[end][closing:])
+                        fixed += 1
+                    else:
+                        result.append(lines[end])
+                    end += 1
+                else:
+                    if not result[-1].endswith("\n"):
+                        result[-1] += "\n"
+                    result.append(prefix + "{.td-table--wide}\n")
+                    fixed += 1
+                index = end
+                continue
+        result.append(lines[index])
+        index += 1
+    if fixed:
+        path.write_text("".join(result), encoding="utf-8")
+    return fixed
+
+
 def apply_known_legacy_fixes(assembly: pathlib.Path, version: str) -> int:
     fixed = 0
     if version in {"1.7", "1.5", "1.3", "1.0"}:
@@ -1545,6 +1614,49 @@ def apply_known_legacy_fixes(assembly: pathlib.Path, version: str) -> int:
                 page = assembly / f"content/{language}/docs/{relative}"
                 if page.is_file():
                     fixed += ensure_search_metadata(page, keywords=keywords, boost=1.5)
+            # Frozen technical catalogs formerly depended on global table CSS.
+            # Bind native layout to audited paths and headers, never all tables.
+            config_headers = (("config option", "default value", "description"),)
+            catalogs = [
+                ("config/config-option.md", config_headers, None),
+                ("config/config-computer.md", config_headers, None),
+                ("quickstart/toolchain/hugegraph-tools.md", (
+                    ("Global Variable", "Environment Variable", "Example"),
+                    ("全局变量", "环境变量", "示例"),
+                ), None),
+                ("quickstart/toolchain/hugegraph-loader.md", (
+                    ("Parameter", "Default value", "Required or not", "Description"),
+                    ("参数", "默认值", "是否必传", "描述信息"),
+                ), None),
+            ]
+            if version == "1.7":
+                environment_headers = (
+                    ("Variable", "Required", "Default", "Description"),
+                    ("变量", "必填", "默认值", "描述"),
+                )
+                catalogs.extend([
+                    ("clients/restful-api/graphspace.md", (
+                        ("Name", "Required", "Type", "Default", "Range/Note", "Description"),
+                        ("Name", "Required", "Type", "Range/Note", "Description"),
+                        ("名称", "是否必填", "类型", "默认值", "取值范围", "说明"),
+                    ), None),
+                    ("quickstart/toolchain/hugegraph-hubble.md", (
+                        ("Configuration Item", "Default Value", "Description"),
+                        ("配置项", "默认值", "说明"),
+                    ), "gremlin.vertex_degree_limit"),
+                    ("quickstart/hugegraph-ai/config-reference.md", (
+                        ("Purpose", "API base", "Key", "Model", "Default maximum tokens"),
+                        ("Purpose", "Host", "Port", "Model"),
+                        ("用途", "API 地址", "密钥", "模型", "最大 token 默认值"),
+                        ("用途", "主机", "端口", "模型"),
+                    ), None),
+                    ("quickstart/hugegraph/hugegraph-pd.md", environment_headers, None),
+                    ("quickstart/hugegraph/hugegraph-hstore.md", environment_headers, None),
+                ])
+            for relative, headers, required_row in catalogs:
+                page = assembly / f"content/{language}/docs/{relative}"
+                if page.is_file():
+                    fixed += ensure_legacy_config_tables_wide(page, headers, required_row)
             summary_path = assembly / f"content/{language}/docs/SUMMARY.md"
             if version in {"1.7", "1.5"}:
                 fixed += repair_historical_performance_routes(summary_path)
@@ -4168,6 +4280,7 @@ def build(args: argparse.Namespace) -> None:
             cwd=assembly,
             check=True,
         )
+        # Keep the exact known LibSass warning visible; reject other diagnostics.
         command = [
             hugo,
             "--config",
@@ -4181,7 +4294,6 @@ def build(args: argparse.Namespace) -> None:
             "production",
             "--printPathWarnings",
             "--printI18nWarnings",
-            "--panicOnWarning",
             "--logLevel",
             "info",
         ]
@@ -4190,7 +4302,7 @@ def build(args: argparse.Namespace) -> None:
         build_environment["PATH"] = (
             go_directory + os.pathsep + build_environment.get("PATH", "")
         )
-        subprocess.run(command, cwd=assembly, check=True, env=build_environment)
+        run_hugo(command, cwd=assembly, env=build_environment)
         route_aliases = (
             write_historical_route_aliases(
                 output, args.site_origin, entry["publishPath"]

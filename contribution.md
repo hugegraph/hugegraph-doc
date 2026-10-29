@@ -15,7 +15,8 @@ For the short workflow, start with [README.md](./README.md). This file records t
 The site uses the Hugo Module recorded in `go.mod` and `go.sum`:
 
 Toolchain versions are maintained in `go.mod` and `.github/workflows/hugo.yml`;
-`go.mod` / `go.sum` pin the theme. Node.js is needed only for the browser tests,
+`go.mod` / `go.sum` pin the theme. Hugo Extended uses its built-in LibSass compiler;
+no standalone Dart Sass or npm dependencies are needed to build the site. Node.js is needed only for the browser tests,
 with its version declared by `tests/e2e/package.json` and CI.
 
 Verify the installed toolchain and locked module:
@@ -42,9 +43,11 @@ scripts/hugo.sh server
 
 Open <http://localhost:1313/>. The local preview includes the language-aware search index so search behavior can be checked before publication.
 
+The site's [local preview guide](https://hugegraph.apache.org/community/documentation/) includes a real toolchain-check recording and a short preview workflow.
+
 ## Strict production build
 
-Run the same warning-strict build used by CI:
+Run the same production build and diagnostics used by CI:
 
 ```bash
 scripts/hugo.sh build
@@ -56,12 +59,19 @@ example `scripts/hugo.sh server -p 8080`. Set `HG_DOC_VERSION`,
 `HG_DOC_SITE_ORIGIN`, or `HG_DOC_HISTORICAL_ORIGIN` only when validating a
 specific version or publication origin.
 
-The wrapper applies Hugo's configuration, environment, strict-warning,
+The wrapper applies Hugo's configuration, environment, path/i18n diagnostics,
 cleanup, and minification flags before your arguments; Hugo's last-wins flag
 handling means anything you append (for example `--logLevel debug`) takes
 effect. Use `--baseURL` or `HG_DOC_SITE_ORIGIN` when changing the rendered
 origin (the flag wins when both are set); a server `--port` is reflected in
 the generated local origin.
+
+OINK 1.4 uses Hugo's built-in LibSass. Its deprecation warning must remain visible;
+do not add `--panicOnWarning` or suppress it with `ignoreLogs`. The shared
+`scripts/hugo_build.py` gate permits only that exact warning and fails builds on
+all other Hugo warnings, including missing translations and duplicate target
+paths. Full output and Hugo failure status are preserved. The source, output
+and browser validators also remain blocking.
 
 A successful command proves that Hugo rendered the configured outputs. It does not replace browser checks for navigation, search, language switching, accessibility, mobile layout, print, or Content Security Policy behavior.
 
@@ -77,7 +87,13 @@ build groups, with at most two versions building concurrently within each runner
 Historical artifacts are reused only when both the complete build-input fingerprint
 and artifact digest match. Missing or invalid cache entries rebuild automatically;
 manual dispatches start without the artifact cache and use the original build and
-validate commands so older candidate branches do not need the new CI helpers. Cache hits still run the full
+validate commands so older candidate branches do not need the new CI helpers.
+Candidates pinned to OINK 1.3.0 are outside this workflow's supported scope.
+OINK 1.3.1 requires standalone Dart Sass, while this workflow installs native
+LibSass only. Both pins are rejected before scheduling builds; upgrade such a
+candidate to OINK 1.4.0 before dispatching it.
+Historical documentation versions still use the current site's shell and are
+unaffected by this candidate-theme restriction. Cache hits still run the full
 version validator, and aggregation validates every selected version again.
 
 Assembly validates at most two versions concurrently, then writes the complete
@@ -103,6 +119,29 @@ version to 3.0.0 in the release branch; keep the `latest` guides tracking upstre
 
 latest 文档使用 SeaTunnel 3.0+ 等最低版本说明，并引用上游 latest/Next 文档；安装命令中的具体版本仅作为示例，引擎和插件保持同版。
 准备 HugeGraph 1.8.0 文档快照时，在发布分支中将 SeaTunnel 文档引用和安装版本固定为 3.0.0，latest 文档继续跟随上游。
+
+## Native content components
+
+Use the focused [OINK feature reference](scripts/oink-features.md) for component
+selection, copyable syntax and real HugeGraph source examples. It covers the
+native components used by this site, OINK 1.4.0's table reader and release cards,
+and the public interfaces used by the site shell. Read the relevant section
+before adding a renderer, shortcode, script or stylesheet.
+
+### Image loading and albums
+
+Use Gallery for screenshots within an explanation and Expo for a standalone
+album. Their preview and preloading behavior differs; see
+[image loading and albums](scripts/oink-features.md#image-loading-and-albums)
+before changing content or claiming a performance improvement.
+
+### Content and output checks
+
+The feature reference also records Markmap/ECharts constraints, complete code
+copying, optional terminal recordings and content metadata rules. Check the
+affected HTML interactions and Print/Markdown fallbacks; check RSS for content
+that appears in a feed. Keep English and Chinese pages aligned and public routes
+stable.
 
 ## Repository structure
 

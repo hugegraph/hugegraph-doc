@@ -3,6 +3,7 @@ title: "Documentation"
 linkTitle: "Documentation"
 weight: 20
 outputs: [HTML, RSS, print, markdown, LLMSFULL]
+icon: fa-solid fa-book
 ---
 
 ## Apache HugeGraph Documentation
@@ -21,21 +22,21 @@ Apache HugeGraph includes graph database, graph computing, and graph AI componen
 
 ### Ecosystem Overview
 
-```
-┌─────────────────────────────────────────────────────────────────┐
-│                  Apache HugeGraph Ecosystem                      │
-├─────────────────────────────────────────────────────────────────┤
-│  ┌─────────────┐  ┌─────────────┐  ┌─────────────────────────┐  │
-│  │ HugeGraph   │  │ Vermeer*    │  │ HugeGraph-AI            │  │
-│  │ Core Engine │  │ Computer    │  │ (GraphRAG/ML/Python)    │  │
-│  │ (OLTP)      │  │ (Java BSP)  │  │                         │  │
-│  └─────────────┘  └─────────────┘  └─────────────────────────┘  │
-│         │               │                    │                   │
-│  ┌──────┴───────────────┴────────────────────┴──────────────┐   │
-│  │              HugeGraph Toolchain                          │   │
-│  │  Hubble (UI) | Loader | Client (Java/Go/Py) | Tools      │   │
-│  └───────────────────────────────────────────────────────────┘   │
-└─────────────────────────────────────────────────────────────────┘
+```text
++-----------------------------------------------------------------+
+|                   Apache HugeGraph Ecosystem                    |
++-----------------------------------------------------------------+
+|  +-------------+  +-------------+  +-------------------------+  |
+|  | HugeGraph   |  | Vermeer*    |  | HugeGraph-AI            |  |
+|  | Core Engine |  | Computer    |  | (GraphRAG/ML/Python)    |  |
+|  | (OLTP)      |  | (Java BSP)  |  |                         |  |
+|  +------+------+  +------+------+  +------------+------------+  |
+|         |                |                      |               |
+|  +------+----------------+----------------------+------------+  |
+|  | HugeGraph Toolchain                                       |  |
+|  | Hubble (UI) | Loader | Client (Java/Go/Py) | Tools        |  |
+|  +-----------------------------------------------------------+  |
++-----------------------------------------------------------------+
 ```
 
 * Vermeer is the default graph computing entry; Computer runs Java BSP jobs.
