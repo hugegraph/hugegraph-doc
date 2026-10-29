@@ -83,6 +83,9 @@ curl -b hubble.cookies -X POST \
 
 ## Hubble schema 默认值
 
+下列可选字段默认值要求 Hubble 构建包含 [Toolchain #859](https://github.com/apache/hugegraph-toolchain/pull/859)；
+仅标记为 `master` / 1.8 不代表已包含修复。未包含时，请显式提供 `"open_label_index":true,"style":{"display_fields":["~id"]}`。
+
 使用 Hubble 的 schema 模型创建顶点类型：
 
 ```bash

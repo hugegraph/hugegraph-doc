@@ -91,6 +91,10 @@ The session establishes the caller identity; body credentials do not replace the
 
 ## Hubble schema defaults
 
+The optional-field defaults below require a Hubble build containing
+[Toolchain #859](https://github.com/apache/hugegraph-toolchain/pull/859); the `master` / 1.8 label alone does not guarantee that fix.
+For builds without it, explicitly supply `"open_label_index":true,"style":{"display_fields":["~id"]}`.
+
 Create a vertex label through Hubble using its schema model:
 
 ```bash
