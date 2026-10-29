@@ -91,9 +91,8 @@ The session establishes the caller identity; body credentials do not replace the
 
 ## Hubble schema defaults
 
-The optional-field defaults below require a Hubble build containing
-[Toolchain #859](https://github.com/apache/hugegraph-toolchain/pull/859); the `master` / 1.8 label alone does not guarantee that fix.
-For builds without it, explicitly supply `"open_label_index":true,"style":{"display_fields":["~id"]}`.
+Hubble 1.8.0 and later releases support the following optional-field defaults. For earlier builds,
+explicitly supply `"open_label_index":true,"style":{"display_fields":["~id"]}`:
 
 Create a vertex label through Hubble using its schema model:
 
@@ -128,7 +127,9 @@ Do not reuse the vertex-ID encoding rule for an edge ID.
 For property appends, use `PUT .../vertices/{id}?action=append` or `PUT .../edges/{id}?action=append`
 with the corresponding JSON property body. Supply the edge label to `DELETE .../edges/{id}?label={label}` as required by the backend.
 Deleting a Server index uses `DELETE .../schema/indexlabels/{name}` and returns a task ID;
-the current Server endpoint has no `delete_all` query parameter. Check the task result before treating deletion as complete.
+the current Server endpoint has no `delete_all` query parameter.
+Rebuilding a vertex, edge, or index label uses `PUT .../jobs/rebuild/{type}/{name}`: missing targets return HTTP 404;
+existing labels return HTTP 202 with an asynchronous task ID; poll the task status to confirm completion.
 
 ## Vermeer service tokens and native UI
 
@@ -172,8 +173,17 @@ Hubble maps native Vermeer task IDs to negative IDs. Poll the same graph's
 `GET /api/v1.3/graphspaces/DEFAULT/graphs/hugegraph/async-tasks/{id}`;
 read result pages through `GET .../async-tasks/{id}/values?cursor=0&limit=100` after successful completion.
 Do not send that Hubble ID to Server's native `/tasks/{id}` endpoint.
-A graph state of `loaded` confirms loading only. An HTTP 400 on computation requires the exact rejected request and response
-before attributing it to an engine defect; the request format above is verified against current source, not a large-dataset benchmark.
+A graph state of `loaded` confirms loading only. An HTTP 400 on computation requires inspecting the exact rejected request and response.
+
+### Native Vermeer task submission
+
+Native clients submit `POST /api/v1/tasks/create` with `graph`, `task_type` (`load`, `reload` or `compute`),
+and a flat string-valued `params` map. For computation, set `params["compute.algorithm"]`, not a top-level `algorithm`.
+The response contains a native `task.id`; query it at `GET /api/v1/task/{id}` and read retained values at
+`GET /api/v1/tasks/value/{id}`. These paths and positive IDs differ from Hubble's wrapper.
+`POST /api/v1/tasks` does not submit work: after the task-method fix it returns HTTP 405 and `Allow: GET`;
+older builds can return a misleading `{"code":200}` without creating a task.
+See the [native API examples](https://github.com/apache/hugegraph-computer/blob/master/vermeer/README.md#api-overview).
 
 ## Cypher and task routes in Hubble
 
@@ -236,16 +246,3 @@ curl -b hubble.cookies -X PUT \
 
 Supported presets are `GS_READ_ONLY`, `GS_READ_WRITE` and `GS_ADMIN`, subject to the caller's grant permissions.
 The account identity in the path and body must match. Anonymous mode has no account-management capability.
-
-### Native Vermeer task submission
-
-Native clients submit `POST /api/v1/tasks/create` with `graph`, `task_type` (`load`, `reload` or `compute`),
-and a flat string-valued `params` map. For computation, set `params["compute.algorithm"]`, not a top-level `algorithm`.
-The response contains a native `task.id`; query it at `GET /api/v1/task/{id}` and read retained values at
-`GET /api/v1/tasks/value/{id}`. These paths and positive IDs differ from Hubble's wrapper.
-`POST /api/v1/tasks` does not submit work: after the task-method fix it returns HTTP 405 and `Allow: GET`;
-older builds can return a misleading `{"code":200}` without creating a task.
-See the [native API examples](https://github.com/hugegraph/hugegraph-computer/blob/master/vermeer/README.md#api-overview).
-
-Rebuilding a missing vertex, edge or index label through `PUT .../jobs/rebuild/{type}/{name}` returns HTTP 404.
-Existing labels return HTTP 202 with a task ID; poll that task before treating the rebuild as complete.

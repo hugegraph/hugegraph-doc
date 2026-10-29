@@ -83,8 +83,7 @@ curl -b hubble.cookies -X POST \
 
 ## Hubble schema 默认值
 
-下列可选字段默认值要求 Hubble 构建包含 [Toolchain #859](https://github.com/apache/hugegraph-toolchain/pull/859)；
-仅标记为 `master` / 1.8 不代表已包含修复。未包含时，请显式提供 `"open_label_index":true,"style":{"display_fields":["~id"]}`。
+Hubble 在 1.8.0 及以上版本中支持以下可选字段默认值。若使用未包含该特性的旧版本，请在请求体中显式提供 `"open_label_index":true,"style":{"display_fields":["~id"]}`：
 
 使用 Hubble 的 schema 模型创建顶点类型：
 
@@ -117,7 +116,8 @@ Server 顶点 ID 在 URL 路径中使用 JSON 值。字符串 ID `1:marko` 需�
 追加属性使用 `PUT .../vertices/{id}?action=append` 或 `PUT .../edges/{id}?action=append`，并提交对应 JSON 属性体。
 删除边时按后端要求提供 `DELETE .../edges/{id}?label={label}` 的标签参数。
 删除 Server 索引使用 `DELETE .../schema/indexlabels/{name}`，响应为任务 ID；当前 Server 接口没有 `delete_all` 查询参数。
-应查看任务结果后再判断删除是否完成。
+重建顶点、边或索引标签使用 `PUT .../jobs/rebuild/{type}/{name}`：目标标签不存在时返回 HTTP 404；
+已有标签返回 HTTP 202 与任务 ID，应轮询任务结果后再确认重建完成。
 
 ## Vermeer 服务 token 与原生 UI
 
@@ -157,8 +157,16 @@ Hubble 响应封装的 `data.task_id` 是任务 ID，请保留正负号：原生
 使用同一图的 `GET /api/v1.3/graphspaces/DEFAULT/graphs/hugegraph/async-tasks/{id}` 查询状态；
 成功后通过 `GET .../async-tasks/{id}/values?cursor=0&limit=100` 读取结果分页。
 不要把 Hubble ID 直接传给 Server 原生 `/tasks/{id}`。
-图状态 `loaded` 只表示加载成功。计算返回 HTTP 400 时，应结合被拒绝的完整请求与响应定位，不能直接归因为引擎缺陷。
-上述格式已核对当前源码，不代表完成了大规模数据的算法性能验证。
+图状态 `loaded` 只表示加载成功。计算返回 HTTP 400 时，应结合被拒绝的完整请求与响应排查定位。
+
+### 原生 Vermeer 任务提交
+
+原生客户端使用 `POST /api/v1/tasks/create`，请求包含 `graph`、`task_type`（`load`、`reload` 或 `compute`）
+及扁平的字符串 `params` 映射。计算算法名填写 `params["compute.algorithm"]`，不是顶层 `algorithm`。
+响应中的原生 `task.id` 通过 `GET /api/v1/task/{id}` 查询状态，通过 `GET /api/v1/tasks/value/{id}` 查询保留结果。
+这些路径及正数 ID 不同于 Hubble 封装接口。`POST /api/v1/tasks` 不提交任务：修复后返回 HTTP 405 和 `Allow: GET`；
+旧构建可能返回误导性的 `{"code":200}`，但实际并未创建任务。
+详见 [原生 API 示例](https://github.com/apache/hugegraph-computer/blob/master/vermeer/README.md#api-overview)。
 
 ## Hubble 的 Cypher 与任务路由
 
@@ -218,15 +226,3 @@ curl -b hubble.cookies -X PUT \
 
 支持 `GS_READ_ONLY`、`GS_READ_WRITE` 与 `GS_ADMIN`，具体授权仍受调用者权限约束。
 路径与请求体中的账号身份必须匹配；匿名模式不提供账号管理能力。
-
-### 原生 Vermeer 任务提交
-
-原生客户端使用 `POST /api/v1/tasks/create`，请求包含 `graph`、`task_type`（`load`、`reload` 或 `compute`）
-及扁平的字符串 `params` 映射。计算算法名填写 `params["compute.algorithm"]`，不是顶层 `algorithm`。
-响应中的原生 `task.id` 通过 `GET /api/v1/task/{id}` 查询状态，通过 `GET /api/v1/tasks/value/{id}` 查询保留结果。
-这些路径及正数 ID 不同于 Hubble 封装接口。`POST /api/v1/tasks` 不提交任务：任务方法修复后返回 HTTP 405 和 `Allow: GET`；
-旧构建可能返回误导性的 `{"code":200}`，但没有创建任务。
-详见 [原生 API 示例](https://github.com/hugegraph/hugegraph-computer/blob/master/vermeer/README.md#api-overview)。
-
-通过 `PUT .../jobs/rebuild/{type}/{name}` 重建不存在的顶点、边或索引标签时，返回 HTTP 404。
-已有标签返回 HTTP 202 与任务 ID，应轮询任务结果后再判断重建完成。
