@@ -33,6 +33,8 @@ Jump directly to a task below. If this is your first visit, start with the stand
   Prepare CSV, map fields, and verify the imported records.
 {.cards}
 
+For HTTP login, Gremlin aliases, asynchronous jobs and schema request bodies, see [HTTP API examples](/docs/quickstart/toolchain/http-api/).
+
 ## Start the standalone pair
 
 Use the main repository's [docker/docker-compose.yml](https://github.com/apache/hugegraph/blob/master/docker/docker-compose.yml)
