@@ -163,7 +163,8 @@ POST http://localhost:8080/graphspaces/DEFAULT/graphs/cloneGraph?clone_graph_nam
 
 ##### 复制图的 Schema
 
-包含 [Schema 克隆变更](https://github.com/hugegraph/hugegraph/pull/361)的 Server 构建还提供独立的同步接口。
+包含[拟议的 Schema 克隆变更](https://github.com/hugegraph/hugegraph/pull/361)的 Server 构建提供独立的同步接口。
+客户端应要求 `GET /versions` 返回的 `versions.api` 不低于 `0.73.0.0`；该变更尚未发布。
 该接口在同一图空间创建新图并复制属性键、顶点标签、边标签和索引，不复制图数据。复制期间请保持源 Schema 不变。
 开启鉴权时需要图空间管理权限。
 

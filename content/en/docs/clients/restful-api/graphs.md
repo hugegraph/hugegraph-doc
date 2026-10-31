@@ -164,7 +164,8 @@ Clone a `non-auth` mode graph (set `Content-Type: application/json`)
 
 ##### Copy a graph schema
 
-Server builds containing [the schema-clone change](https://github.com/hugegraph/hugegraph/pull/361) also provide a separate synchronous API.
+Server builds containing [the proposed schema-clone change](https://github.com/hugegraph/hugegraph/pull/361) provide a separate synchronous API.
+Clients should require `versions.api` of `0.73.0.0` or later from `GET /versions`; this change has not yet been released.
 It creates a new graph in the same graph space and copies property keys, vertex labels, edge labels, and indexes; it does not copy graph data.
 Keep the source schema unchanged while copying. Authentication, when enabled, requires graph-space administrator permission.
 
