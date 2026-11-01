@@ -62,6 +62,7 @@ The server registers 20 implementation classes but exposes 17 unique names; V2 i
 It returns the task record. `result(task)` decodes serialized JSON once; plain text remains text.
 Failed/cancelled jobs raise `TaskFailedError`/`TaskCancelledError`, exposing `.task` and `.task_id`.
 `TaskTimeoutError` stops waiting without cancelling the remote job. HTTP timeouts and the waiting deadline are separate controls.
+Waiting requests use the remaining deadline without automatic HTTP retries or redirects; configure the final service URL.
 Use `cancel_task(id)` explicitly. `delete_task(id, force=False)` deletes task records.
 `list_tasks(status=None, limit=None, ids=None, page=None)` supports repeated IDs, but IDs cannot combine with status/page.
 

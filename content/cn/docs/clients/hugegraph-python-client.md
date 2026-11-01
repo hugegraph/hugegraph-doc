@@ -60,6 +60,7 @@ PageRank 等算法会将属性写回图中。Server 注册了 20 个实现类，
 `result(task)` 对序列化 JSON 解析一次，普通文本保持文本。
 任务失败或取消分别抛出 `TaskFailedError`、`TaskCancelledError`，可通过 `.task`、`.task_id` 检查上下文。
 `TaskTimeoutError` 仅停止等待，不取消远端任务；HTTP 超时和等待时限是两个独立控制。
+等待请求按剩余时限设置传输超时，并关闭自动 HTTP 重试和重定向；请配置最终服务地址。
 取消使用 `cancel_task(id)`；`delete_task(id, force=False)` 删除任务记录。
 `list_tasks(status=None, limit=None, ids=None, page=None)` 支持批量 ID；`ids` 不可与 `status` 或 `page` 同时使用。
 
