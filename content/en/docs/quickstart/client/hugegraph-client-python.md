@@ -148,7 +148,7 @@ schema.index_label("personByCity").on_v("person").by("city") \
 
 ```python
 schema = client.schema()
-print(schema.get_schema())            # whole schema, format defaults to "json"
+print(schema.get_schema())            # whole schema as native server JSON
 print(schema.get_property_keys())
 print(schema.get_vertex_labels())
 print(schema.get_edge_labels())
@@ -241,15 +241,15 @@ traverser.same_neighbors(marko_id, josh_id)
 traverser.jaccard_similarity(marko_id, josh_id)
 traverser.shortest_path(marko_id, ripple_id, 3)
 traverser.all_shortest_paths(marko_id, ripple_id, 3)
-traverser.weighted_shortest_path(marko_id, ripple_id, "weight", 3)
-traverser.single_source_shortest_path(marko_id, 2)
+traverser.weighted_shortest_path(marko_id, ripple_id, "weight", capacity=10000)
+traverser.single_source_shortest_path(marko_id, weight="weight", limit=10)
 traverser.multi_node_shortest_path([marko_id, josh_id], max_depth=2)
 traverser.paths(marko_id, josh_id, 2)
 traverser.crosspoints(marko_id, josh_id, 2)
 traverser.rings(marko_id, 3)
 traverser.rays(marko_id, 2)
-traverser.vertices(marko_id)
-traverser.edges(edge_id)
+traverser.vertices([marko_id])
+traverser.edges([edge_id])
 ```
 
 The POST-based variants take request bodies: `advanced_paths`, `customized_paths`, `template_paths`, `customized_crosspoints` and `fusiform_similarity`.
@@ -309,27 +309,27 @@ user = auth.create_user("test_user", "password")
 auth.modify_user(user["id"], user_email="hugegraph@apache.org")
 auth.get_user(user["id"])
 auth.list_users(limit=10)
-auth.delete_user(user["id"])
 
 group = auth.create_group("test_group", "read only")
 auth.modify_group(group["id"], group_description="updated")
 auth.list_groups()
-auth.delete_group(group["id"])
 
 target = auth.create_target("target1", "hugegraph", "127.0.0.1:8080", [])
 auth.update_target(target["id"], "target1", "hugegraph", "127.0.0.1:8080", [])
 auth.list_targets()
-auth.delete_target(target["id"])
 
 belong = auth.create_belong(user["id"], group["id"])
 auth.update_belong(belong["id"], "description")
 auth.list_belongs()
-auth.delete_belong(belong["id"])
 
 access = auth.grant_accesses(group["id"], target["id"], "READ")
 auth.modify_accesses(access["id"], "description")
 auth.list_accesses()
 auth.revoke_accesses(access["id"])
+auth.delete_belong(belong["id"])
+auth.delete_target(target["id"])
+auth.delete_group(group["id"])
+auth.delete_user(user["id"])
 ```
 
 ## Method Naming
@@ -343,7 +343,7 @@ Exceptions live in `pyhugegraph.utils.exceptions`:
 | Exception | Raised when |
 |-----------|-------------|
 | `NotAuthorizedError` | The server answers 401 |
-| `NotFoundError` | The server answers 404, or a required argument is missing |
+| `NotFoundError` | The server answers 404 |
 | `ServerError` | Any other non-2xx response, with the server message attached |
 | `ResponseParseError` | A successful response cannot be parsed into the expected shape |
 | `ServiceUnavailableError` | The server reports `ServiceUnavailableException` |
