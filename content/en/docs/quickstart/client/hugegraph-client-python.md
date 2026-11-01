@@ -10,11 +10,11 @@ The module lives in the [hugegraph-ai](https://github.com/apache/hugegraph-ai) r
 
 ## Requirements
 
-- The client and HugeGraph-AI workspace require Python 3.10 or later; CI runs client tests on 3.10 and 3.11.
+- The client and HugeGraph-AI workspace require Python 3.12 or later; CI runtime versions follow the HugeGraph-AI workspace configuration.
 - HugeGraph Server 1.5.0 or later. The client refuses to connect to older servers; use client v1.3.x for those.
 - `uv` (recommended) or `pip`
 
-Runtime dependencies are `decorator`, `requests`, `setuptools`, `urllib3` and `rich`.
+Runtime dependencies are `decorator`, `requests`, `urllib3` and `rich`.
 
 ## Installation
 
@@ -50,25 +50,24 @@ client = PyHugeClient(
 )
 
 schema = client.schema()
-schema.propertyKey("name").asText().ifNotExist().create()
-schema.propertyKey("birthDate").asText().ifNotExist().create()
-schema.vertexLabel("Person").properties("name", "birthDate") \
-      .usePrimaryKeyId().primaryKeys("name").ifNotExist().create()
-schema.vertexLabel("Movie").properties("name") \
-      .usePrimaryKeyId().primaryKeys("name").ifNotExist().create()
-schema.edgeLabel("ActedIn").sourceLabel("Person").targetLabel("Movie") \
-      .ifNotExist().create()
+schema.property_key("name").as_text().if_not_exist().create()
+schema.property_key("birthDate").as_text().if_not_exist().create()
+schema.vertex_label("Person").properties("name", "birthDate") \
+      .use_primary_key_id().primary_keys("name").if_not_exist().create()
+schema.vertex_label("Movie").properties("name") \
+      .use_primary_key_id().primary_keys("name").if_not_exist().create()
+schema.edge_label("ActedIn").source_label("Person").target_label("Movie") \
+      .if_not_exist().create()
 
 graph = client.graph()
-person = graph.addVertex(
+person = graph.add_vertex(
     "Person", {"name": "Al Pacino", "birthDate": "1940-04-25"}
 )
-movie = graph.addVertex("Movie", {"name": "The Godfather"})
-edge = graph.addEdge("ActedIn", person.id, movie.id, {})
+movie = graph.add_vertex("Movie", {"name": "The Godfather"})
+edge = graph.add_edge("ActedIn", person.id, movie.id, {})
 
-print(graph.getVertexById(person.id))
-print(graph.getEdgeById(edge.id))
-graph.close()
+print(graph.get_vertex_by_id(person.id))
+print(graph.get_edge_by_id(edge.id))
 ```
 
 ### Client Parameters
@@ -93,14 +92,14 @@ The client resolves GraphSpace at construction time:
 - A non-empty `graphspace` string turns GraphSpace mode on directly.
 - Otherwise the client sends `GET {url}/versions` and reads `versions.core`.
 - A server older than 1.5.0 raises `RuntimeError` asking you to upgrade the server or use client v1.3.x.
-- A server newer than 1.5.0 gets `graphspace` set to `DEFAULT` and GraphSpace mode turned on, with a warning in the log. A server at exactly 1.5.0 keeps GraphSpace mode off.
-- If the probe fails for network reasons, GraphSpace mode stays off.
+- Server 1.7+ selects graphspace `DEFAULT`; server 1.5/1.6 keeps legacy routes.
+- If the probe fails, initialization raises an error instead of guessing the server profile.
 
 The mode decides the request prefix: `/graphspaces/<graphspace>/graphs/<graph>/...` when GraphSpace is on, `/graphs/<graph>/...` when it is off.
 
 ### Managers on the Client
 
-Each accessor builds its manager lazily and gives it a dedicated HTTP session.
+Accessors cache their managers; all managers share the HTTP session owned by the client.
 
 | Accessor | Manager | Covers |
 |----------|---------|--------|
@@ -115,7 +114,7 @@ Each accessor builds its manager lazily and gives it a dedicated HTTP session.
 | `client.metrics()` | `MetricsManager` | Server metrics |
 | `client.version()` | `VersionManager` | Server version |
 
-`RankManager`, `RebuildManager` and `ServicesManager` also ship in `pyhugegraph.api`, but `PyHugeClient` does not expose accessors for them yet; construct them directly with a session if you need them.
+Use `client.rank()`, `client.rebuild()` and `client.olap()` directly. See the [Python API reference](/docs/clients/hugegraph-python-client/).
 
 ## Common Operations
 
@@ -126,43 +125,43 @@ The schema builders are fluent. Call `create()` last, or `append()`, `eliminate(
 ```python
 schema = client.schema()
 
-# Property keys: asText/asInt/asLong/asFloat/asDouble/asBool/asByte/asBlob/asDate/asObject
-# cardinality: valueSingle/valueList/valueSet
-# aggregation: calcMax/calcMin/calcSum/calcOld
-schema.propertyKey("age").asInt().valueSingle().ifNotExist().create()
+# Property keys: as_text/as_int/as_long/as_float/as_double/as_bool/as_byte/as_blob/as_date/as_object
+# cardinality: value_single/value_list/value_set
+# aggregation: calc_max/calc_min/calc_sum/calc_old
+schema.property_key("age").as_int().value_single().if_not_exist().create()
 
-# Vertex labels: useAutomaticId/useCustomizeStringId/useCustomizeNumberId/usePrimaryKeyId
-schema.vertexLabel("person").properties("name", "age", "city") \
-      .primaryKeys("name").nullableKeys("city").ifNotExist().create()
+# Vertex labels: use_automatic_id/use_customize_string_id/use_customize_number_id/use_primary_key_id
+schema.vertex_label("person").properties("name", "age", "city") \
+      .primary_keys("name").nullable_keys("city").if_not_exist().create()
 
-# Edge labels: link() is shorthand for sourceLabel() plus targetLabel()
-schema.edgeLabel("knows").link("person", "person").multiTimes() \
-      .properties("date", "city").sortKeys("date").nullableKeys("city") \
-      .ifNotExist().create()
+# Edge labels: link() is shorthand for source_label() plus target_label()
+schema.edge_label("knows").link("person", "person").multi_times() \
+      .properties("date", "city").sort_keys("date").nullable_keys("city") \
+      .if_not_exist().create()
 
-# Index labels: onV/onE, then secondary/range/search/shard/unique
-schema.indexLabel("personByCity").onV("person").by("city") \
-      .secondary().ifNotExist().create()
+# Index labels: on_v/on_e, then secondary/range/search/shard/unique
+schema.index_label("personByCity").on_v("person").by("city") \
+      .secondary().if_not_exist().create()
 ```
 
 ### Query the Schema
 
 ```python
 schema = client.schema()
-print(schema.getSchema())            # whole schema, format defaults to "json"
-print(schema.getPropertyKeys())
-print(schema.getVertexLabels())
-print(schema.getEdgeLabels())
-print(schema.getIndexLabels())
+print(schema.get_schema())            # whole schema, format defaults to "json"
+print(schema.get_property_keys())
+print(schema.get_vertex_labels())
+print(schema.get_edge_labels())
+print(schema.get_index_labels())
 
 # Single definitions
-print(schema.getPropertyKey("name"))
-print(schema.getVertexLabel("person"))
-print(schema.getEdgeLabel("knows"))
-print(schema.getIndexLabel("personByCity"))
+print(schema.get_property_key("name"))
+print(schema.get_vertex_label("person"))
+print(schema.get_edge_label("knows"))
+print(schema.get_index_label("personByCity"))
 
 # Edge label links, formatted as "Person--ActedIn-->Movie"
-print(schema.getRelations())
+print(schema.get_relations())
 ```
 
 ### Read, Update and Delete Graph Data
@@ -171,30 +170,29 @@ The graph API takes property dictionaries, not chained property builders:
 
 ```python
 graph = client.graph()
-graph.appendVertex(person.id, {"birthDate": "1940-04-25"})    # add properties
-graph.eliminateVertex(person.id, {"birthDate": "1940-04-25"}) # drop properties
-graph.appendEdge(edge.id, {"city": "Beijing"})
-graph.eliminateEdge(edge.id, {"city": "Beijing"})
-graph.removeEdgeById(edge.id)
-graph.removeVertexById(person.id)
-graph.close()
+graph.append_vertex(person.id, {"birthDate": "1940-04-25"})    # add properties
+graph.eliminate_vertex(person.id, {"birthDate": "1940-04-25"}) # drop properties
+graph.append_edge(edge.id, {"city": "Beijing"})
+graph.eliminate_edge(edge.id, {"city": "Beijing"})
+graph.remove_edge_by_id(edge.id)
+graph.remove_vertex_by_id(person.id)
 ```
 
-`addVertex` returns a `VertexData` with `id`, `label`, `type` and `properties`. `addEdge` returns an `EdgeData` with `id`, `label`, `type`, `outV`, `outVLabel`, `inV`, `inVLabel` and `properties`.
+`add_vertex` returns a `VertexData` with `id`, `label`, `type` and `properties`. `add_edge` returns an `EdgeData` with `id`, `label`, `type`, `out_v`, `out_v_label`, `in_v`, `in_v_label` and `properties`.
 
 Vertex ids passed to the client may be strings, integers or `uuid.UUID` values. Booleans are rejected, and integers must fit the Java signed long range.
 
 ### Batch Writes
 
-`addVertices` takes `(label, properties)` pairs, and `addEdges` takes `(label, out_id, in_id, out_label, in_label, properties)` tuples. Both return objects that carry only the generated ids.
+`add_vertices` takes `(label, properties)` pairs, and `add_edges` takes `(label, out_id, in_id, out_label, in_label, properties)` tuples. Both return objects that carry only the generated ids.
 
 ```python
 graph = client.graph()
-vertices = graph.addVertices([
+vertices = graph.add_vertices([
     ("person", {"name": "Alice", "age": 20}),
     ("person", {"name": "Bob", "age": 23}),
 ])
-edges = graph.addEdges([
+edges = graph.add_edges([
     ("knows", vertices[0].id, vertices[1].id, "person", "person", {"date": "2012-01-10"}),
 ])
 ```
@@ -205,19 +203,19 @@ edges = graph.addEdges([
 graph = client.graph()
 
 # Returns (vertices, next_page); pass next_page back in to continue
-vertices, next_page = graph.getVertexByPage("person", limit=10)
-vertices, next_page = graph.getVertexByPage("person", limit=10, page=next_page)
+vertices, next_page = graph.get_vertex_by_page("person", limit=10)
+vertices, next_page = graph.get_vertex_by_page("person", limit=10, page=next_page)
 
 # Server-side property predicates
-older = graph.getVertexByCondition("person", properties={"age": "P.gt(29)"})
+older = graph.get_vertex_by_condition("person", properties={"age": "P.gt(29)"})
 
 # Edges by page. When vertex_id is given, direction is required
-edges, next_page = graph.getEdgeByPage(label="knows", limit=10)
-edges, next_page = graph.getEdgeByPage(vertex_id=person.id, direction="OUT", limit=10)
+edges, next_page = graph.get_edge_by_page(label="knows", limit=10)
+edges, next_page = graph.get_edge_by_page(vertex_id=person.id, direction="OUT", limit=10)
 
 # Batch lookup by id
-graph.getVerticesById([v1.id, v2.id])
-graph.getEdgesById([e1.id, e2.id])
+graph.get_vertices_by_id([v1.id, v2.id])
+graph.get_edges_by_id([e1.id, e2.id])
 ```
 
 ### Execute Gremlin
@@ -336,7 +334,7 @@ auth.revoke_accesses(access["id"])
 
 ## Method Naming
 
-Manager methods written in camelCase, such as `addVertex` and `getVertexById`, also get a snake_case alias generated at construction time. `graph.add_vertex(...)` and `graph.addVertex(...)` reach the same method. The camelCase spellings are marked deprecated in the debug log, so prefer snake_case in new code.
+Public methods and properties use `snake_case`. CamelCase aliases have been removed; update callers together with the client.
 
 ## Error Handling
 
@@ -357,7 +355,7 @@ Request and response bodies are logged with password, token and secret values re
 from pyhugegraph.utils.exceptions import NotFoundError
 
 try:
-    graph.getVertexById("no-such-id")
+    graph.get_vertex_by_id("no-such-id")
 except NotFoundError:
     print("vertex missing")
 ```
@@ -369,7 +367,9 @@ API parameters may change with the HugeGraph REST API version. If an interface i
 Run formatting and static checks from the root of the HugeGraph-AI repository:
 
 ```bash
-./style/code_format_and_analysis.sh
+uv run --extra dev ruff format --check .
+uv run --extra dev ruff check .
+uv run --extra dev ty check hugegraph-python-client/src/pyhugegraph
 ```
 
 Run the tests the same way CI does:
@@ -386,6 +386,31 @@ HUGEGRAPH_PASSWORD=admin \
 uv run pytest hugegraph-python-client/src/tests -m "integration and hugegraph"
 ```
 
-CI runs the integration job against the `hugegraph/hugegraph:1.7.0` image. `HUGEGRAPH_GRAPHSPACE` is also read when you need a non-default space.
+Use upstream `hugegraph/hugegraph:latest` for primary integration validation and 1.7 for compatibility regression. `HUGEGRAPH_GRAPHSPACE` is also read when you need a non-default space.
 
 The source code and tests are under `hugegraph-python-client/src/pyhugegraph/` and `hugegraph-python-client/src/tests/`. A runnable example is at `hugegraph-python-client/src/pyhugegraph/example/hugegraph_example.py`.
+
+## OLTP or OLAP?
+
+Use `client.traverser()` for immediate neighbourhood/path queries (OLTP).
+Use `client.olap()` for whole-graph computation scheduled as an asynchronous server task.
+The new interfaces below describe master source; verify availability in your installed client release.
+
+```python
+print(client.traverser().k_out(vertex_id, 2, direction="OUT", limit=100))
+receipt = client.olap().count_vertex()
+task = client.task().wait(receipt["task_id"], timeout=300)
+print(client.task().result(task))
+```
+
+`client.olap().run("count_vertex", timeout=60)` combines submission, waiting and result decoding.
+A waiting timeout does not cancel the remote job. PageRank writes computed properties to the graph.
+Close the owning client, not individual managers. Public methods/properties now use `snake_case` without CamelCase aliases.
+See the [API reference and migration notes](/docs/clients/hugegraph-python-client/) for all 17 named algorithms,
+the complete REST surface, server compatibility and deployment-specific extensions.
+
+For deployments that require explicit schema preparation, declare nullable DOUBLE property `r_rank` on participating vertex labels before PageRank.
+
+```python
+client.close()
+```

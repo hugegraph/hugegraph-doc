@@ -3260,3 +3260,6 @@ POST http://localhost:8080/graphspaces/DEFAULT/graphs/{graph}/traversers/count
 ##### 3.2.27.3 适用场景
 
 只关心多步邻居的规模时使用，避免序列化和传输大量顶点。
+
+
+Python 调用方：异步全图任务使用 `client.olap()`，立即返回的 OLTP 查询使用 `client.traverser()` 或 `client.rank()`，详见 [Python API 参考](/cn/docs/clients/hugegraph-python-client/)。

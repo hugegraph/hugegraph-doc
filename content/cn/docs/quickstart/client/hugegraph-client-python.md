@@ -10,11 +10,11 @@ weight: 2
 
 ## 环境要求
 
-- 客户端与 HugeGraph-AI workspace 均要求 Python 3.10 或更高版本，CI 在 3.10 和 3.11 上运行客户端测试。
+- 客户端与 HugeGraph-AI workspace 均要求 Python 3.12 或更高版本，CI 运行版本以 HugeGraph-AI workspace 配置为准。
 - HugeGraph Server 1.5.0 或更高版本。客户端会拒绝连接更低版本的 Server，此类场景请改用 v1.3.x 客户端。
 - `uv`（推荐）或 `pip`
 
-运行时依赖为 `decorator`、`requests`、`setuptools`、`urllib3` 和 `rich`。
+运行时依赖为 `decorator`、`requests`、`urllib3` 和 `rich`。
 
 ## 安装
 
@@ -50,25 +50,24 @@ client = PyHugeClient(
 )
 
 schema = client.schema()
-schema.propertyKey("name").asText().ifNotExist().create()
-schema.propertyKey("birthDate").asText().ifNotExist().create()
-schema.vertexLabel("Person").properties("name", "birthDate") \
-      .usePrimaryKeyId().primaryKeys("name").ifNotExist().create()
-schema.vertexLabel("Movie").properties("name") \
-      .usePrimaryKeyId().primaryKeys("name").ifNotExist().create()
-schema.edgeLabel("ActedIn").sourceLabel("Person").targetLabel("Movie") \
-      .ifNotExist().create()
+schema.property_key("name").as_text().if_not_exist().create()
+schema.property_key("birthDate").as_text().if_not_exist().create()
+schema.vertex_label("Person").properties("name", "birthDate") \
+      .use_primary_key_id().primary_keys("name").if_not_exist().create()
+schema.vertex_label("Movie").properties("name") \
+      .use_primary_key_id().primary_keys("name").if_not_exist().create()
+schema.edge_label("ActedIn").source_label("Person").target_label("Movie") \
+      .if_not_exist().create()
 
 graph = client.graph()
-person = graph.addVertex(
+person = graph.add_vertex(
     "Person", {"name": "Al Pacino", "birthDate": "1940-04-25"}
 )
-movie = graph.addVertex("Movie", {"name": "The Godfather"})
-edge = graph.addEdge("ActedIn", person.id, movie.id, {})
+movie = graph.add_vertex("Movie", {"name": "The Godfather"})
+edge = graph.add_edge("ActedIn", person.id, movie.id, {})
 
-print(graph.getVertexById(person.id))
-print(graph.getEdgeById(edge.id))
-graph.close()
+print(graph.get_vertex_by_id(person.id))
+print(graph.get_edge_by_id(edge.id))
 ```
 
 ### 客户端参数
@@ -84,7 +83,7 @@ graph.close()
 | `graphspace` | `str` 或 `None` | `None` | GraphSpace 名称，`None` 的解析规则见下文。 |
 | `timeout` | `tuple[float, float]` 或 `None` | `None` | `(连接, 读取)` 超时时间，单位为秒。`None` 会取 `(0.5, 15.0)`。 |
 
-每个 HTTP 会话在收到 500、502、504 响应时会重试 3 次，退避因子为 0.1。
+HTTP 重试策略仅作用于可重试操作；算法作业提交不会自动重放。
 
 ### Server 版本与 GraphSpace
 
@@ -93,14 +92,14 @@ graph.close()
 - 传入非空的 `graphspace` 字符串时直接开启 GraphSpace 模式。
 - 否则客户端会请求 `GET {url}/versions` 并读取 `versions.core`。
 - Server 版本低于 1.5.0 时抛出 `RuntimeError`，提示升级 Server 或改用 v1.3.x 客户端。
-- Server 版本高于 1.5.0 时会把 `graphspace` 设为 `DEFAULT` 并开启 GraphSpace 模式，同时在日志中打印警告。版本恰好为 1.5.0 时保持关闭。
-- 若因网络原因探测失败，GraphSpace 模式保持关闭。
+- Server 1.7+ 默认使用 graphspace `DEFAULT`，1.5/1.6 保持旧版路由。
+- 版本探测失败会报错，不会猜测路由模式。
 
 该模式决定请求前缀：开启时为 `/graphspaces/<graphspace>/graphs/<graph>/...`，关闭时为 `/graphs/<graph>/...`。
 
 ### 客户端提供的 Manager
 
-每个访问器都会惰性创建对应的 Manager，并为其分配独立的 HTTP 会话。
+访问器缓存对应 Manager；所有 Manager 共享由 client 统一管理的 HTTP 会话。
 
 | 访问器 | Manager | 覆盖范围 |
 |--------|---------|----------|
@@ -115,7 +114,7 @@ graph.close()
 | `client.metrics()` | `MetricsManager` | Server 指标 |
 | `client.version()` | `VersionManager` | Server 版本 |
 
-`pyhugegraph.api` 中还提供了 `RankManager`、`RebuildManager` 和 `ServicesManager`，但 `PyHugeClient` 暂未提供对应的访问器，需要时可自行传入 session 构造。
+可直接使用 `client.rank()`、`client.rebuild()` 和 `client.olap()`。完整用法见 [Python API 参考](/cn/docs/clients/hugegraph-python-client/)。
 
 ## 常用操作
 
@@ -126,43 +125,43 @@ Schema 构建器采用链式调用，最后调用 `create()`，也可以用 `app
 ```python
 schema = client.schema()
 
-# 属性类型：asText/asInt/asLong/asFloat/asDouble/asBool/asByte/asBlob/asDate/asObject
-# 基数：valueSingle/valueList/valueSet
-# 聚合：calcMax/calcMin/calcSum/calcOld
-schema.propertyKey("age").asInt().valueSingle().ifNotExist().create()
+# 属性类型：as_text/as_int/as_long/as_float/as_double/as_bool/as_byte/as_blob/as_date/as_object
+# 基数：value_single/value_list/value_set
+# 聚合：calc_max/calc_min/calc_sum/calc_old
+schema.property_key("age").as_int().value_single().if_not_exist().create()
 
-# 顶点标签 ID 策略：useAutomaticId/useCustomizeStringId/useCustomizeNumberId/usePrimaryKeyId
-schema.vertexLabel("person").properties("name", "age", "city") \
-      .primaryKeys("name").nullableKeys("city").ifNotExist().create()
+# 顶点标签 ID 策略：use_automatic_id/use_customize_string_id/use_customize_number_id/use_primary_key_id
+schema.vertex_label("person").properties("name", "age", "city") \
+      .primary_keys("name").nullable_keys("city").if_not_exist().create()
 
-# 边标签：link() 等价于 sourceLabel() 加 targetLabel()
-schema.edgeLabel("knows").link("person", "person").multiTimes() \
-      .properties("date", "city").sortKeys("date").nullableKeys("city") \
-      .ifNotExist().create()
+# 边标签：link() 等价于 source_label() 加 target_label()
+schema.edge_label("knows").link("person", "person").multi_times() \
+      .properties("date", "city").sort_keys("date").nullable_keys("city") \
+      .if_not_exist().create()
 
-# 索引标签：先 onV/onE，再选择 secondary/range/search/shard/unique
-schema.indexLabel("personByCity").onV("person").by("city") \
-      .secondary().ifNotExist().create()
+# 索引标签：先 on_v/on_e，再选择 secondary/range/search/shard/unique
+schema.index_label("personByCity").on_v("person").by("city") \
+      .secondary().if_not_exist().create()
 ```
 
 ### 查询 Schema
 
 ```python
 schema = client.schema()
-print(schema.getSchema())            # 完整 Schema，format 默认为 json
-print(schema.getPropertyKeys())
-print(schema.getVertexLabels())
-print(schema.getEdgeLabels())
-print(schema.getIndexLabels())
+print(schema.get_schema())            # 完整 Schema，format 默认为 json
+print(schema.get_property_keys())
+print(schema.get_vertex_labels())
+print(schema.get_edge_labels())
+print(schema.get_index_labels())
 
 # 查询单个定义
-print(schema.getPropertyKey("name"))
-print(schema.getVertexLabel("person"))
-print(schema.getEdgeLabel("knows"))
-print(schema.getIndexLabel("personByCity"))
+print(schema.get_property_key("name"))
+print(schema.get_vertex_label("person"))
+print(schema.get_edge_label("knows"))
+print(schema.get_index_label("personByCity"))
 
 # 边标签的连接关系，格式形如 Person--ActedIn-->Movie
-print(schema.getRelations())
+print(schema.get_relations())
 ```
 
 ### 读取、更新和删除图数据
@@ -171,30 +170,29 @@ print(schema.getRelations())
 
 ```python
 graph = client.graph()
-graph.appendVertex(person.id, {"birthDate": "1940-04-25"})    # 追加属性
-graph.eliminateVertex(person.id, {"birthDate": "1940-04-25"}) # 删除属性
-graph.appendEdge(edge.id, {"city": "Beijing"})
-graph.eliminateEdge(edge.id, {"city": "Beijing"})
-graph.removeEdgeById(edge.id)
-graph.removeVertexById(person.id)
-graph.close()
+graph.append_vertex(person.id, {"birthDate": "1940-04-25"})    # 追加属性
+graph.eliminate_vertex(person.id, {"birthDate": "1940-04-25"}) # 删除属性
+graph.append_edge(edge.id, {"city": "Beijing"})
+graph.eliminate_edge(edge.id, {"city": "Beijing"})
+graph.remove_edge_by_id(edge.id)
+graph.remove_vertex_by_id(person.id)
 ```
 
-`addVertex` 返回 `VertexData`，包含 `id`、`label`、`type` 和 `properties`。`addEdge` 返回 `EdgeData`，包含 `id`、`label`、`type`、`outV`、`outVLabel`、`inV`、`inVLabel` 和 `properties`。
+`add_vertex` 返回 `VertexData`，包含 `id`、`label`、`type` 和 `properties`。`add_edge` 返回 `EdgeData`，包含 `id`、`label`、`type`、`out_v`、`out_v_label`、`in_v`、`in_v_label` 和 `properties`。
 
 传给客户端的顶点 ID 可以是字符串、整数或 `uuid.UUID`。布尔值会被拒绝，整数必须落在 Java signed long 范围内。
 
 ### 批量写入
 
-`addVertices` 接收 `(label, properties)` 二元组，`addEdges` 接收 `(label, out_id, in_id, out_label, in_label, properties)` 六元组。两者返回的对象只携带生成的 ID。
+`add_vertices` 接收 `(label, properties)` 二元组，`add_edges` 接收 `(label, out_id, in_id, out_label, in_label, properties)` 六元组。两者返回的对象只携带生成的 ID。
 
 ```python
 graph = client.graph()
-vertices = graph.addVertices([
+vertices = graph.add_vertices([
     ("person", {"name": "Alice", "age": 20}),
     ("person", {"name": "Bob", "age": 23}),
 ])
-edges = graph.addEdges([
+edges = graph.add_edges([
     ("knows", vertices[0].id, vertices[1].id, "person", "person", {"date": "2012-01-10"}),
 ])
 ```
@@ -205,19 +203,19 @@ edges = graph.addEdges([
 graph = client.graph()
 
 # 返回 (vertices, next_page)，把 next_page 传回即可继续翻页
-vertices, next_page = graph.getVertexByPage("person", limit=10)
-vertices, next_page = graph.getVertexByPage("person", limit=10, page=next_page)
+vertices, next_page = graph.get_vertex_by_page("person", limit=10)
+vertices, next_page = graph.get_vertex_by_page("person", limit=10, page=next_page)
 
 # 服务端属性条件
-older = graph.getVertexByCondition("person", properties={"age": "P.gt(29)"})
+older = graph.get_vertex_by_condition("person", properties={"age": "P.gt(29)"})
 
 # 边分页查询，传入 vertex_id 时必须同时传 direction
-edges, next_page = graph.getEdgeByPage(label="knows", limit=10)
-edges, next_page = graph.getEdgeByPage(vertex_id=person.id, direction="OUT", limit=10)
+edges, next_page = graph.get_edge_by_page(label="knows", limit=10)
+edges, next_page = graph.get_edge_by_page(vertex_id=person.id, direction="OUT", limit=10)
 
 # 按 ID 批量查询
-graph.getVerticesById([v1.id, v2.id])
-graph.getEdgesById([e1.id, e2.id])
+graph.get_vertices_by_id([v1.id, v2.id])
+graph.get_edges_by_id([e1.id, e2.id])
 ```
 
 ### 执行 Gremlin
@@ -336,7 +334,7 @@ auth.revoke_accesses(access["id"])
 
 ## 方法命名
 
-Manager 中以驼峰命名的方法（例如 `addVertex`、`getVertexById`）会在构造时自动生成蛇形命名别名，`graph.add_vertex(...)` 与 `graph.addVertex(...)` 指向同一个方法。驼峰写法已在 debug 日志中标记为废弃，新代码建议使用蛇形命名。
+公共方法与属性统一使用 `snake_case`，已移除 CamelCase 别名；升级客户端时请同步迁移调用方。
 
 ## 错误处理
 
@@ -357,7 +355,7 @@ Manager 中以驼峰命名的方法（例如 `addVertex`、`getVertexById`）会
 from pyhugegraph.utils.exceptions import NotFoundError
 
 try:
-    graph.getVertexById("no-such-id")
+    graph.get_vertex_by_id("no-such-id")
 except NotFoundError:
     print("vertex missing")
 ```
@@ -369,7 +367,9 @@ except NotFoundError:
 在 HugeGraph-AI 仓库根目录运行格式与静态检查：
 
 ```bash
-./style/code_format_and_analysis.sh
+uv run --extra dev ruff format --check .
+uv run --extra dev ruff check .
+uv run --extra dev ty check hugegraph-python-client/src/pyhugegraph
 ```
 
 按照 CI 的方式运行测试：
@@ -386,6 +386,30 @@ HUGEGRAPH_PASSWORD=admin \
 uv run pytest hugegraph-python-client/src/tests -m "integration and hugegraph"
 ```
 
-CI 的集成测试作业使用 `hugegraph/hugegraph:1.7.0` 镜像。需要非默认空间时，还可以设置 `HUGEGRAPH_GRAPHSPACE`。
+主验收使用上游 `hugegraph/hugegraph:latest` 镜像，1.7 镜像仅用于兼容回归。需要非默认空间时，还可以设置 `HUGEGRAPH_GRAPHSPACE`。
 
 源码与测试位于 `hugegraph-python-client/src/pyhugegraph/` 和 `hugegraph-python-client/src/tests/`，可直接运行的示例在 `hugegraph-python-client/src/pyhugegraph/example/hugegraph_example.py`。
+
+## 选择 OLTP 还是 OLAP？
+
+`client.traverser()` 用于立即返回的邻居、路径等局部图查询（OLTP）。
+`client.olap()` 用于扫描全图的计算，以 server 异步任务执行。
+以下新增接口以 master 源码为准；使用发行包时请确认对应版本是否已包含。
+
+```python
+print(client.traverser().k_out(vertex_id, 2, direction="OUT", limit=100))
+receipt = client.olap().count_vertex()
+task = client.task().wait(receipt["task_id"], timeout=300)
+print(client.task().result(task))
+```
+
+`client.olap().run("count_vertex", timeout=60)` 可一次完成提交、等待和结果解析。
+等待超时不会取消远端任务；PageRank 会将计算属性写回图中。
+资源关闭由 client 统一负责。公共方法和对象属性统一为 `snake_case`，不保留 CamelCase 别名。
+完整的 17 个算法、REST 入口、迁移说明及扩展能力前提见 [Python API 参考](/cn/docs/clients/hugegraph-python-client/)。
+
+需要显式准备 Schema 的部署，应在运行 PageRank 前为参与计算的顶点标签声明可空 DOUBLE 属性 `r_rank`。
+
+```python
+client.close()
+```

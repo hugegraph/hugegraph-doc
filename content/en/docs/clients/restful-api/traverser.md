@@ -3266,3 +3266,6 @@ POST http://localhost:8080/graphspaces/DEFAULT/graphs/{graph}/traversers/count
 ##### 3.2.27.3 Use Cases
 
 Get the size of a multi-step neighborhood when only the number matters, so the vertices do not have to be serialized and transferred.
+
+
+Python callers: use `client.olap()` for asynchronous full-graph jobs and `client.traverser()`/`client.rank()` for immediate OLTP queries. See the [Python API reference](/docs/clients/hugegraph-python-client/).
