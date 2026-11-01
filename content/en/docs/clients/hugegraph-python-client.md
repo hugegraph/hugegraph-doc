@@ -190,7 +190,7 @@ Algorithm names must also be checked against the server registry. Jersey WADL me
 | `rest.graphs.resume_snapshot()` | PUT | `/graphspaces/{graphspace}/graphs/{name}/snapshot_resume` | — |
 | `rest.graphs.set_default()` | POST | `/graphspaces/{graphspace}/graphs/{name}/default` | — |
 | `rest.graphs.unset_default()` | DELETE | `/graphspaces/{graphspace}/graphs/{name}/default` | — |
-| `rest.gremlin.get()` | GET | `/gremlin` | — |
+| `rest.gremlin.get()` | GET | `/gremlin` | gremlin, language; additional query map |
 | `rest.gremlin.post()` | POST | `/gremlin` | — |
 | `rest.gremlin_job.post()` | POST | `/graphspaces/{graphspace}/graphs/{graph}/jobs/gremlin` | — |
 | `rest.group.create()` | POST | `/auth/groups` | — |
