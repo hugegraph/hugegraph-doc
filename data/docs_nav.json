@@ -142,6 +142,9 @@
               "page": "/docs/clients/hugegraph-client"
             },
             {
+              "page": "/docs/clients/hugegraph-python-client"
+            },
+            {
               "page": "/docs/clients/gremlin-console"
             },
             {
@@ -572,6 +575,9 @@
               "page": "/docs/clients/hugegraph-client",
               "url": "/docs/clients/hugegraph-client/",
               "children": []
+            },
+            {
+              "page": "/docs/clients/hugegraph-python-client"
             },
             {
               "page": "/docs/clients/gremlin-console",
