@@ -577,7 +577,9 @@
               "children": []
             },
             {
-              "page": "/docs/clients/hugegraph-python-client"
+              "page": "/docs/clients/hugegraph-python-client",
+              "url": "/docs/clients/hugegraph-python-client/",
+              "children": []
             },
             {
               "page": "/docs/clients/gremlin-console",
@@ -1102,6 +1104,11 @@
       "/docs/clients/",
       "/docs/clients/hugegraph-client/"
     ],
+    "/docs/clients/hugegraph-python-client/": [
+      "@group/develop",
+      "/docs/clients/",
+      "/docs/clients/hugegraph-python-client/"
+    ],
     "/docs/clients/gremlin-console/": [
       "@group/develop",
       "/docs/clients/",
@@ -1482,6 +1489,7 @@
     ],
     "/docs/clients/": [
       "/docs/clients/hugegraph-client",
+      "/docs/clients/hugegraph-python-client",
       "/docs/clients/gremlin-console",
       "/docs/clients/restful-api"
     ],
