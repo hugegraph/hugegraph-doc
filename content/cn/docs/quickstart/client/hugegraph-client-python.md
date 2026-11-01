@@ -72,7 +72,7 @@ print(graph.get_edge_by_id(edge.id))
 
 ### 客户端参数
 
-`PyHugeClient(url, graph, user, pwd, graphspace=None, timeout=None)`
+`PyHugeClient(url, graph, user, pwd, graphspace=None, timeout=None, *, token=None)`
 
 | 参数 | 类型 | 默认值 | 说明 |
 |------|------|--------|------|
@@ -81,9 +81,10 @@ print(graph.get_edge_by_id(edge.id))
 | `user` | `str` | 必填 | 用户名，以 HTTP Basic Auth 发送。 |
 | `pwd` | `str` | 必填 | 密码，以 HTTP Basic Auth 发送。 |
 | `graphspace` | `str` 或 `None` | `None` | GraphSpace 名称，`None` 的解析规则见下文。 |
-| `timeout` | `tuple[float, float]` 或 `None` | `None` | `(连接, 读取)` 超时时间，单位为秒。`None` 会取 `(0.5, 15.0)`。 |
+| `timeout` | `float`、`tuple[float, float]` 或 `None` | `None` | 正数 `(连接, 读取)` 超时时间，单位为秒；标量同时用于两者。`None` 会取 `(0.5, 15.0)`。 |
+| `token` | `str` 或 `None` | `None` | 显式 Bearer token，用于版本探测和后续请求，优先于 Basic Auth。 |
 
-HTTP 重试策略仅作用于可重试操作；算法作业提交不会自动重放。
+幂等操作遇到 500、502、504 响应时最多重试三次，退避系数为 0.1。任务等待关闭自动 HTTP 重试和重定向，以遵守剩余等待时限。
 
 ### Server 版本与 GraphSpace
 

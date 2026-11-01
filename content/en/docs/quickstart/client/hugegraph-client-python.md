@@ -72,7 +72,7 @@ print(graph.get_edge_by_id(edge.id))
 
 ### Client Parameters
 
-`PyHugeClient(url, graph, user, pwd, graphspace=None, timeout=None)`
+`PyHugeClient(url, graph, user, pwd, graphspace=None, timeout=None, *, token=None)`
 
 | Parameter | Type | Default | Description |
 |-----------|------|---------|-------------|
@@ -81,9 +81,10 @@ print(graph.get_edge_by_id(edge.id))
 | `user` | `str` | required | Username, sent as HTTP basic auth. |
 | `pwd` | `str` | required | Password, sent as HTTP basic auth. |
 | `graphspace` | `str` or `None` | `None` | GraphSpace name. See below for how `None` is resolved. |
-| `timeout` | `tuple[float, float]` or `None` | `None` | `(connect, read)` timeouts in seconds. `None` becomes `(0.5, 15.0)`. |
+| `timeout` | `float`, `tuple[float, float]` or `None` | `None` | Positive `(connect, read)` timeouts in seconds, or one value for both. `None` becomes `(0.5, 15.0)`. |
+| `token` | `str` or `None` | `None` | Explicit Bearer token for version probing and subsequent requests; overrides Basic auth. |
 
-Every HTTP session retries three times with a 0.1 backoff factor on 500, 502 and 504 responses.
+Idempotent requests may retry 500, 502 and 504 responses up to three times with a 0.1 backoff factor. Task waiting disables automatic HTTP retries and redirects to respect the remaining waiting budget.
 
 ### Server Version and GraphSpace
 
