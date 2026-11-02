@@ -335,7 +335,8 @@ auth.delete_user(user["id"])
 
 ## 方法命名
 
-公共方法与属性统一使用 `snake_case`，已移除 CamelCase 别名；升级客户端时请同步迁移调用方。
+新代码推荐使用 `snake_case`，已有公开方法及属性的 CamelCase 名称保留为直接别名。
+参数及返回值变化仍需按迁移说明处理，两种命名共用当前实现。
 
 ## 错误处理
 
@@ -406,7 +407,7 @@ print(client.task().result(task))
 
 `client.olap().run("count_vertex", timeout=60)` 可一次完成提交、等待和结果解析。
 等待超时不会取消远端任务；PageRank 会将计算属性写回图中。
-资源关闭由 client 统一负责。公共方法和对象属性统一为 `snake_case`，不保留 CamelCase 别名。
+资源关闭由 client 统一负责。新代码推荐使用 `snake_case`，已有公开 CamelCase 名称保留为别名。
 完整的 17 个算法、REST 入口、迁移说明及扩展能力前提见 [Python API 参考](/cn/docs/clients/hugegraph-python-client/)。
 
 需要显式准备 Schema 的部署，应在运行 PageRank 前为参与计算的顶点标签声明可空 DOUBLE 属性 `r_rank`。

@@ -76,9 +76,14 @@ PageRank 等算法会将属性写回图中。Server 注册了 20 个实现类，
 
 ## 迁移
 
-公共方法及对象属性统一为 `snake_case`，不保留 CamelCase 别名。
+新代码推荐使用 `snake_case`；已有公开方法及对象属性的 CamelCase 名称保留为直接别名。
+新增 API 只提供 snake_case 名称；参数和返回值发生变化的部分仍需迁移。
 例如 `propertyKey` → `property_key`、`asText` → `as_text`、`addVertex` → `add_vertex`、`outV` → `out_v`。
 Server JSON 字段仍使用原格式，例如 `outV`；`get_all_graphs()` 返回 `{"graphs": [...]}`。
+旧写法 `getSchema(_format=...)` 继续接受格式参数并返回 JSON；规范写法 `get_schema()` 不提供格式参数。
+`get_version()` 和 `get_graph_info()` 返回解析后的字典，请移除外层 `json.loads(...)`。
+`NeighborRankStep` 的第 4 个位置参数仍为 `top`，新增的 `skip_degree` 建议按关键字传入。
+HTTP 超时各部分必须为有限正数，`(5, None)` 会抛出 `ValueError`。
 关闭操作改为由 client 统一负责。加权及单源最短路径不再接受 server 本就不支持的 `max_depth`，请使用相应容量、度数或结果数参数。
 
 ## 完整 REST 与扩展能力
@@ -94,6 +99,8 @@ print(rest.task.list(status="success", page="", limit=20))
 ```
 
 JSON、文本响应保留原生结构，HTTP 204 返回空字典。
+对于 JSON 接口，省略 `body` 表示不发送实体，显式 `body=None` 表示发送 JSON `null`。
+图查询 helper 在非零 `offset` 下省略 `page`；显式 `page` 与非零 `offset` 混用会报错。
 Raft、Arthas、IP 白名单、异常追踪和外部 Computer 作业提交使用独立资源，需要相应配置和权限；REST 封装本身不部署外部服务。
 旧 Services 模块面向定制部署，不属于固定 server 提交的标准端点；Property CAS 也不宣称为已实现的 REST 功能。
 图配置导出返回源文本，需要图具有本地配置文件来源。

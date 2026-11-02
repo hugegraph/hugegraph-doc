@@ -335,7 +335,8 @@ auth.delete_user(user["id"])
 
 ## Method Naming
 
-Public methods and properties use `snake_case`. CamelCase aliases have been removed; update callers together with the client.
+New code uses `snake_case`. Existing public CamelCase method/property names remain direct aliases.
+Check the migration notes for parameter and return-value changes that affect both spellings.
 
 ## Error Handling
 
@@ -406,7 +407,7 @@ print(client.task().result(task))
 
 `client.olap().run("count_vertex", timeout=60)` combines submission, waiting and result decoding.
 A waiting timeout does not cancel the remote job. PageRank writes computed properties to the graph.
-Close the owning client, not individual managers. Public methods/properties now use `snake_case` without CamelCase aliases.
+Close the owning client, not individual managers. New code uses `snake_case`; existing public CamelCase names remain aliases.
 See the [API reference and migration notes](/docs/clients/hugegraph-python-client/) for all 17 named algorithms,
 the complete REST surface, server compatibility and deployment-specific extensions.
 

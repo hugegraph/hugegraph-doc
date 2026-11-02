@@ -79,9 +79,14 @@ Older servers may ignore `with_result=false` and still return a task result duri
 
 ## Migration
 
-Public methods and properties now use `snake_case`; CamelCase aliases are removed.
+Use `snake_case` in new code. Existing public CamelCase method/property names remain direct aliases.
+New APIs only introduce snake_case names; parameter and return-value changes still require migration.
 Examples: `propertyKey` → `property_key`, `asText` → `as_text`, `addVertex` → `add_vertex`, `outV` → `out_v`.
 Server JSON keys such as `outV` remain unchanged. `get_all_graphs()` returns `{"graphs": [...]}`.
+Legacy `getSchema(_format=...)` accepts the format argument and returns JSON; canonical `get_schema()` has no format argument.
+`get_version()` and `get_graph_info()` return parsed dictionaries; remove surrounding `json.loads(...)` calls.
+`NeighborRankStep` retains `top` as its fourth positional argument; pass `skip_degree` by keyword.
+HTTP timeout components must be positive and finite; `(5, None)` raises `ValueError`.
 Close the client instead of a manager. Weighted and single-source shortest-path methods no longer accept `max_depth`,
 which their server endpoints do not support; use their capacity/degree/limit controls.
 
@@ -98,6 +103,8 @@ print(rest.task.list(status="success", page="", limit=20))
 ```
 
 JSON/text responses retain their native shape; HTTP 204 returns an empty dictionary.
+For JSON operations, omitting `body` sends no entity; `body=None` explicitly sends JSON `null`.
+Graph helpers omit `page` for a nonzero `offset`, and reject an explicit `page` combined with nonzero `offset`.
 Raft, Arthas, IP whitelist, exception tracing and external Computer submission are separate resources,
 requiring their own server configuration and privileges. Their REST wrappers do not deploy external services.
 The standalone Services module targets custom deployments; it is not a standard endpoint at the pinned revision.
