@@ -93,13 +93,18 @@ jobs:
           python3 -m py_compile scripts/versioning.py
           git diff --check
 
-      - name: Commit validated baseline update and remove this workflow
+      - name: Commit validated update to a protected-branch child PR
         shell: bash
         run: |
           set -euo pipefail
+          target=codex/pr557-nav-baseline-fix-20261102
+          if git ls-remote --exit-code --heads origin "refs/heads/${target}"; then
+            echo "Refusing to overwrite existing ${target}" >&2
+            exit 1
+          fi
           rm .github/workflows/pr557-nav-metadata-fix.yml
           git config user.name "github-actions[bot]"
           git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
           git add -A
           git commit -m "docs: refresh navigation validation baselines"
-          git push origin HEAD:refs/heads/codex/pr557-contract-fix-20261102
+          git push origin "HEAD:refs/heads/${target}"
