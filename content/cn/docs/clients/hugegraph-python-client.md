@@ -79,9 +79,11 @@ PageRank 等算法会将属性写回图中。Server 注册了 20 个实现类，
 新代码推荐使用 `snake_case`；已有公开方法及对象属性的 CamelCase 名称保留为直接别名。
 新增 API 只提供 snake_case 名称；参数和返回值发生变化的部分仍需迁移。
 例如 `propertyKey` → `property_key`、`asText` → `as_text`、`addVertex` → `add_vertex`、`outV` → `out_v`。
-Server JSON 字段仍使用原格式，例如 `outV`；`get_all_graphs()` 返回 `{"graphs": [...]}`。
+Server JSON 字段仍使用原格式，例如 `outV`。
 旧写法 `getSchema(_format=...)` 继续接受格式参数并返回 JSON；规范写法 `get_schema()` 不提供格式参数。
-`get_version()` 和 `get_graph_info()` 返回解析后的字典，请移除外层 `json.loads(...)`。
+为兼容旧调用，`get_all_graphs()`、`get_version()` 和 `get_graph_info()` 保持返回 JSON 字符串。
+需要字典时，使用 `client.graphs().list()`、`client.version().version()` 和 `client.graphs().get(graph_name)`。
+旧入口外层的 `json.loads(...)` 可以保留；返回字典的新入口无需再调用 `json.loads(...)`。
 `NeighborRankStep` 的第 4 个位置参数仍为 `top`，新增的 `skip_degree` 建议按关键字传入。
 HTTP 超时各部分必须为有限正数，`(5, None)` 会抛出 `ValueError`。
 关闭操作改为由 client 统一负责。加权及单源最短路径不再接受 server 本就不支持的 `max_depth`，请使用相应容量、度数或结果数参数。

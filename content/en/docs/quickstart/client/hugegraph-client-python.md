@@ -277,6 +277,9 @@ task.delete_task(task_id)
 
 ### Server Metrics and Graph Info
 
+The legacy graph shortcuts `get_all_graphs()`, `get_version()` and `get_graph_info()` return JSON strings.
+For parsed dictionaries, use `client.graphs().list()`, `client.version().version()` or `client.graphs().get(graph_name)` without `json.loads(...)`.
+
 ```python
 metrics = client.metrics()
 metrics.get_all_basic_metrics()

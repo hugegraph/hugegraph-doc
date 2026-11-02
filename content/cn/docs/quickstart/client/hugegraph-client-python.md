@@ -277,6 +277,9 @@ task.delete_task(task_id)
 
 ### Server 指标与图信息
 
+旧入口 `get_all_graphs()`、`get_version()` 和 `get_graph_info()` 保持返回 JSON 字符串。
+需要字典时，使用 `client.graphs().list()`、`client.version().version()` 或 `client.graphs().get(graph_name)`，无需再调用 `json.loads(...)`。
+
 ```python
 metrics = client.metrics()
 metrics.get_all_basic_metrics()
