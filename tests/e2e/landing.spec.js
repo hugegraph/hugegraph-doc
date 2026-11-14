@@ -1,0 +1,219 @@
+const { test, expect } = require("./artifact-test");
+
+test.use({ locale: "en-US" });
+
+test.beforeEach(async ({ page }) => {
+  await page.addInitScript(() => {
+    if (!localStorage.getItem("hg-language")) localStorage.setItem("hg-language", "en");
+    localStorage.setItem("td-color-theme", "light");
+  });
+});
+
+async function openHome(page, prefix = "") {
+  const response = await page.goto(`${prefix}/`);
+  expect(response && response.ok()).toBeTruthy();
+  await expect(page.locator("#hg-landing")).toBeVisible();
+  await page.evaluate(() => document.fonts.ready);
+}
+
+async function onScreen(locator) {
+  return locator.evaluate(node => {
+    const box = node.getBoundingClientRect();
+    if (!(box.width > 0 && box.height > 0 && box.left >= 0 && box.right <= innerWidth + 1
+      && box.top >= 0 && box.bottom <= innerHeight + 1)) return false;
+    let opacity = 1;
+    for (let parent = node; parent; parent = parent.parentElement) {
+      const style = getComputedStyle(parent);
+      opacity *= Number(style.opacity);
+      if (style.visibility === "hidden" || style.display === "none") return false;
+      const clip = parent.getBoundingClientRect();
+      if (/(hidden|clip|auto|scroll)/.test(style.overflowX)
+        && (box.left < clip.left - 1 || box.right > clip.right + 1)) return false;
+      if (/(hidden|clip|auto|scroll)/.test(style.overflowY)
+        && (box.top < clip.top - 1 || box.bottom > clip.bottom + 1)) return false;
+    }
+    return opacity >= 0.5;
+  });
+}
+
+async function visibleStoryPanels(page) {
+  return page.locator("#story .panel").evaluateAll(nodes => nodes.flatMap(node => {
+    const style = getComputedStyle(node);
+    const box = node.getBoundingClientRect();
+    if (style.visibility === "hidden" || Number(style.opacity) <= 0.01
+      || box.bottom <= 0 || box.top >= innerHeight) return [];
+    return [{ id: node.id, opacity: Number(style.opacity), text: node.textContent.trim() }];
+  }));
+}
+
+for (const [language, prefix, locale] of [["en", "", "en-US"], ["cn", "/cn", "zh-CN"]]) {
+  test(`${language} homepage keeps the hero and primary action above later content`, async ({ page }) => {
+    await page.setViewportSize({ width: 1440, height: 1000 });
+    const errors = [];
+    page.on("pageerror", error => errors.push(error.message));
+    await openHome(page, prefix);
+    await expect(page.locator("html")).toHaveAttribute("lang", locale);
+    const heading = page.locator("#hero h1");
+    await expect(heading).toBeVisible();
+    await expect.poll(() => onScreen(heading)).toBe(true);
+    const start = page.locator(`#hero a[href*="${prefix}/docs/quickstart/"]`).first();
+    await expect(start).toBeVisible();
+    await expect.poll(() => onScreen(start)).toBe(true);
+    expect(await page.locator("#capabilities").evaluate(node => node.getBoundingClientRect().top))
+      .toBeGreaterThanOrEqual(1000);
+    await start.click();
+    await expect(page).toHaveURL(url => url.pathname === `${prefix}/docs/quickstart/`);
+    await expect(page.locator("main h1").first()).toBeVisible();
+    expect(errors).toEqual([]);
+  });
+
+  test(`${language} component choices link to the corresponding local guides`, async ({ page }) => {
+    await openHome(page, prefix);
+    const choices = page.locator("#components a[href]");
+    await expect(choices).toHaveCount(8);
+    const destinations = [];
+    for (const link of await choices.all()) {
+      const destination = new URL(await link.getAttribute("href"), page.url());
+      expect(destination.pathname).toMatch(new RegExp(`^${prefix}/docs/`));
+      expect((await link.textContent()).trim()).not.toBe("");
+      const local = new URL(destination.pathname + destination.search, "http://127.0.0.1:4173");
+      const response = await page.request.get(local.href);
+      expect(response.ok(), destination.pathname).toBe(true);
+      destinations.push(destination.pathname);
+    }
+    // Each advertised component should be a useful choice, not eight copies
+    // of the generic documentation landing page.
+    expect(new Set(destinations).size).toBe(8);
+    await choices.first().click();
+    await expect(page).toHaveURL(url => url.pathname === destinations[0]);
+    await expect(page.locator("main h1").first()).toBeVisible();
+  });
+
+  test(`${language} startup copies the complete command and offers a next step`, async ({ page, context }) => {
+    await context.grantPermissions(["clipboard-read", "clipboard-write"]);
+    await openHome(page, prefix);
+    const command = (await page.locator("#cmd").textContent()).trim();
+    expect(command).toMatch(/^docker run /);
+    expect(command).not.toMatch(/^\$/);
+    await page.locator("#copy").click();
+    await expect.poll(() => page.evaluate(() => navigator.clipboard.readText())).toBe(command);
+    await expect(page.locator("#copy-status")).toHaveText(/\S/);
+    const next = page.locator("#quickstart a[href]").first();
+    await expect(next).toBeVisible();
+    expect(new URL(await next.getAttribute("href"), page.url()).pathname).toMatch(new RegExp(`^${prefix}/docs/`));
+  });
+
+  test(`${language} reduced motion preserves all four explanations and usable layer controls`, async ({ page }) => {
+    await page.emulateMedia({ reducedMotion: "reduce" });
+    await page.setViewportSize({ width: 390, height: 844 });
+    await openHome(page, prefix);
+    const controls = page.locator("#hg-stack button[data-layer]");
+    await expect(controls).toHaveCount(4);
+    for (const control of await controls.all()) {
+      await expect(control).toHaveAccessibleName(/\S/);
+      expect((await control.textContent()).trim()).not.toBe("");
+    }
+    const explanations = page.locator("#story .panel");
+    await expect(explanations).toHaveCount(4);
+    for (const explanation of await explanations.all()) {
+      await explanation.scrollIntoViewIfNeeded();
+      await expect(explanation).toBeVisible();
+      await expect(explanation.locator("h2")).toHaveText(/\S/);
+    }
+    expect(await page.evaluate(() => document.documentElement.scrollWidth <= innerWidth + 1)).toBe(true);
+  });
+}
+
+test("homepage language choice navigates to translated content and persists", async ({ page }) => {
+  await page.setViewportSize({ width: 1440, height: 1000 });
+  // Use the published origin for this preference test so navigating a
+  // canonical language link keeps localStorage on the same origin.
+  await page.goto("https://hugegraph.apache.org/");
+  await expect(page.locator("#hg-landing")).toBeVisible();
+  const english = await page.locator("#hero h1").textContent();
+  const language = page.locator(".td-site-header .td-site-nav__language");
+  await language.locator(".td-language-selector__trigger").hover();
+  await language.locator('ul a[hreflang="zh-CN"]').click();
+  await expect(page).toHaveURL(url => url.pathname === "/cn/");
+  await expect(page.locator("html")).toHaveAttribute("lang", "zh-CN");
+  await expect(page.locator("#hero h1")).not.toHaveText(english);
+  expect(await page.evaluate(() => localStorage.getItem("hg-language"))).toBe("cn");
+  await page.reload();
+  await expect(page.locator("html")).toHaveAttribute("lang", "zh-CN");
+  await expect(page.locator("#hero h1")).not.toHaveText(english);
+  expect(await page.evaluate(() => localStorage.getItem("hg-language"))).toBe("cn");
+});
+
+test("320px homepage navigation remains reachable and Escape restores focus", async ({ page }) => {
+  await page.setViewportSize({ width: 320, height: 844 });
+  await openHome(page);
+  const opener = page.locator("[data-td-landing-menu-toggle]");
+  await expect(opener).toBeVisible();
+  await expect.poll(() => onScreen(opener)).toBe(true);
+  await opener.click();
+  const drawer = page.locator("[data-td-landing-menu]");
+  await expect(drawer).toBeVisible();
+  await expect(drawer.locator('a[href*="/docs/"]').first()).toBeVisible();
+  await page.keyboard.press("Escape");
+  await expect(drawer).toBeHidden();
+  await expect(opener).toBeFocused();
+  await expect(opener).toHaveAttribute("aria-expanded", "false");
+  expect(await page.evaluate(() => document.documentElement.scrollWidth <= innerWidth + 1)).toBe(true);
+});
+
+for (const viewport of [{ width: 390, height: 844 }, { width: 844, height: 390 }]) {
+  test(`${viewport.width}x${viewport.height} homepage retains a readable architecture`, async ({ page }) => {
+    await page.setViewportSize(viewport);
+    await openHome(page);
+    const diagram = page.locator("#hg-stack");
+    const box = await diagram.boundingBox();
+    expect(box.width).toBeGreaterThanOrEqual(200);
+    expect(box.height).toBeGreaterThanOrEqual(200);
+    const names = diagram.locator("button[data-layer] .hgs-lab-name");
+    await expect(names).toHaveCount(4);
+    for (const name of await names.all()) {
+      await expect(name).toBeVisible();
+      expect((await name.textContent()).trim()).not.toBe("");
+      // A button may have a nonzero box even when its actual name is
+      // hidden or clipped beyond the hero. Check what readers see.
+      await expect.poll(() => onScreen(name)).toBe(true);
+      expect((await name.boundingBox()).height).toBeGreaterThanOrEqual(12);
+    }
+    expect(await page.evaluate(() => document.documentElement.scrollWidth <= innerWidth + 1)).toBe(true);
+  });
+}
+
+test("progressive graph remains rendered while each stopped scene has one readable explanation", async ({ page }) => {
+  await page.setViewportSize({ width: 1440, height: 1000 });
+  await page.emulateMedia({ reducedMotion: "no-preference" });
+  await openHome(page);
+  const frames = [];
+  const scenes = [];
+  for (const progress of [0.20, 0.42, 0.68, 0.94]) {
+    await page.locator("#story").evaluate((story, progress) => {
+      const top = story.getBoundingClientRect().top + scrollY;
+      scrollTo({ top: top + (story.offsetHeight - innerHeight) * progress, behavior: "instant" });
+    }, progress);
+    // The scene eases toward the real scroll position. Stopping mid-story
+    // must settle into readable text rather than a perpetual cross-fade.
+    await page.waitForTimeout(800);
+    await expect.poll(async () => (await visibleStoryPanels(page)).length).toBe(1);
+    const [panel] = await visibleStoryPanels(page);
+    expect(panel.opacity).toBeGreaterThanOrEqual(0.95);
+    expect(panel.text).not.toBe("");
+    scenes.push(panel.id);
+    const canvas = page.locator("#world");
+    await expect(canvas).toBeVisible();
+    const frame = await canvas.evaluate(node => {
+      const context = node.getContext("2d");
+      const pixels = context.getImageData(0, 0, node.width, node.height).data;
+      let drawn = 0;
+      for (let i = 3; i < pixels.length; i += 16) if (pixels[i] > 16) drawn++;
+      return { drawn, image: node.toDataURL() };
+    });
+    expect(frame.drawn).toBeGreaterThan(50);
+    frames.push(frame.image);
+  }
+  expect(new Set(scenes).size).toBe(4);
+  expect(new Set(frames).size).toBe(4);
+});
