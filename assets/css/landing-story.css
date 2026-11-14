@@ -1452,6 +1452,12 @@ to{transform:translateY(calc(-3.1 * var(--u) * var(--spread)))}
 .td-home main:has(> .hg-landing), .td-home main:has(.hg-landing) { padding: 0; overflow: visible; }
 .td-home:has(.hg-landing) > .td-site-header.td-scrolled { background: rgba(42, 47, 170, .94); }
 
+/* Keep the native launcher outside desktop hero layer controls. During the
+   story it returns to its native position above the graph readout. */
+@media (min-width: 1024px) {
+  .td-home:has(.stage:not(.diving)) .hg-ask-ai-launcher { bottom: max(8px, env(safe-area-inset-bottom)); }
+}
+
 /* Geometry can select the compact legend on desktop as well as mobile. */
 .hg-landing #hg-stack[data-labels="none"] .hgs-labels { position: relative; z-index: 1; display: grid; width: 100%; height: auto; overflow: visible; clip: auto; clip-path: none; white-space: normal; grid-template-columns: 1fr 1fr; gap: 6px; margin-top: -16px; opacity: 1; }
 .hg-landing #hg-stack[data-labels="none"] .hgs-lab { position: static; min-width: 0; width: auto; padding: 7px 9px; transform: none; border-radius: 8px; box-shadow: inset 0 0 0 1px rgba(228, 239, 255, .4); }
