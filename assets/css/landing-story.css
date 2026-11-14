@@ -2,21 +2,21 @@
  * adapted from the supplied D5 concept; selectors are local to this surface.
  */
 .hg-landing {
-  --bg: #2347d1;
+  --bg: #fff;
   --bg-2: #edf3ff;
   --surface: #fff;
-  --ink: #fff;
-  --ink-2: #e0e8ff;
+  --ink: #141a33;
+  --ink-2: #4d5674;
   --line: #d8e0f1;
-  --accent: #c9d5ff;
-  --accent-ink: #fff;
+  --accent: #4933d4;
+  --accent-ink: #2c1c98;
   --accent-soft: rgba(225, 234, 255, .14);
   --on-accent: #3024b6;
   --ghost-line: rgba(255, 255, 255, .65);
-  --code-bg: rgba(10, 26, 105, .32);
-  --float-bg: rgba(28, 48, 152, .85);
-  --bar-idle: rgba(255, 255, 255, .4);
-  --bar-hover: rgba(255, 255, 255, .75);
+  --code-bg: #edf0f8;
+  --float-bg: rgba(245, 247, 252, .94);
+  --bar-idle: #aab3ca;
+  --bar-hover: #66749a;
   --well: #fff;
   --well-line: #d8e0f1;
   --btn2-bg: #171d3c;
@@ -39,7 +39,7 @@
   --mono: ui-monospace, "SFMono-Regular", Menlo, Consolas, monospace;
   color: var(--ink);
   font: 400 1.0625rem/1.6 var(--body);
-  background: var(--stage-bg);
+  background: var(--bg);
   -webkit-font-smoothing: antialiased;
 }
 .hg-landing *, .hg-landing *::before, .hg-landing *::after { box-sizing: border-box; }
@@ -52,7 +52,7 @@
 .hg-landing .wrap { width: 100%; max-width: 1440px; margin-inline: auto; padding-inline: var(--pad); }
 .hg-landing .sr-only { position: absolute; width: 1px; height: 1px; overflow: hidden; clip-path: inset(50%); white-space: nowrap; }
 .hg-landing svg.ic { width: 1.2em; height: 1.2em; flex: none; }
-.hg-landing .story { position: relative; padding: 0; background: var(--stage-bg); }
+.hg-landing .story { position: relative; padding: 0; background: var(--bg); }
 .hg-landing :where(.veil, #world, .readout, .mini) { display: none; }
 .hg-landing .btn {
   display:inline-flex;
@@ -829,6 +829,8 @@ to{transform:translateY(calc(-3.1 * var(--u) * var(--spread)))}
   --stack-size:min(100%,calc((100dvh - var(--nav-h) - 64px) * 1))
 }
 
+.hg-landing.live .diving .explore-hint { opacity: 0; }
+
 .hg-landing.live .diving .hero {
   pointer-events:none
 }
@@ -989,7 +991,6 @@ to{transform:translateY(calc(-3.1 * var(--u) * var(--spread)))}
   inset:0;
   z-index:7;
   background:var(--bg);
-  background-image:var(--stage-bg);
   opacity:0;
   pointer-events:none;
   transition:opacity .5s ease
@@ -1351,8 +1352,25 @@ to{transform:translateY(calc(-3.1 * var(--u) * var(--spread)))}
 
 }
 
-/* Keep the progressive scene in one color space. The reading surface follows
-   only after the story, so the first viewport always belongs to the hero. */
+/* The hero owns the blue surface. A pale gradient rises during lift-off,
+   finishing before the first canvas graph; every subsequent scene stays white. */
+.hg-landing .hero { color: #fff; background: var(--stage-bg); }
+.hg-landing.live .hero { background: transparent; }
+.hg-landing.live .stage::before {
+  content: "";
+  position: absolute;
+  inset: 0 0 auto;
+  height: 200%;
+  z-index: 1;
+  pointer-events: none;
+  background: linear-gradient(180deg, rgba(237, 243, 255, 0), #edf3ff 30%, #fff 50%);
+  transform: translateY(calc(50% - var(--scene-light, 0) * 100%));
+}
+.hg-landing:not(.live) .hero { margin-bottom: 128px; overflow: visible; }
+.hg-landing:not(.live) .hero::after {
+  content: ""; position: absolute; top: 100%; left: 0; right: 0; height: 128px;
+  background: linear-gradient(180deg, transparent, #fff), var(--stage-bg);
+}
 .hg-landing .hero { min-height: 100svh; }
 .hg-landing.live .hero { min-height: 0; }
 .hg-landing .hero-grid { grid-template-columns: minmax(0, .8fr) minmax(0, 1.25fr); gap: 24px; }
@@ -1363,13 +1381,13 @@ to{transform:translateY(calc(-3.1 * var(--u) * var(--spread)))}
 .hg-landing .btn-ghost { color: #fff; }
 .hg-landing .story-skip, .hg-landing .story-guide { display: inline-flex; align-items: center; gap: .6rem; }
 .hg-landing .hero-copy > .story-skip { margin-top: 24px; font-size: .875rem; text-decoration: underline; text-underline-offset: 4px; }
-.hg-landing .story-guide { margin-top: 24px; font-weight: 600; color: #fff; text-decoration: underline; text-underline-offset: 5px; }
+.hg-landing .story-guide { margin-top: 24px; font-weight: 600; color: var(--accent); text-decoration: underline; text-underline-offset: 5px; }
 .hg-landing .explore-hint { position: absolute; left: 56%; bottom: 28px; display: flex; align-items: center; gap: 10px; font-size: .9rem; color: #edf2ff; }
-.hg-landing .mini .story-skip { margin-left: 16px; font: 500 .8rem/1.4 var(--body); color: #fff; text-decoration: underline; text-underline-offset: 4px; }
+.hg-landing .mini .story-skip { margin-left: 16px; font: 500 .8rem/1.4 var(--body); color: var(--accent); text-decoration: underline; text-underline-offset: 4px; }
 .hg-landing .mini-bars button { min-height: 32px; }
 .hg-landing .panel .copy { max-width: min(40rem, 46vw); }
-.hg-landing .panel .lede { color: #e6edff; }
-.hg-landing.live .veil { background: var(--stage-bg); -webkit-mask-image: linear-gradient(90deg, #000 38%, transparent 64%); mask-image: linear-gradient(90deg, #000 38%, transparent 64%); }
+.hg-landing .panel .lede { color: var(--ink-2); }
+.hg-landing.live .veil { background: #fff; -webkit-mask-image: linear-gradient(90deg, #000 38%, transparent 64%); mask-image: linear-gradient(90deg, #000 38%, transparent 64%); }
 .hg-landing #hg-stack {
   --hgs-mono: var(--mono);
   --hgs-veil: rgba(225, 239, 255, .1);
@@ -1401,7 +1419,6 @@ to{transform:translateY(calc(-3.1 * var(--u) * var(--spread)))}
 .hg-landing .hgs-lab-desc { color: #edf3ff; }
 .hg-landing .hgs-has-active .hgs-lab:not(.is-active) .hgs-lab-name,
 .hg-landing .hgs-has-active .hgs-lab:not(.is-active) .hgs-lab-parts { opacity: .8; }
-.hg-landing .story-transition { height: clamp(160px, 17vw, 240px); background: linear-gradient(180deg, rgba(237, 243, 255, 0), #edf3ff); }
 .hg-landing .landing-content {
   --ink: #141a33;
   --ink-2: #4d5674;
@@ -1410,12 +1427,12 @@ to{transform:translateY(calc(-3.1 * var(--u) * var(--spread)))}
   --accent-soft: #e9e7ff;
   --on-accent: #fff;
   --code-bg: #e6ebf6;
-  background: linear-gradient(#edf3ff, #f8faff 720px, var(--bs-body-bg) 1400px);
+  background: linear-gradient(#fff, #f8faff 720px, var(--bs-body-bg) 1400px);
   color: var(--ink);
 }
 .hg-landing .landing-content a:hover { color: var(--accent); }
 .hg-landing .section { padding-block: clamp(64px, 7vw, 112px); }
-.hg-landing #capabilities { padding-top: 16px; }
+.hg-landing #capabilities { padding-top: clamp(64px, 7vw, 112px); }
 .hg-landing .cap .ic { display: grid; place-items: center; }
 .hg-landing .cap h3 a { text-decoration: none; }
 .hg-landing .cap h3 a:hover { text-decoration: underline; text-underline-offset: 5px; }
@@ -1429,12 +1446,21 @@ to{transform:translateY(calc(-3.1 * var(--u) * var(--spread)))}
 .hg-landing .doors > li { margin: 0; }
 .hg-landing .doors .ic { display: grid; place-items: center; }
 [data-bs-theme="dark"] .hg-landing { --bg-2: #10182b; --line: #303b56; --well: #10182b; --well-line: #303b56; --rule: linear-gradient(90deg, #9784ff, #303b56); }
-[data-bs-theme="dark"] .hg-landing .story-transition { background: linear-gradient(180deg, rgba(16, 24, 43, 0), #10182b); }
-[data-bs-theme="dark"] .hg-landing .landing-content { --ink: #edf2ff; --ink-2: #bbc6df; --accent: #b3a7ff; --accent-soft: #2c2850; --code-bg: #202940; background: linear-gradient(#10182b, var(--bs-body-bg) 1200px); }
+[data-bs-theme="dark"] .hg-landing .landing-content { --ink: #edf2ff; --ink-2: #bbc6df; --accent: #b3a7ff; --accent-soft: #2c2850; --code-bg: #202940; background: var(--bs-body-bg); }
 
 /* The native shell owns menu, language, appearance, search and their focus. */
 .td-home main:has(> .hg-landing), .td-home main:has(.hg-landing) { padding: 0; overflow: visible; }
 .td-home:has(.hg-landing) > .td-site-header.td-scrolled { background: rgba(42, 47, 170, .94); }
+
+/* Geometry can select the compact legend on desktop as well as mobile. */
+.hg-landing #hg-stack[data-labels="none"] .hgs-labels { position: relative; z-index: 1; display: grid; width: 100%; height: auto; overflow: visible; clip: auto; clip-path: none; white-space: normal; grid-template-columns: 1fr 1fr; gap: 6px; margin-top: -16px; opacity: 1; }
+.hg-landing #hg-stack[data-labels="none"] .hgs-lab { position: static; min-width: 0; width: auto; padding: 7px 9px; transform: none; border-radius: 8px; box-shadow: inset 0 0 0 1px rgba(228, 239, 255, .4); }
+.hg-landing #hg-stack[data-labels="none"] .hgs-lab-in { animation: none; }
+.hg-landing #hg-stack[data-labels="none"] .hgs-lab::before { display: none; }
+.hg-landing #hg-stack[data-labels="none"] .hgs-lab-name { font: 600 .75rem/1.3 var(--body); }
+.hg-landing #hg-stack[data-labels="none"] .hgs-lab-parts,
+.hg-landing #hg-stack[data-labels="none"] .hgs-lab-desc { display: none; }
+.hg-landing #hg-stack[data-labels="none"] .hgs-go { display: none; }
 
 @media (max-width: 1023px) {
   .hg-landing .hero-grid { grid-template-columns: minmax(0, 1fr); gap: 4px; }
@@ -1445,19 +1471,10 @@ to{transform:translateY(calc(-3.1 * var(--u) * var(--spread)))}
   .hg-landing.live .hero { padding-top: calc(var(--nav-h) + 24px); }
   .hg-landing.live .hero-stack { --stack-size: min(100%, max(230px, calc(100dvh - 450px))); max-width: 620px; }
   .hg-landing.live #hg-stack[data-labels="none"] { --stack-size: min(100%, max(230px, calc(100dvh - 450px))); }
-  .hg-landing #hg-stack[data-labels="none"] .hgs-labels { position: static; display: grid; width: 100%; height: auto; overflow: visible; clip: auto; clip-path: none; white-space: normal; grid-template-columns: 1fr 1fr; gap: 6px; margin-top: -16px; opacity: 1; }
-  .hg-landing #hg-stack[data-labels="none"] .hgs-lab { position: static; min-width: 0; width: auto; padding: 7px 9px; transform: none; border-radius: 8px; box-shadow: inset 0 0 0 1px rgba(228, 239, 255, .4); }
-  .hg-landing #hg-stack[data-labels="none"] .hgs-lab-in { animation: none; }
-  .hg-landing #hg-stack[data-labels="none"] .hgs-lab::before { display: none; }
-  .hg-landing #hg-stack[data-labels="none"] .hgs-lab-name { font: 600 .75rem/1.3 var(--body); }
-  .hg-landing #hg-stack[data-labels="none"] .hgs-lab-parts,
-  .hg-landing #hg-stack[data-labels="none"] .hgs-lab-desc { display: none; }
-  .hg-landing #hg-stack[data-labels="none"] .hgs-go { display: none; }
   .hg-landing .explore-hint { display: none; }
   .hg-landing .panel .copy { max-width: 100%; }
   .hg-landing.live .veil { -webkit-mask-image: linear-gradient(180deg, transparent 24%, #000 58%); mask-image: linear-gradient(180deg, transparent 24%, #000 58%); }
   .hg-landing .mini .story-skip { margin-left: 4px; font-size: .7rem; }
-  .hg-landing .story-transition { height: 128px; }
 }
 @media (max-width: 479px) {
   .td-home:has(.hg-landing) .hg-ask-ai-launcher { bottom: max(16px, env(safe-area-inset-bottom)); }
@@ -1490,6 +1507,23 @@ to{transform:translateY(calc(-3.1 * var(--u) * var(--spread)))}
   .hg-landing .story-guide { margin-top: 10px; font-size: .8rem; }
   .hg-landing .query { margin-top: 10px; font-size: .7rem; }
 }
+/* Short portrait phones still expose every layer button before scrolling. */
+@media (max-width: 639px) and (max-height: 640px) {
+  .hg-landing.live .hero { padding-top: calc(var(--nav-h) + 8px); padding-bottom: 8px; }
+  .hg-landing .hero h1 { font-size: 1.65rem; }
+  .hg-landing .hero .lede { font-size: .875rem; line-height: 1.4; margin-top: 10px; }
+  .hg-landing .cta-row { margin-top: 12px; }
+  .hg-landing .btn { height: 40px; }
+  .hg-landing .hero-copy > .story-skip { margin-top: 8px; }
+  .hg-landing.live #hg-stack[data-labels="none"] { --stack-size: 200px; }
+  .hg-landing #hg-stack[data-labels="none"] .hgs-labels {
+    width: calc(100vw - 2 * var(--pad));
+    margin-left: calc((200px - (100vw - 2 * var(--pad))) / 2);
+    margin-top: -26px;
+  }
+  .hg-landing #hg-stack[data-labels="none"] .hgs-lab { padding: 4px 6px; }
+  .td-home:has(.hg-landing) .hg-ask-ai-launcher { bottom: max(90px, env(safe-area-inset-bottom)); }
+}
 @media (prefers-reduced-motion: reduce) {
   .hg-landing *, .hg-landing *::before, .hg-landing *::after { animation: none !important; transition: none !important; }
   .hg-landing .hero { min-height: 100svh; }
@@ -1502,6 +1536,8 @@ to{transform:translateY(calc(-3.1 * var(--u) * var(--spread)))}
   .hg-landing.live .stage-in { position: static; }
   .hg-landing :is(.hero-stack, .explore-hint, .story-skip, .story-transition, .still, .copy-btn, #world, #veil, #wash, #mini, #readout) { display: none !important; }
   .hg-landing .hero-grid { display: block; }
+  .hg-landing .hero::after, .hg-landing.live .stage::before { display: none; }
+  .hg-landing .hero { color: #111; background: #fff; margin-bottom: 0; }
   .hg-landing .hero .lede, .hg-landing .panel .lede, .hg-landing .story-guide { color: #222; }
   .hg-landing .reveal { opacity: 1 !important; transform: none !important; }
   .hg-landing .panel .copy { max-width: none; }

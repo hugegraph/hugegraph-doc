@@ -9,7 +9,9 @@ The selected transition reference is the task image
 (1254 × 1254 pixels). The supplied D5 HTML is the source of the interactive
 stack, graph evolution and camera timeline. The user explicitly requested that
 the first viewport remain a complete hero, that later content appear on scroll,
-and that the gradual graph changes remain intact.
+and that the gradual graph changes remain intact. In the follow-up review, the
+user specified that the blue-to-white transition belongs at the beginning of
+scrolling and that all evolving graph scenes should use the original white ground.
 
 This PR applies the chosen blue → pale-blue → near-white surface and fixes the
 confirmed usability defects. The concept's compressed document composition is
@@ -20,21 +22,22 @@ place; the diagram remains live instead of becoming a raster illustration.
 ## Evidence and normalization
 
 - Browser: Chromium; viewport 1440 × 1000 CSS pixels, deviceScaleFactor 1.
-  Additional captures: 390 × 844, 320 × 844 and 844 × 390; both EN and CN.
+  Additional captures: 390 × 844, 320 × 844, 320 × 568, 844 × 390, 1200 × 900 and 1440 × 700; both EN and CN.
 - Full-view comparison: `/workspace/landing-review/design-comparison.png` puts
-  the selected source and the actual hero/exit states in one comparison input.
+  the selected source and the original hero/exit states in one comparison input.
   Both sides use equal display widths; the source's composite document and the
   runtime's separate scroll states are labelled. No pixel-difference claim is
   made across those intentionally different compositions.
 - Focused evidence: four layer labels at 320/390px and 844 × 390; stopped
-  Database/Computing/Storage/AI panels; the exit gradient; native Print media.
+  Database/Computing/Storage/AI panels; the entry gradient; native Print media.
 - [Before desktop](tests/e2e/screenshots/landing/before-en-1440.jpg) /
   [after desktop](tests/e2e/screenshots/landing/after-en-1440.jpg).
 - [Before 320px](tests/e2e/screenshots/landing/before-en-320.jpg) /
   [after 320px](tests/e2e/screenshots/landing/after-en-320.jpg).
+- [Short portrait](tests/e2e/screenshots/landing/after-en-short.jpg).
 - [Chinese](tests/e2e/screenshots/landing/after-cn-1440.jpg),
   [progressive graph](tests/e2e/screenshots/landing/after-storage.jpg),
-  [exit transition](tests/e2e/screenshots/landing/after-transition.jpg).
+  [entry transition](tests/e2e/screenshots/landing/after-transition.jpg).
 - Real browser recording: `/workspace/landing-review/animation.webm` (15 s).
 
 ## Comparison history and fixes
@@ -51,9 +54,22 @@ place; the diagram remains live instead of becoming a raster illustration.
 3. The small-screen AI launcher overlapped the restored layer legend. Its
    homepage-only position now uses the safe bottom edge; the final 390px capture
    shows separated hit areas. Documentation pages retain their existing layout.
-4. A flat text veil introduced a color seam at the scene exit. The veil now
-   masks the same blue gradient as the scene; the 240px desktop / 128px mobile
-   transition blends into the reading surface without changing text opacity.
+4. The follow-up places the gradient in the initial lift-off (scroll progress
+   0.0075–0.095), before the canvas appears at 0.105. A pale-to-white background
+   rises behind the existing geometry and reverses with scrolling. All four
+   graph scenes use the original ink-on-white palette, with a matching white
+   text veil and pale floating controls. The delayed exit gradient is removed.
+5. CI exposed current-only component links in archived Markdown homepages.
+   Archived homes now retain their native documentation/LLMS index, while the
+   current homepage retains its full catalogue. Regression checks cover all
+   four archived releases in both languages without weakening link validation.
+6. Independent review found clipped labels at 320 × 568 and launcher overlap
+   after compacting the diagram. Short portrait now uses compact spacing, a
+   full-width label grid independent of the diagram, and separates the launcher
+   from the labels. Compact labels also appear at desktop widths when the
+   diagram lacks room for side labels; they sit above plate hit areas.
+   Regressions check visibility, launcher intersections and left/center/right
+   hit targets, including 1200 × 900 and 1440 × 700.
 
 ## Required fidelity surfaces
 
@@ -63,10 +79,10 @@ place; the diagram remains live instead of becoming a raster illustration.
   This deliberately reuses site fonts instead of embedding prototype fonts.
 - **Spacing and rhythm:** complete initial viewport; aligned copy, diagram and
   downstream sections; all layer names fit on narrow and short screens. The
-  chosen pale section begins only after the preserved progressive story.
-- **Colors and tokens:** vivid violet/blue scene, white primary action, fixed
-  semantic layer colors and pale reading surface. Dark appearance retains the
-  blue scene and uses the native dark reading background.
+  blue-to-white transition completes before the progressive graph story.
+- **Colors and tokens:** vivid violet/blue hero, white primary action, fixed
+  semantic layer colors and white graph scenes. Dark appearance retains this
+  authored scene palette and uses the native dark reading background.
 - **Image and diagram quality:** existing brand assets and icon library are
   reused. The supplied live vector/canvas geometry is retained for real graph
   morphing, with consistent material and semantic accents. A static generated
@@ -81,7 +97,8 @@ The new browser regressions cover first-viewport CTA/section placement, genuine
 language navigation and persistence, eight component destinations, complete
 clipboard content/status, reduced motion, 320px drawer reachability/Escape/focus,
 visible layer names including landscape, and distinct nonempty graph frames
-with one readable explanation at every sampled stop. Native theme, search and
+with one readable explanation at every sampled stop. The entry transition is
+also checked before canvas hand-off, throughout all four scenes and in reverse. Native theme, search and
 AI enabled/disabled fixtures are checked by the existing browser suites.
 
 Independent review confirmed the fixes. The actual Hugo runtime recording also
@@ -100,7 +117,7 @@ make third-party requests. Native AI consent behavior is unchanged.
 ## Implementation checklist
 
 - [x] Keep the complete blue first viewport and progressive graph story.
-- [x] Apply the selected transition after the story.
+- [x] Apply the selected transition at the start, before graph evolution.
 - [x] Fix text overlap, narrow/short viewport failures and layer-label clipping.
 - [x] Reuse native language, theme, navigation and consent controls.
 - [x] Add component guide links, copy feedback and the next action.

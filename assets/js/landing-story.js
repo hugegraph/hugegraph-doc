@@ -153,7 +153,7 @@
    A click on a layer of the hero stack, on a bar of the layer control or on the nav logo goes to that stop: neighbouring
    stops are travelled with an eased scroll, longer moves dissolve the stage and settle on the target (see go()).
    Theme: the canvas reads site-owned CSS tokens and follows OINK appearance changes without replacing its theme controller.
-   The authored blue scene can request the bright canvas palette independently of the surrounding reading surface. */
+   The white graph scene has its own ink-on-paper palette, independent of the blue hero and native shell. */
 (() => {
   'use strict';
   const FORCE_P = null;   // review hook: set 0..1 to freeze the whole timeline at one scroll position
@@ -694,7 +694,12 @@
     /* One timeline: any progress value renders the correct frame, forwards or backwards. */
     function render(p, t) {
       const changed = p !== lastP;
-      if (changed) liftoff(p);
+      if (changed) {
+        // The background hand-off shares the graph timeline, including reverse
+        // scrolling and direct layer navigation. Finish before the canvas appears.
+        stage.style.setProperty('--scene-light', sstep(HERO_P, T.plate[1], p).toFixed(4));
+        liftoff(p);
+      }
       const q = qmap(p), aCv = sstep(T.cv[0], T.cv[1], p);
       D.q = q;
       if (changed) cv.style.opacity = aCv.toFixed(3);
@@ -868,7 +873,7 @@
     });
   }
 
-  /* OINK owns appearance selection and persistence. The scene only reads the native theme, or its authored bright-on-blue
+  /* OINK owns appearance selection and persistence. The scene only reads the native theme, or its authored white-scene
      palette override; it never changes the site's data-bs-theme or saved preferences. */
   const stillMotion = matchMedia('(prefers-reduced-motion: reduce)');
   const followNativeTheme = () => syncTheme(stillMotion.matches ? 0 : 260);

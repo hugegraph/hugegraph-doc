@@ -1,6 +1,6 @@
 {{- $page := . -}}
 {{- $data := index hugo.Data.landing .Site.Language.Lang -}}
-<div class="hg-landing" id="hg-landing" data-story-palette="dark" data-hg-story-config="{{ dict "readouts" $data.story.readouts | jsonify }}">
+<div class="hg-landing" id="hg-landing" data-story-palette="light" data-hg-story-config="{{ dict "readouts" $data.story.readouts | jsonify }}">
   <section class="story" id="story" aria-label="{{ $data.story.label }}">
     <div class="stage" id="stage">
       <header class="hero" id="hero">
@@ -140,7 +140,6 @@
       <div class="wash" id="wash" aria-hidden="true"></div>
     </div>
   </section>
-  <div class="story-transition" aria-hidden="true"></div>
   <div class="landing-content">
     <section class="section" id="capabilities" aria-labelledby="capabilities-title">
       <div class="wrap">

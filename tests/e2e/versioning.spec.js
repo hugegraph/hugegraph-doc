@@ -36,6 +36,23 @@ for (const locale of ["en", "cn"]) {
 
 for (const version of VERSION_IDS.slice(1)) {
   for (const locale of ["en", "cn"]) {
+    test(`${version} ${locale} Markdown home links only to available archived content`, async ({ request }) => {
+      test.skip(!EXPECTED_IDS.includes(version), "latest-only staging artifact");
+      const prefix = `/versions/${version}${locale === "cn" ? "/cn" : ""}`;
+      const response = await request.get(`${prefix}/index.md`);
+      expect(response.ok()).toBeTruthy();
+      const markdown = await response.text();
+      const links = [...markdown.matchAll(/\]\(([^)]+)\)/g)].map(match => match[1]);
+      expect(links.some(link => new URL(link, "https://hugegraph.apache.org").pathname === `${prefix}/docs/`)).toBeTruthy();
+      expect(markdown).not.toContain("docker run");
+      for (const link of links) {
+        const url = new URL(link, "https://hugegraph.apache.org");
+        expect(url.pathname).toMatch(new RegExp(`^${prefix.replaceAll(".", "\\.")}/`));
+        const target = await request.get(url.pathname);
+        expect(target.ok(), `Missing archived Markdown target: ${link}`).toBeTruthy();
+      }
+    });
+
     test(`${version} ${locale} is archived and directly reachable`, async ({ page }) => {
       test.skip(!EXPECTED_IDS.includes(version), "latest-only staging artifact");
       const prefix = `/versions/${version}${locale === "cn" ? "/cn" : ""}`;

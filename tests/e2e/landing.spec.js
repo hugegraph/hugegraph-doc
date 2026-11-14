@@ -85,7 +85,7 @@ for (const [language, prefix, locale] of [["en", "", "en-US"], ["cn", "/cn", "zh
     // of the generic documentation landing page.
     expect(new Set(destinations).size).toBe(8);
     await choices.first().click();
-    await expect(page).toHaveURL(url => url.pathname === destinations[0]);
+    await expect.poll(() => new URL(page.url()).pathname).toBe(destinations[0]);
     await expect(page.locator("main h1").first()).toBeVisible();
   });
 
@@ -161,7 +161,7 @@ test("320px homepage navigation remains reachable and Escape restores focus", as
   expect(await page.evaluate(() => document.documentElement.scrollWidth <= innerWidth + 1)).toBe(true);
 });
 
-for (const viewport of [{ width: 390, height: 844 }, { width: 844, height: 390 }]) {
+for (const viewport of [{ width: 1200, height: 900 }, { width: 1440, height: 700 }, { width: 320, height: 568 }, { width: 390, height: 844 }, { width: 844, height: 390 }]) {
   test(`${viewport.width}x${viewport.height} homepage retains a readable architecture`, async ({ page }) => {
     await page.setViewportSize(viewport);
     await openHome(page);
@@ -178,6 +178,18 @@ for (const viewport of [{ width: 390, height: 844 }, { width: 844, height: 390 }
       // hidden or clipped beyond the hero. Check what readers see.
       await expect.poll(() => onScreen(name)).toBe(true);
       expect((await name.boundingBox()).height).toBeGreaterThanOrEqual(12);
+      const overlapsLauncher = await name.evaluate(node => {
+        const launcher = document.querySelector(".hg-ask-ai-launcher");
+        if (!launcher || !launcher.checkVisibility()) return false;
+        const a = node.closest("button").getBoundingClientRect(), b = launcher.getBoundingClientRect();
+        return a.left < b.right && a.right > b.left && a.top < b.bottom && a.bottom > b.top;
+      });
+      expect(overlapsLauncher).toBe(false);
+      expect(await name.evaluate(node => {
+        const button = node.closest("button"), box = button.getBoundingClientRect();
+        return [box.left + 5, (box.left + box.right) / 2, box.right - 5].every(x =>
+          button.contains(document.elementFromPoint(x, (box.top + box.bottom) / 2)));
+      })).toBe(true);
     }
     expect(await page.evaluate(() => document.documentElement.scrollWidth <= innerWidth + 1)).toBe(true);
   });
@@ -216,4 +228,35 @@ test("progressive graph remains rendered while each stopped scene has one readab
   }
   expect(new Set(scenes).size).toBe(4);
   expect(new Set(frames).size).toBe(4);
+});
+
+test("blue hero fades to white before graph evolution and restores on reverse scroll", async ({ page }) => {
+  await page.setViewportSize({ width: 1440, height: 1000 });
+  await openHome(page);
+  const progress = async value => {
+    await page.locator("#story").evaluate((story, value) => {
+      scrollTo({ top: story.offsetTop + (story.offsetHeight - innerHeight) * value, behavior: "instant" });
+    }, value);
+    await page.waitForTimeout(900);
+  };
+  const light = () => page.locator("#stage").evaluate(node =>
+    Number(getComputedStyle(node).getPropertyValue("--scene-light")));
+  await expect.poll(light).toBe(0);
+  await progress(0.05);
+  expect(await light()).toBeGreaterThan(0);
+  expect(await light()).toBeLessThan(1);
+  // Background conversion finishes before the first canvas graph appears.
+  await progress(0.10);
+  await expect.poll(light).toBe(1);
+  await expect(page.locator("#world")).toHaveCSS("opacity", "0");
+  for (const value of [0.20, 0.42, 0.68, 0.94]) {
+    await progress(value);
+    expect(await light()).toBe(1);
+    await expect(page.locator("#veil")).toHaveCSS("background-color", "rgb(255, 255, 255)");
+    await expect(page.locator("#story .panel.on h2")).toHaveCSS("color", "rgb(20, 26, 51)");
+  }
+  await progress(0);
+  await expect.poll(light).toBe(0);
+  await expect(page.locator("#hero h1")).toBeVisible();
+  await expect(page.locator("#hero h1")).toHaveCSS("color", "rgb(255, 255, 255)");
 });

@@ -12,6 +12,10 @@
       (partial "content/markdown-url.html" .RelPermalink)) -}}
 {{- end -}}
 
+{{- /* Archived releases only own their versioned documentation. The current
+     product catalogue contains components and routes absent from older releases;
+     keep their Markdown home as a native documentation/LLMS index instead. */ -}}
+{{- if not .Site.Params.archived_version -}}
 {{- $chunks = $chunks | append (printf "## %s\n\n%s" $data.hero.title $data.hero.body) -}}
 {{- range slice $data.hero.primary $data.hero.secondary -}}
   {{- $chunks = $chunks | append (printf "[%s](%s)"
@@ -64,6 +68,7 @@
   {{- $chunks = $chunks | append (printf "- [**%s**](%s) — %s"
       (partial "content/markdown-escape.html" .title)
       (partial "content/markdown-url.html" (.url | relURL)) .body) -}}
+{{- end -}}
 {{- end -}}
 
 {{- with .Pages -}}
