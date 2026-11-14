@@ -1,0 +1,193 @@
+name: Publish PR 65 Duo View animation
+
+on:
+  push:
+    branches:
+      - pr-assets/oink-1.5.1-duo-view
+    paths:
+      - '.github/workflows/pr65-gif-publish.yml'
+
+permissions:
+  contents: write
+
+jobs:
+  publish-asset:
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    env:
+      PR_COMMIT: cc7396c818dfba2080b0f51419ee55a782f106e0
+      ASSET_BASE: dad3b0f5dac166b5353755870adef561f4c22a63
+      ASSET_BASE_TREE: 524c2bce090835453d561a14d5d09fda9fca846b
+      ASSET_BRANCH: pr-assets/oink-1.5.1-duo-view
+      HUGO_VERSION: 0.168.0
+      HUGO_ENVIRONMENT: production
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7
+        with:
+          ref: ${{ env.PR_COMMIT }}
+          fetch-depth: 0
+          persist-credentials: false
+      - uses: actions/setup-python@ece7cb06caefa5fff74198d8649806c4678c61a1 # v6
+        with:
+          python-version: '3.13'
+      - uses: actions/setup-go@b7ad1dad31e06c5925ef5d2fc7ad053ef454303e # v7
+        with:
+          go-version-file: go.mod
+          cache: true
+      - name: Setup Hugo Extended
+        uses: ./.github/actions/setup-site-tools
+        with:
+          hugo-version: ${{ env.HUGO_VERSION }}
+      - uses: actions/setup-node@820762786026740c76f36085b0efc47a31fe5020 # v7
+        with:
+          node-version: '24'
+          cache: npm
+          cache-dependency-path: tests/e2e/package-lock.json
+      - name: Build latest site and install browser
+        run: |
+          set -euo pipefail
+          scripts/hugo.sh build \
+            --baseURL http://127.0.0.1:4173/ \
+            --destination "$RUNNER_TEMP/site"
+          cd tests/e2e
+          npm ci
+          npx playwright install --with-deps chromium
+          python3 -m pip install --disable-pip-version-check pillow
+      - name: Capture native Duo View states
+        working-directory: tests/e2e
+        env:
+          SITE_ROOT: ${{ runner.temp }}/site
+          FRAME_DIR: ${{ runner.temp }}/duo-frames
+        run: |
+          set -euo pipefail
+          mkdir -p "$FRAME_DIR"
+          python3 -m http.server 4173 --directory "$SITE_ROOT" >"$RUNNER_TEMP/site-server.log" 2>&1 &
+          server_pid=$!
+          trap 'kill "$server_pid" 2>/dev/null || true' EXIT
+          for attempt in {1..30}; do
+            if curl -fsS http://127.0.0.1:4173/docs/ >/dev/null; then break; fi
+            sleep 1
+          done
+          curl -fsS http://127.0.0.1:4173/docs/ >/dev/null
+          node <<'JS'
+          const { chromium } = require('playwright');
+          const path = require('node:path');
+
+          (async () => {
+            const browser = await chromium.launch({ headless: true });
+            const page = await browser.newPage({ viewport: { width: 1440, height: 900 }, deviceScaleFactor: 1 });
+            await page.route('**/*', route => {
+              const url = new URL(route.request().url());
+              return url.origin === 'http://127.0.0.1:4173' ? route.continue() : route.abort();
+            });
+            await page.goto('http://127.0.0.1:4173/docs/quickstart/hugegraph/hugegraph-server/', {
+              waitUntil: 'networkidle',
+            });
+            const entry = page.locator('[data-td-compare-open]');
+            await entry.waitFor({ state: 'visible' });
+            await page.screenshot({ path: path.join(process.env.FRAME_DIR, '01-entry.png') });
+
+            await entry.click();
+            const dialog = page.locator('dialog[data-td-compare]');
+            await dialog.waitFor({ state: 'visible' });
+            await page.waitForFunction(() => {
+              const frames = [...document.querySelectorAll('iframe[data-td-compare-frame]')];
+              return frames.length === 2 && frames.every(frame => {
+                try {
+                  return frame.contentWindow?.OinkComparePane === true &&
+                    frame.contentDocument?.querySelector('#td-main-content .td-content');
+                } catch (_) {
+                  return false;
+                }
+              });
+            });
+            await page.screenshot({ path: path.join(process.env.FRAME_DIR, '02-open.png') });
+
+            const paneFrames = page.frames().filter(frame => {
+              try { return new URL(frame.url()).searchParams.get('oink_compare_pane') === '1'; }
+              catch (_) { return false; }
+            });
+            await paneFrames[0].evaluate(() => window.scrollTo({
+              top: document.documentElement.scrollHeight * 0.58,
+              behavior: 'instant',
+            }));
+            await page.waitForTimeout(900);
+            await page.screenshot({ path: path.join(process.env.FRAME_DIR, '03-sync.png') });
+            await browser.close();
+          })().catch(error => {
+            console.error(error);
+            process.exit(1);
+          });
+          JS
+      - name: Assemble optimized GIF
+        env:
+          FRAME_DIR: ${{ runner.temp }}/duo-frames
+          GIF_PATH: ${{ runner.temp }}/oink-1.5.1-duo-view.gif
+        run: |
+          set -euo pipefail
+          python3 <<'PY'
+          import os
+          from pathlib import Path
+          from PIL import Image
+
+          source = Path(os.environ['FRAME_DIR'])
+          output = Path(os.environ['GIF_PATH'])
+          names = ['01-entry.png', '02-open.png', '03-sync.png']
+          durations = [1300, 1900, 1700]
+          frames = []
+          for name in names:
+              image = Image.open(source / name).convert('RGB')
+              image.thumbnail((960, 600), Image.Resampling.LANCZOS)
+              canvas = Image.new('RGB', (960, 600), 'white')
+              canvas.paste(image, ((960 - image.width) // 2, (600 - image.height) // 2))
+              frames.append(canvas.quantize(colors=64, method=Image.Quantize.MEDIANCUT))
+          frames[0].save(
+              output,
+              save_all=True,
+              append_images=frames[1:],
+              duration=durations,
+              loop=0,
+              optimize=True,
+              disposal=2,
+          )
+          print(f'{output}: {output.stat().st_size} bytes')
+          PY
+          test -s "$GIF_PATH"
+          sha256sum "$GIF_PATH"
+      - name: Publish clean asset branch commit
+        env:
+          GH_TOKEN: ${{ github.token }}
+          REPOSITORY: ${{ github.repository }}
+          GIF_PATH: ${{ runner.temp }}/oink-1.5.1-duo-view.gif
+        run: |
+          set -euo pipefail
+          api="https://api.github.com/repos/$REPOSITORY"
+          headers=(-H "Authorization: Bearer $GH_TOKEN" -H "Accept: application/vnd.github+json" -H "X-GitHub-Api-Version: 2022-11-28")
+          base64 -w0 "$GIF_PATH" > "$RUNNER_TEMP/gif.b64"
+          blob_sha=$(jq -n --rawfile content "$RUNNER_TEMP/gif.b64" \
+            '{content:$content,encoding:"base64"}' |
+            curl -fsSL "${headers[@]}" -X POST "$api/git/blobs" --data-binary @- |
+            jq -er .sha)
+          tree_payload=$(jq -n \
+            --arg base "$ASSET_BASE_TREE" \
+            --arg blob "$blob_sha" \
+            '{base_tree:$base,tree:[{path:"pr-assets/oink-1.5.1-duo-view.gif",mode:"100644",type:"blob",sha:$blob}]}')
+          tree_sha=$(printf '%s' "$tree_payload" |
+            curl -fsSL "${headers[@]}" -X POST "$api/git/trees" --data-binary @- |
+            jq -er .sha)
+          timestamp=$(date -u +%Y-%m-%dT%H:%M:%SZ)
+          commit_payload=$(jq -n \
+            --arg message "docs: add OINK 1.5.1 Duo View PR animation" \
+            --arg tree "$tree_sha" \
+            --arg parent "$ASSET_BASE" \
+            --arg date "$timestamp" \
+            '{message:$message,tree:$tree,parents:[$parent],author:{name:"Imba Jin",email:"jin@apache.org",date:$date},committer:{name:"Imba Jin",email:"jin@apache.org",date:$date}}')
+          commit_sha=$(printf '%s' "$commit_payload" |
+            curl -fsSL "${headers[@]}" -X POST "$api/git/commits" --data-binary @- |
+            jq -er .sha)
+          ref_payload=$(jq -n --arg sha "$commit_sha" '{sha:$sha,force:true}')
+          printf '%s' "$ref_payload" |
+            curl -fsSL "${headers[@]}" -X PATCH \
+              "$api/git/refs/heads/$ASSET_BRANCH" --data-binary @- |
+            jq -er --arg sha "$commit_sha" '.object.sha == $sha' >/dev/null
+          echo "published $commit_sha with GIF blob $blob_sha"
