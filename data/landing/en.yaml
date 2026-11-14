@@ -136,7 +136,7 @@ components:
 quickstart:
   title: Running in one command.
   body: Start a single-node Server with Docker for testing or development, then reach the REST API on port 8080.
-  command: docker run -itd --name=server -p 8080:8080 hugegraph/hugegraph:1.7.0
+  command: docker run -itd --name=server -p 127.0.0.1:8080:8080 hugegraph/hugegraph:1.7.0
   copy: Copy
   copied: Copied
   copy_fallback: Copy selected command

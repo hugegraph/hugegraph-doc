@@ -136,7 +136,7 @@ components:
 quickstart:
   title: 一条命令，启动服务。
   body: 使用 Docker 启动用于测试或开发的单节点 Server，然后通过 8080 端口访问 REST API。
-  command: docker run -itd --name=server -p 8080:8080 hugegraph/hugegraph:1.7.0
+  command: docker run -itd --name=server -p 127.0.0.1:8080:8080 hugegraph/hugegraph:1.7.0
   copy: 复制
   copied: 已复制
   copy_fallback: 复制已选命令

@@ -70,6 +70,12 @@ place; the diagram remains live instead of becoming a raster illustration.
    diagram lacks room for side labels; they sit above plate hit areas.
    Regressions check visibility, launcher intersections and left/center/right
    hit targets, including 1200 × 900 and 1440 × 700.
+7. Layer buttons use a white keyboard focus outline on the blue hero. Changing
+   reduced-motion preference while the page is open now disposes the previous
+   mode's listeners, observers, animation frame and jump timers, switches to
+   readable static scenes, and restores the current explanation when animation
+   is enabled again. The page does not reload. The Docker example binds only
+   to loopback for local development.
 
 ## Required fidelity surfaces
 
@@ -88,8 +94,8 @@ place; the diagram remains live instead of becoming a raster illustration.
   morphing, with consistent material and semantic accents. A static generated
   diagram would remove functionality explicitly required by the user.
 - **Copy and content:** EN/CN cover every new visible section and feedback state.
-  Components link to their own guides; the command matches the Server guide and
-  offers the next step. Semantic Markdown and native printing retain content.
+  Components link to their own guides; the command uses the documented image
+  with loopback-only port binding and offers the next step. Semantic Markdown and native printing retain content.
 
 ## Interaction verification
 
@@ -98,7 +104,10 @@ language navigation and persistence, eight component destinations, complete
 clipboard content/status, reduced motion, 320px drawer reachability/Escape/focus,
 visible layer names including landscape, and distinct nonempty graph frames
 with one readable explanation at every sampled stop. The entry transition is
-also checked before canvas hand-off, throughout all four scenes and in reverse. Native theme, search and
+also checked before canvas hand-off, throughout all four scenes and in reverse.
+Runtime motion-preference regressions check cancellation of an in-flight jump,
+absence of hidden canvas painting, static navigation, repeated mode switches
+and preservation of the current explanation and downstream reading position. Native theme, search and
 AI enabled/disabled fixtures are checked by the existing browser suites.
 
 Independent review confirmed the fixes. The actual Hugo runtime recording also

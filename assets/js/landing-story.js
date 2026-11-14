@@ -157,7 +157,8 @@
 (() => {
   'use strict';
   const FORCE_P = null;   // review hook: set 0..1 to freeze the whole timeline at one scroll position
-  const html = document.documentElement, live = landing.classList.contains('live');
+  const html = document.documentElement;
+  const stillMotion = matchMedia('(prefers-reduced-motion: reduce)');
   const $ = (s, r = landing) => r.querySelector(s), $$ = (s, r = landing) => [...r.querySelectorAll(s)];
   let config = {};
   try { config = JSON.parse(landing.dataset.hgStoryConfig || '{}'); } catch { /* use authored defaults */ }
@@ -568,7 +569,10 @@
   }
 
   /* ---------- live mode: pinned stage, scroll-driven lift-off and camera ---------- */
-  function startLive() {
+  function startLive(initialBeat) {
+    const lifetime = new AbortController();
+    const listen = (target, event, handler, options = {}) =>
+      target.addEventListener(event, handler, { ...options, signal: lifetime.signal });
     const S = window.HGStack, sroot = S.root, GEO = S.geom;
     const story = $('#story'), stage = $('#stage'), hero = $('#hero'), copy = $('.hero-copy'), rig = $('#rig');
     const veil = $('#veil'), cv = $('#world'), ctx = cv.getContext('2d'), wash = $('#wash');
@@ -750,9 +754,11 @@
       raf = requestAnimationFrame(frame);
     }
     const kick = () => { if (running && !raf) { snapNext = true; lastNow = performance.now(); raf = requestAnimationFrame(frame); } };
-    new ResizeObserver(() => { size(); if (running && !raf) kick(); }).observe(stage);
-    new IntersectionObserver(es => { running = es[0].isIntersecting && !document.hidden; kick(); }).observe(story);
-    document.addEventListener('visibilitychange', () => { if (document.hidden) running = false; else { const r = story.getBoundingClientRect(); running = r.bottom > 0 && r.top < innerHeight; kick(); } });
+    const resize = new ResizeObserver(() => { if (lifetime.signal.aborted) return; size(); if (running && !raf) kick(); });
+    resize.observe(stage);
+    const visibility = new IntersectionObserver(es => { if (lifetime.signal.aborted) return; running = es[0].isIntersecting && !document.hidden; kick(); });
+    visibility.observe(story);
+    listen(document, 'visibilitychange', () => { if (document.hidden) running = false; else { const r = story.getBoundingClientRect(); running = r.bottom > 0 && r.top < innerHeight; kick(); } });
     size();
 
     /* ---------- going to a stop (the hero or a layer's beat) ----------
@@ -824,12 +830,12 @@
     }
     /* a click made with the pointer does not leave focus on the control: Space and the arrow keys keep scrolling the page */
     const release = (e, el) => { if (e.detail !== 0 && el && el.blur) el.blur(); };
-    sroot.addEventListener('click', e => { const hit = e.target.closest('[data-layer]'); if (!hit) return; go(S.layers[+hit.dataset.layer].id, e.detail === 0); release(e, hit); });
-    bars.forEach(b => b.addEventListener('click', e => { go(b.dataset.id, e.detail === 0); release(e, b); }));
-    if (brand) brand.addEventListener('click', e => { e.preventDefault(); go('hero'); release(e, brand); });   // the way back
+    listen(sroot, 'click', e => { const hit = e.target.closest('[data-layer]'); if (!hit) return; go(S.layers[+hit.dataset.layer].id, e.detail === 0); release(e, hit); });
+    bars.forEach(b => listen(b, 'click', e => { go(b.dataset.id, e.detail === 0); release(e, b); }));
+    if (brand) listen(brand, 'click', e => { e.preventDefault(); go('hero'); release(e, brand); });   // the way back
     /* these listeners only hand control back to the reader; progress is still read in the frame loop */
     const SCROLL_KEYS = new Set(['ArrowUp', 'ArrowDown', 'PageUp', 'PageDown', 'Home', 'End', ' ']);
-    addEventListener('wheel', e => {
+    listen(window, 'wheel', e => {
       tau = 0.12;
       if (!J) return;
       const d = Math.abs(e.deltaY) * (e.deltaMode === 1 ? 32 : e.deltaMode === 2 ? innerHeight : 1), last = J.last;
@@ -839,43 +845,127 @@
       const rising = last === null || d > last + 1 || (d >= 30 && d >= last);   // a fling's tail only ever shrinks
       if ((d >= 14 && rising) || J.up >= 40) endJump();
     }, { passive: true });
-    addEventListener('touchstart', e => { tau = 0.05; if (!(e.target.closest && e.target.closest('[data-layer],#mini button,[data-hg-story-home]'))) endJump(); }, { passive: true });   // a finger already scrolls smoothly: follow it closely
-    addEventListener('keydown', e => { if (!SCROLL_KEYS.has(e.key) || (e.key === ' ' && e.target.closest && e.target.closest('button,a'))) return; tau = 0.12; endJump(); });
-    addEventListener('pointerdown', e => {                   // a press elsewhere takes over, but not the second press of a double click
+    listen(window, 'touchstart', e => { tau = 0.05; if (!(e.target.closest && e.target.closest('[data-layer],#mini button,[data-hg-story-home]'))) endJump(); }, { passive: true });   // a finger already scrolls smoothly: follow it closely
+    listen(window, 'keydown', e => { if (!SCROLL_KEYS.has(e.key) || (e.key === ' ' && e.target.closest && e.target.closest('button,a'))) return; tau = 0.12; endJump(); });
+    listen(window, 'pointerdown', e => {                   // a press elsewhere takes over, but not the second press of a double click
       if (!J || e.pointerType === 'touch' || performance.now() - J.t0 < 450 || (e.target.closest && e.target.closest('[data-layer],#mini button,[data-hg-story-home]'))) return;
       endJump();
     });
-    document.addEventListener('visibilitychange', () => { if (document.hidden && J) { const id = J.id; snapNext = true; scrollTo(0, yOf(id)); endJump(); } });   // a hidden tab finishes its jump at once
+    listen(document, 'visibilitychange', () => { if (document.hidden && J) { const id = J.id; snapNext = true; scrollTo(0, yOf(id)); endJump(); } });   // a hidden tab finishes its jump at once
 
     /* the palette changed: draw the current frame again now (a view transition snapshots the page right after), and keep the loop alive */
     onPalette = () => { if (running && W) { lastP = -1; render(ps, (performance.now() - t0) / 1000); } kick(); };
     window.__hgSyncTheme = ms => syncTheme(ms);
     window.__hgDebug = () => Object.assign({}, D, { p: ps, target, wash: +getComputedStyle(wash).opacity, jumping: Boolean(J), tau, diving, hero: { x: G.hx, y: G.hy, r: F_MAIN * G.u, zoom: G.u / U }, land: { x: G.mx, y: G.my }, z0: G.z0, sc: G.sc });
+    if (initialBeat) {
+      ps = target = pStop(initialBeat);
+      scrollTo({ top: yOf(initialBeat), behavior: 'instant' });
+      render(ps, (performance.now() - t0) / 1000);
+    }
+    return {
+      currentBeat: () => J?.id || (ps <= T.gone ? 'hero' : BEATS.find(n => qmap(ps) < n[0])[1]),
+      destroy() {
+        lifetime.abort();
+        resize.disconnect(); visibility.disconnect();
+        running = false; cancelAnimationFrame(raf); raf = 0;
+        endJump(); pendingFocus = null;
+        clearLift();
+        stage.style.removeProperty('--scene-light');
+        for (const el of [cv, veil, mini, readout]) {
+          el.style.removeProperty('opacity'); el.style.removeProperty('visibility');
+        }
+        panels.forEach(el => {
+          el.removeAttribute('style'); el.classList.remove('on');
+          el.inert = false; el.removeAttribute('aria-hidden');
+        });
+        bars.forEach(el => { el.classList.remove('on'); el.removeAttribute('aria-current'); });
+        ctx.clearRect(0, 0, W, H);
+        onPalette = () => {};
+        delete window.__hgDebug; delete window.__hgSyncTheme;
+      },
+    };
   }
 
-  if (live && window.HGStack) {
-    startLive();
-    const io = new IntersectionObserver(es => es.forEach(e => { if (e.isIntersecting) { e.target.classList.add('in'); io.unobserve(e.target); } }), { rootMargin: '0px 0px -12% 0px' });
-    $$('.reveal').forEach(el => io.observe(el));
-  } else {
-    /* static mode (reduced motion): four ordinary stacked beats; a layer click goes straight to its beat, with no animation */
-    landing.classList.remove('live');
+  function startStatic() {
+    const lifetime = new AbortController();
     onPalette = renderStills;
     renderStills();
-    let rt = 0; new ResizeObserver(() => { clearTimeout(rt); rt = setTimeout(renderStills, 150); }).observe(landing);
-    const sroot = window.HGStack && window.HGStack.root;
-    const brand = $('[data-hg-story-home]');
-    if (brand) brand.addEventListener('click', e => { e.preventDefault(); scrollTo(0, 0); });
+    let rt = 0;
+    const resize = new ResizeObserver(() => {
+      if (lifetime.signal.aborted) return;
+      clearTimeout(rt); rt = setTimeout(renderStills, 150);
+    });
+    resize.observe(landing);
+    const sroot = window.HGStack?.root, brand = $('[data-hg-story-home]');
+    if (brand) brand.addEventListener('click', e => {
+      e.preventDefault(); scrollTo({ top: 0, behavior: 'instant' });
+    }, { signal: lifetime.signal });
     if (sroot) sroot.addEventListener('click', e => {
       const hit = e.target.closest('[data-layer]'); if (!hit) return;
-      const el = document.getElementById('beat-' + window.HGStack.layers[+hit.dataset.layer].id);
-      if (el) el.scrollIntoView({ behavior: 'auto', block: 'start' });
-    });
+      const el = $('#beat-' + window.HGStack.layers[+hit.dataset.layer].id);
+      if (el) el.scrollIntoView({ behavior: 'instant', block: 'start' });
+    }, { signal: lifetime.signal });
+    return {
+      currentBeat() {
+        const panels = $$('.panel');
+        const padding = parseFloat(getComputedStyle(document.scrollingElement).scrollPaddingTop) || 0;
+        const margin = panels.length ? parseFloat(getComputedStyle(panels[0]).scrollMarginTop) || 0 : 0;
+        const readingLine = padding + margin + 2;
+        const visible = panels.find(el => {
+          const box = el.getBoundingClientRect();
+          return box.bottom > readingLine && box.top < innerHeight * 0.65;
+        });
+        return visible ? visible.id.slice(5) : 'hero';
+      },
+      destroy() {
+        lifetime.abort(); resize.disconnect(); clearTimeout(rt);
+        onPalette = () => {};
+      },
+    };
   }
+
+  // One active mode owns its observers, listeners, jumps and animation frame.
+  // Preference changes retain the current explanation (or downstream position)
+  // while swapping between the pinned story and ordinary document sections.
+  let mode = null, reveal = null;
+  function updateMotion() {
+    const active = document.activeElement;
+    const story = $('#story'), content = $('.landing-content');
+    const box = story.getBoundingClientRect();
+    const withinStory = box.top < innerHeight && box.bottom > 0;
+    const beat = mode && withinStory ? mode.currentBeat() : null;
+    const contentTop = mode && !withinStory ? content.getBoundingClientRect().top : null;
+    mode?.destroy(); reveal?.disconnect();
+    cancelAnimationFrame(themeRaf);
+    const live = !stillMotion.matches && Boolean(window.HGStack);
+    landing.classList.toggle('live', live);
+    window.HGStack?.setPaused(!live);
+    window.HGStack?.setInteractive(true);
+    mode = live ? startLive(beat) : startStatic();
+    if (live) {
+      reveal = new IntersectionObserver(es => es.forEach(e => {
+        if (e.isIntersecting) { e.target.classList.add('in'); reveal.unobserve(e.target); }
+      }), { rootMargin: '0px 0px -12% 0px' });
+      $$('.reveal').forEach(el => reveal.observe(el));
+    } else if (beat) {
+      const target = beat === 'hero' ? $('#hero') : $('#beat-' + beat);
+      target?.scrollIntoView({ behavior: 'instant', block: 'start' });
+    }
+    if (contentTop !== null) {
+      scrollBy({ top: content.getBoundingClientRect().top - contentTop, behavior: 'instant' });
+    }
+    // A keyboard user must not keep focus in the now-hidden pinned controls.
+    if (beat && active && landing.contains(active) && !active.getClientRects().length) {
+      const target = live ? $('#mini button[data-id="' + beat + '"]') : $('#beat-' + beat + ' .story-guide');
+      target?.focus({ preventScroll: true });
+    }
+    syncTheme(0);
+  }
+  updateMotion();
+  stillMotion.addEventListener('change', updateMotion);
 
   /* OINK owns appearance selection and persistence. The scene only reads the native theme, or its authored white-scene
      palette override; it never changes the site's data-bs-theme or saved preferences. */
-  const stillMotion = matchMedia('(prefers-reduced-motion: reduce)');
   const followNativeTheme = () => syncTheme(stillMotion.matches ? 0 : 260);
   new MutationObserver(followNativeTheme).observe(html, { attributes: true, attributeFilter: ['data-bs-theme'] });
   new MutationObserver(followNativeTheme).observe(landing, { attributes: true, attributeFilter: ['data-story-palette'] });

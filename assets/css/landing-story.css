@@ -541,7 +541,7 @@ to{transform:rotate(1turn)}
 }
 
 .hg-landing .hgs-lab:focus-visible {
-  outline:2px solid var(--hgs-accent);
+  outline:2px solid #fff;
   outline-offset:5px
 }
 
@@ -1524,7 +1524,7 @@ to{transform:translateY(calc(-3.1 * var(--u) * var(--spread)))}
   .hg-landing.live #hg-stack[data-labels="none"] { --stack-size: 200px; }
   .hg-landing #hg-stack[data-labels="none"] .hgs-labels {
     width: calc(100vw - 2 * var(--pad));
-    margin-left: calc((200px - (100vw - 2 * var(--pad))) / 2);
+    margin-left: calc((100% - (100vw - 2 * var(--pad))) / 2);
     margin-top: -26px;
   }
   .hg-landing #hg-stack[data-labels="none"] .hgs-lab { padding: 4px 6px; }
