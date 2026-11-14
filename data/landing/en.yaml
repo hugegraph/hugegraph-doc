@@ -1,6 +1,7 @@
 hero:
   title: One graph stack, from storage to AI.
-  body: Apache HugeGraph covers graph database, graph computing and graph AI, with Gremlin and Cypher on top of distributed storage.
+  body: Apache HugeGraph covers graph database, graph computing and graph AI,
+    with Gremlin and Cypher on top of distributed storage.
   primary:
     label: Get Started
     url: /docs/quickstart/
@@ -76,7 +77,8 @@ capabilities:
       icon: fa-solid fa-terminal
       url: /docs/quickstart/toolchain/
     - title: Efficient
-      body: Batch import for massive datasets, millisecond-level retrieval and concurrent online operations for thousands of users.
+      body: Batch import for massive datasets, millisecond-level retrieval
+        and concurrent online operations for thousands of users.
       icon: fa-solid fa-bolt
       url: /docs/quickstart/toolchain/hugegraph-loader/
     - title: Adaptable

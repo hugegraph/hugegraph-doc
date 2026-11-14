@@ -43,13 +43,13 @@ for (const version of VERSION_IDS.slice(1)) {
       expect(response.ok()).toBeTruthy();
       const markdown = await response.text();
       const links = [...markdown.matchAll(/\]\(([^)]+)\)/g)].map(match => match[1]);
-      expect(links.some(link => new URL(link, "https://hugegraph.apache.org").pathname === `${prefix}/docs/`)).toBeTruthy();
+      const paths = links.map(link => new URL(link, "https://hugegraph.apache.org").pathname);
+      expect(paths).toContain(`${prefix}/docs/`);
       expect(markdown).not.toContain("docker run");
-      for (const link of links) {
-        const url = new URL(link, "https://hugegraph.apache.org");
-        expect(url.pathname).toMatch(new RegExp(`^${prefix.replaceAll(".", "\\.")}/`));
-        const target = await request.get(url.pathname);
-        expect(target.ok(), `Missing archived Markdown target: ${link}`).toBeTruthy();
+      for (const path of paths) {
+        expect(path).toMatch(new RegExp(`^${prefix.replaceAll(".", "\\.")}/`));
+        const target = await request.get(path);
+        expect(target.ok(), `Missing archived Markdown target: ${path}`).toBeTruthy();
       }
     });
 
