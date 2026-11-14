@@ -1,0 +1,271 @@
+{{- $page := . -}}
+{{- $data := index hugo.Data.landing .Site.Language.Lang -}}
+<div class="hg-landing" id="hg-landing" data-story-palette="light"
+     data-hg-story-config="{{ dict "readouts" $data.story.readouts | jsonify }}">
+  <section class="story" id="story" aria-label="{{ $data.story.label }}">
+    <div class="stage" id="stage">
+      <header class="hero" id="hero">
+        <div class="wrap hero-grid">
+          <div class="hero-copy">
+            <h1>{{ $data.hero.title }}</h1>
+            <p class="lede">{{ $data.hero.body }}</p>
+            <div class="cta-row">
+              <a class="btn btn-primary" href="{{ $data.hero.primary.url | relURL }}">
+                {{ $data.hero.primary.label }} <i class="fa-solid fa-arrow-right" aria-hidden="true"></i>
+              </a>
+              <a class="btn btn-ghost" href="{{ $data.hero.secondary.url }}">
+                <i class="fa-brands fa-github" aria-hidden="true"></i> {{ $data.hero.secondary.label }}
+              </a>
+            </div>
+            <a class="story-skip" href="#components">
+              {{ $data.hero.skip }} <i class="fa-solid fa-arrow-down" aria-hidden="true"></i>
+            </a>
+          </div>
+          <div class="hero-stack" id="rig">
+<div id="hg-stack" data-labels="side" role="group" aria-label="{{ $data.story.stack_label }}">
+<div class="hgs-inner">
+  <div class="hgs-scene" aria-hidden="true">
+    <div class="hgs-plane">
+      <div class="hgs-ground"></div>
+
+      <div class="hgs-guide" style="--side:-1"></div>
+      <div class="hgs-guide" style="--side:1"></div>
+
+
+      <div class="hgs-layer" style="--i:0" data-layer="0" data-id="storage"><div class="hgs-slab">
+        <div class="hgs-face hgs-under"></div>
+        <div class="hgs-flat"><div class="hgs-face hgs-top">
+          <svg class="hgs-art" viewBox="0 0 380 380">
+            <g class="hgs-cell">
+              <rect x="90" y="130" width="34" height="34" rx="5"/>
+              <rect x="132" y="130" width="34" height="34" rx="5"/>
+              <rect x="174" y="130" width="34" height="34" rx="5"/>
+              <rect x="216" y="130" width="34" height="34" rx="5"/>
+              <rect x="90" y="172" width="34" height="34" rx="5"/>
+              <rect x="132" y="172" width="34" height="34" rx="5"/>
+              <rect x="174" y="172" width="34" height="34" rx="5"/>
+              <rect x="216" y="172" width="34" height="34" rx="5"/>
+              <rect x="90" y="214" width="34" height="34" rx="5"/>
+              <rect x="132" y="214" width="34" height="34" rx="5"/>
+              <rect x="174" y="214" width="34" height="34" rx="5"/>
+              <rect x="216" y="214" width="34" height="34" rx="5"/>
+            </g>
+            <rect class="hgs-rep" x="132" y="172" width="34" height="34" rx="5"/>
+            <rect class="hgs-rep hgs-rep-2" x="216" y="130" width="34" height="34" rx="5"/>
+            <rect class="hgs-rep hgs-rep-3" x="90" y="214" width="34" height="34" rx="5"/>
+          </svg>
+        </div></div>
+      </div></div>
+
+
+      <div class="hgs-layer" style="--i:1" data-layer="1" data-id="database"><div class="hgs-slab">
+        <div class="hgs-face hgs-under"></div>
+        <div class="hgs-flat"><div class="hgs-face hgs-top">
+          <svg class="hgs-art" viewBox="0 0 380 380">
+            <path class="hgs-edge"
+                  d="M167 191L148 240M167 191L184 136M167 191L128 136M184 136L128 136M184 136L232 122M96 185L128 136"/>
+            <g class="hgs-v">
+              <circle cx="148" cy="240" r="5.6"/>
+              <circle cx="184" cy="136" r="5.6"/>
+              <circle cx="128" cy="136" r="5.6"/>
+              <circle cx="232" cy="122" r="5.6"/>
+              <circle cx="96" cy="185" r="5.6"/>
+            </g>
+            <circle class="hgs-ring" cx="167" cy="191" r="13.5"/>
+            <circle class="hgs-v-main" cx="167" cy="191" r="7.2"/>
+
+            <g class="hgs-loop"><circle class="hgs-dot" cx="167" cy="191" r="2.6" style="--dx:17px;--dy:-55px"/></g>
+          </svg>
+        </div></div>
+      </div></div>
+
+
+      <div class="hgs-layer" style="--i:2" data-layer="2" data-id="computing"><div class="hgs-slab">
+        <div class="hgs-face hgs-under"></div>
+        <div class="hgs-flat"><div class="hgs-face hgs-top">
+          <svg class="hgs-art" viewBox="0 0 380 380">
+            <g transform="translate(180 180) rotate(45)">
+              <path class="hgs-base" d="M29 -76V76"/>
+              <path class="hgs-bar"
+                    d="M26 -68.25h-13M26 -57.75h-21M26 -47.25h-33M26 -36.75h-48M26 -26.25h-67M26 -15.75h-87
+                       M26 5.25h-92M26 15.75h-77M26 26.25h-58M26 36.75h-40M26 47.25h-28M26 57.75h-18M26 68.25h-11"/>
+              <path class="hgs-bar hgs-bar-main" d="M26 -5.25h-100"/>
+            </g>
+          </svg>
+        </div></div>
+      </div></div>
+
+
+      <div class="hgs-layer" style="--i:3" data-layer="3" data-id="ai"><div class="hgs-slab">
+        <div class="hgs-face hgs-under"></div>
+        <div class="hgs-flat"><div class="hgs-face hgs-top hgs-crown">
+          <svg class="hgs-art" viewBox="0 0 380 380">
+            <defs>
+              <radialGradient id="hgs-bloom">
+                <stop offset="0" class="hgs-bloom-a"/>
+                <stop offset=".45" class="hgs-bloom-b"/>
+                <stop offset="1" class="hgs-bloom-c"/>
+              </radialGradient>
+            </defs>
+            <circle class="hgs-bloom" cx="190" cy="190" r="124" fill="url(#hgs-bloom)"/>
+            <circle class="hgs-orbit" cx="190" cy="190" r="30"/>
+            <circle class="hgs-orbit hgs-orbit-2" cx="190" cy="190" r="74"/>
+            <g class="hgs-sats">
+              <path class="hgs-spoke" d="M190 190L259.5 215.3M190 190L133.3 237.6M190 190L177.2 117.1"/>
+              <circle cx="259.5" cy="215.3" r="7.6" fill="#229efa"/>
+              <circle cx="133.3" cy="237.6" r="7.6" fill="#9948f7"/>
+              <circle cx="177.2" cy="117.1" r="7.6" fill="#33bc7a"/>
+            </g>
+            <circle class="hgs-core" cx="190" cy="190" r="9.6"/>
+          </svg>
+        </div></div>
+      </div></div>
+    </div>
+
+
+    <div class="hgs-hit" style="--i:0" data-layer="0"></div>
+    <div class="hgs-hit" style="--i:1" data-layer="1"></div>
+    <div class="hgs-hit" style="--i:2" data-layer="2"></div>
+    <div class="hgs-hit" style="--i:3" data-layer="3"></div>
+  </div>
+
+  <div class="hgs-labels">
+    {{ range $index, $id := slice "ai" "computing" "database" "storage" }}
+    {{ $layer := index $data.layers $id }}
+    <button class="hgs-lab" type="button" style="--i:{{ sub 3 $index }}"
+            data-layer="{{ sub 3 $index }}" aria-label="{{ $layer.go }}">
+      <span class="hgs-lab-in">
+        <span class="hgs-lab-name">
+          {{ $layer.name }}<i class="fa-solid fa-arrow-right hgs-go" aria-hidden="true"></i>
+        </span>
+        <span class="hgs-lab-parts">{{ $layer.components }}</span>
+        <span class="hgs-lab-desc">{{ $layer.description }}</span>
+      </span>
+    </button>
+    {{ end }}
+  </div>
+</div>
+</div>
+          </div>
+        </div>
+        <p class="explore-hint"><i class="fa-solid fa-layer-group" aria-hidden="true"></i> {{ $data.hero.explore }}</p>
+      </header>
+      <canvas id="world" aria-hidden="true"></canvas>
+      <div class="veil" id="veil" aria-hidden="true"></div>
+      <div class="wrap stage-in">
+        {{ range $id := slice "database" "computing" "storage" "ai" }}
+        {{ $beat := index $data.story.beats $id }}
+        {{ $q := index (dict "database" "0.28" "computing" "0.6" "storage" "0.93" "ai" "1.22") $id }}
+        <section class="panel" id="beat-{{ $id }}" aria-labelledby="beat-title-{{ $id }}">
+          <div class="copy">
+            <h2 id="beat-title-{{ $id }}">{{ $beat.title }}</h2>
+            <p class="lede">{{ $beat.body }}</p>
+            {{ if eq $id "database" }}<code class="query">g.V().has('name', 'marko').out('knows')</code>{{ end }}
+            <a class="story-guide" href="{{ $beat.url | relURL }}">
+              {{ $beat.link_label }} <i class="fa-solid fa-arrow-right" aria-hidden="true"></i>
+            </a>
+          </div>
+          <canvas class="still" data-q="{{ $q }}" aria-hidden="true"></canvas>
+        </section>
+        {{ end }}
+      </div>
+      <nav class="mini" id="mini" aria-label="{{ $data.story.controls_label }}">
+        <span class="mini-bars">
+          {{ range $index, $id := slice "ai" "computing" "database" "storage" }}
+          {{ $layer := index $data.layers $id }}
+          <button type="button" data-id="{{ $id }}" style="--c:var(--accent);--o:{{ add $index 1 }}"
+                  aria-label="{{ $layer.go }}"></button>
+          {{ end }}
+        </span>
+        <span id="mini-name" aria-live="polite">{{ $data.layers.database.name }}</span>
+        <a class="story-skip" href="#components">
+          {{ $data.hero.skip }} <i class="fa-solid fa-arrow-down" aria-hidden="true"></i>
+        </a>
+      </nav>
+      <p class="readout" id="readout" aria-hidden="true"></p>
+      <div class="wash" id="wash" aria-hidden="true"></div>
+    </div>
+  </section>
+  <div class="landing-content">
+    <section class="section" id="capabilities" aria-labelledby="capabilities-title">
+      <div class="wrap">
+        <h2 id="capabilities-title">{{ $data.capabilities.title }}</h2>
+        <div class="cap-grid">
+          {{ range $index, $item := $data.capabilities.items }}
+          <article class="cap reveal" style="--i:{{ mod $index 2 }}">
+            <i class="{{ $item.icon }} ic" aria-hidden="true"></i>
+            <h3><a href="{{ $item.url | relURL }}">{{ $item.title }}</a></h3>
+            <p>{{ $item.body }}</p>
+          </article>
+          {{ end }}
+        </div>
+      </div>
+    </section>
+    <section class="section parts" id="components" aria-labelledby="components-title">
+      <div class="wrap">
+        <h2 id="components-title">{{ $data.components.title }}</h2>
+        <p class="sub">{{ $data.components.body }}</p>
+        <div class="parts-grid reveal">
+          {{ range $data.components.groups }}
+          <div class="group"><h3>{{ .title }}</h3><dl>
+            {{ range .items }}
+            <div>
+              <dt>
+                <a href="{{ .url | relURL }}">
+                  {{ .name }} <i class="fa-solid fa-arrow-up-right-from-square" aria-hidden="true"></i>
+                </a>
+                {{ if .first_use }}<span class="first-use">{{ $data.components.first_use }}</span>{{ end }}
+              </dt>
+              <dd>{{ .body }}</dd>
+            </div>
+            {{ end }}
+          </dl></div>
+          {{ end }}
+        </div>
+      </div>
+    </section>
+    <section class="section" id="quickstart" aria-labelledby="quickstart-title">
+      <div class="wrap">
+        <h2 id="quickstart-title">{{ $data.quickstart.title }}</h2>
+        <p class="sub">{{ $data.quickstart.body }}</p>
+        <div class="cmd">
+          <code id="cmd" tabindex="0">{{ $data.quickstart.command }}</code>
+          <button class="copy-btn" id="copy" type="button"
+                  data-copy="{{ $data.quickstart.copy }}"
+                  data-copied="{{ $data.quickstart.copied }}"
+                  data-copy-fallback="{{ $data.quickstart.copy_fallback }}"
+                  data-copy-status="{{ $data.quickstart.copy_status }}"
+                  data-copy-fallback-status="{{ $data.quickstart.copy_fallback_status }}">
+            <i class="fa-regular fa-copy" aria-hidden="true"></i>
+            <span id="copy-label">{{ $data.quickstart.copy }}</span>
+          </button>
+        </div>
+        <p class="sr-only" id="copy-status" role="status" aria-live="polite"></p>
+        <p class="next-step">
+          {{ $data.quickstart.verify }}
+          <a href="{{ $data.quickstart.next.url | relURL }}">
+            {{ $data.quickstart.next.label }} <i class="fa-solid fa-arrow-right" aria-hidden="true"></i>
+          </a>
+        </p>
+      </div>
+    </section>
+    <section class="section" id="community" aria-labelledby="community-title">
+      <div class="wrap">
+        <h2 id="community-title">{{ $data.community.title }}</h2>
+        <p class="sub">{{ $data.community.body }}</p>
+        <ul class="doors">
+          {{ range $data.community.items }}
+          <li class="reveal">
+            <a href="{{ if .external }}{{ .url }}{{ else }}{{ .url | relURL }}{{ end }}">
+              <i class="{{ .icon }} ic" aria-hidden="true"></i>
+              <span class="t">{{ .title }}</span>
+              <span class="d">{{ .body }}</span>
+              <span class="go"><i class="fa-solid fa-arrow-up-right-from-square" aria-hidden="true"></i></span>
+            </a>
+          </li>
+          {{ end }}
+        </ul>
+      </div>
+    </section>
+  </div>
+</div>

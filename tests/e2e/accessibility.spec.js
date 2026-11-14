@@ -2,6 +2,8 @@ const { test, expect } = require("./artifact-test");
 const AxeBuilder = require("@axe-core/playwright").default;
 
 for (const route of [
+  "/",
+  "/cn/",
   "/docs/",
   "/cn/docs/",
   "/community/",
@@ -42,6 +44,44 @@ for (const route of [
     expect(blocking).toEqual([]);
   });
 }
+
+test("homepage story controls remain accessible on the white graph surface", async ({ page }) => {
+  await page.setViewportSize({ width: 1440, height: 1000 });
+  await page.emulateMedia({ reducedMotion: "no-preference" });
+  await page.goto("/");
+  await expect(page.locator("#hg-landing")).toBeVisible();
+  await page.locator("#story").evaluate(story => {
+    const top = story.getBoundingClientRect().top + scrollY;
+    scrollTo({ top: top + (story.offsetHeight - innerHeight) * 0.68, behavior: "instant" });
+  });
+  await expect(page.locator("#mini")).toBeVisible();
+  await expect(page.locator("#mini")).toHaveCSS("opacity", "1");
+  // Axe can mark text over the animated canvas as "needs review". Measure
+  // these opaque controls against their own surface over the white scene too.
+  const contrast = await page.locator("#mini").evaluate(mini => {
+    const channels = value => value.match(/[\d.]+/g).map(Number);
+    const luminance = rgb => rgb.slice(0, 3).reduce((sum, channel, i) => {
+      const value = channel / 255;
+      return sum + [0.2126, 0.7152, 0.0722][i]
+        * (value <= 0.04045 ? value / 12.92 : ((value + 0.055) / 1.055) ** 2.4);
+    }, 0);
+    const background = channels(getComputedStyle(mini).backgroundColor);
+    const alpha = background[3] ?? 1;
+    const surface = luminance(background.slice(0, 3).map(value => value * alpha + 255 * (1 - alpha)));
+    return [...mini.querySelectorAll("#mini-name, .story-skip")].map(element => {
+      const ink = luminance(channels(getComputedStyle(element).color));
+      return (Math.max(ink, surface) + 0.05) / (Math.min(ink, surface) + 0.05);
+    });
+  });
+  expect(contrast).toHaveLength(2);
+  for (const ratio of contrast) expect(ratio).toBeGreaterThanOrEqual(4.5);
+  const results = await new AxeBuilder({ page })
+    .include("#mini")
+    .withTags(["wcag2a", "wcag2aa", "wcag21aa", "wcag22aa"])
+    .analyze();
+  expect(results.violations.filter(item => ["critical", "serious"].includes(item.impact)))
+    .toEqual([]);
+});
 
 for (const locale of ["en", "cn"]) {
   test(`download table scrolls with the keyboard on mobile ${locale}`, async ({ page }) => {
