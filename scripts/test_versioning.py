@@ -6,6 +6,7 @@
 # The ASF licenses this file to You under the Apache License, Version 2.0.
 
 import argparse
+import hashlib
 import json
 import shutil
 import tempfile
@@ -103,7 +104,7 @@ class VersionUrlTest(unittest.TestCase):
         fixtures = (
             (
                 "docs/config/index.html",
-                '<nav id="TableOfContents" aria-label="Content"></nav>',
+                '<nav id="TableOfContents" aria-label="On this page"></nav>',
             ),
             (
                 "cn/docs/config/index.html",
@@ -126,17 +127,21 @@ class VersionUrlTest(unittest.TestCase):
             ),
             (
                 "cn/docs/config/index.html",
+                '<nav id="TableOfContents" aria-label="On this page"></nav>',
+            ),
+            (
+                "docs/config/index.html",
                 '<nav id="TableOfContents" aria-label="Content"></nav>',
             ),
             (
                 "docs/config/index.html",
-                '<nav id="TableOfContents" aria-label="Content" '
-                'aria-label="Content"></nav>',
+                '<nav id="TableOfContents" aria-label="On this page" '
+                'aria-label="On this page"></nav>',
             ),
             (
                 "docs/config/index.html",
-                '<nav id="TableOfContents" aria-label="Content"></nav>'
-                '<nav id="TableOfContents" aria-label="Content"></nav>',
+                '<nav id="TableOfContents" aria-label="On this page"></nav>'
+                '<nav id="TableOfContents" aria-label="On this page"></nav>',
             ),
         )
         for relative, fragment in fixtures:
@@ -146,7 +151,7 @@ class VersionUrlTest(unittest.TestCase):
                 with self.assertRaises(SystemExit):
                     versioning.require_toc_accessible_name(parser, relative)
 
-    def test_validate_artifact_rejects_missing_toc_accessible_name(self) -> None:
+    def test_validate_artifact_rejects_missing_toc_or_native_resource_targets(self) -> None:
         with tempfile.TemporaryDirectory() as temp_name:
             temp = Path(temp_name)
             artifact = temp / "artifact"
@@ -169,12 +174,6 @@ class VersionUrlTest(unittest.TestCase):
             social = artifact / "img/social/fallback.png"
             social.parent.mkdir(parents=True)
             social.write_bytes(b"png")
-            (artifact / "index.html").write_text(
-                '<meta property="og:image" content="/img/social/fallback.png">'
-                '<meta name="twitter:image" content="/img/social/fallback.png">'
-                '<nav id="TableOfContents"></nav>',
-                encoding="utf-8",
-            )
             en_llms = artifact / "docs/llms-full.txt"
             cn_llms = artifact / "cn/docs/llms-full.txt"
             en_llms.parent.mkdir(parents=True)
@@ -208,11 +207,26 @@ class VersionUrlTest(unittest.TestCase):
                 site_origin=ORIGIN,
                 artifact=artifact,
             )
-            with (
-                mock.patch.object(versioning, "URL_CONTRACT", contract),
-                self.assertRaisesRegex(SystemExit, "TableOfContents nav"),
-            ):
-                versioning.validate_artifact(args)
+            fixtures = (
+                ('<nav id="TableOfContents"></nav>', "TableOfContents nav"),
+                ('<div data-td-body-src="/offline-search-body.en.abc.json"></div>',
+                 "missing local target.*offline-search-body"),
+                ('<script type="application/json" data-td-markmap-config>'
+                 '{"src":"/third_party/markmap/markmap.abc123.js"}</script>',
+                 "missing local target.*third_party/markmap"),
+            )
+            for fragment, error in fixtures:
+                (artifact / "index.html").write_text(
+                    '<meta property="og:image" content="/img/social/fallback.png">'
+                    '<meta name="twitter:image" content="/img/social/fallback.png">' + fragment,
+                    encoding="utf-8",
+                )
+                with (
+                    self.subTest(fragment=fragment),
+                    mock.patch.object(versioning, "URL_CONTRACT", contract),
+                    self.assertRaisesRegex(SystemExit, error),
+                ):
+                    versioning.validate_artifact(args)
 
     def test_version_urls_preserve_language_and_order(self) -> None:
         manifest = {
@@ -1597,13 +1611,14 @@ class VersionUrlTest(unittest.TestCase):
             '<source srcset=/images/five.png>'
             '<svg><use xlink:href="/images/sprite.svg#icon"></use></svg>'
             '<button data-td-action-url="/docs/action/">action</button>'
+            '<div data-td-body-src="/offline-search-body.en.hash.json"></div>'
         )
         rendered, count = versioning.rewrite_text_urls(
             source,
             rewrite,
             markdown=False,
         )
-        self.assertEqual(count, 7)
+        self.assertEqual(count, 8)
         for name in ("one", "two", "three", "four", "five"):
             self.assertIn(
                 f"/versions/1.7/images/{name}.png",
@@ -1617,6 +1632,10 @@ class VersionUrlTest(unittest.TestCase):
         )
         self.assertIn(
             'data-td-action-url="/versions/1.7/docs/action/"',
+            rendered,
+        )
+        self.assertIn(
+            'data-td-body-src="/versions/1.7/offline-search-body.en.hash.json"',
             rendered,
         )
 
@@ -1753,6 +1772,70 @@ class VersionUrlTest(unittest.TestCase):
             )
             self.assertEqual(scoped["labels"], {"title": "Duo View"})
             self.assertEqual(stats["compareConfigs"], 1)
+
+    def test_split_search_and_markmap_resources_stay_in_archive(self) -> None:
+        manifest = versioning.load_manifest(versioning.ROOT / "versions.json")
+        archived = next(entry for entry in manifest["versions"] if entry["id"] == "1.7")
+        with tempfile.TemporaryDirectory() as temp_name:
+            output = Path(temp_name)
+            page = output / "docs/index.html"
+            page.parent.mkdir()
+            engine = "/third_party/markmap/markmap.abc123.js"
+            (output / engine.lstrip("/")).parent.mkdir(parents=True)
+            (output / engine.lstrip("/")).write_text("export const engine = true;")
+            original_names = {}
+            body_bytes = 0
+            for kind, entry in (
+                ("index", {"ref": "/docs/", "title": "Docs"}),
+                ("body", {"ref": "/docs/", "body": "只在正文中出现的 searchable value"}),
+            ):
+                content = json.dumps([entry], ensure_ascii=False).encode("utf-8")
+                name = f"offline-search-{kind}.en.{hashlib.md5(content).hexdigest()}.json"
+                (output / name).write_bytes(content)
+                original_names[kind] = name
+                if kind == "body":
+                    body_bytes = len(content)
+            page.write_text(
+                f'<div data-td-index-src="/{original_names["index"]}" '
+                f'data-td-body-src="/{original_names["body"]}" data-td-body-bytes="{body_bytes}"></div>'
+                f'<script type="application/json" data-td-markmap-config>{{"src":"{engine}"}}</script>',
+                encoding="utf-8",
+            )
+
+            stats = versioning.scope_version_artifact(output, manifest, archived, STAGING_ORIGIN)
+            self.assertEqual(stats["searchFingerprints"], 2)
+            resources = {}
+            rendered = page.read_text(encoding="utf-8")
+            for kind in ("index", "body"):
+                resource, = output.glob(f"offline-search-{kind}.*.json")
+                content = resource.read_bytes()
+                self.assertEqual(resource.name.split(".")[2], hashlib.md5(content).hexdigest())
+                self.assertIn(f'data-td-{kind}-src="/versions/1.7/{resource.name}"', rendered)
+                self.assertNotIn(original_names[kind], rendered)
+                resources[kind] = json.loads(content)
+                if kind == "body":
+                    self.assertIn(f'data-td-body-bytes="{len(content)}"', rendered)
+            # The native engine joins the independently fetched files by ref.
+            self.assertEqual(resources["index"][0]["ref"], "/versions/1.7/docs/")
+            self.assertEqual(resources["body"][0]["ref"], resources["index"][0]["ref"])
+            self.assertEqual(resources["body"][0]["body"], "只在正文中出现的 searchable value")
+            markmap = json.loads(versioning.MARKMAP_CONFIG_RE.search(rendered).group("body"))
+            self.assertEqual(markmap["src"], "/versions/1.7" + engine)
+
+            before = {path.relative_to(output): path.read_bytes() for path in output.rglob("*") if path.is_file()}
+            stats = versioning.scope_version_artifact(output, manifest, archived, STAGING_ORIGIN)
+            self.assertEqual(stats["searchFingerprints"], 0)
+            self.assertEqual(before, {path.relative_to(output): path.read_bytes() for path in output.rglob("*") if path.is_file()})
+
+    def test_split_search_body_rejects_stale_fingerprint(self) -> None:
+        manifest = versioning.load_manifest(versioning.ROOT / "versions.json")
+        with tempfile.TemporaryDirectory() as temp_name:
+            output = Path(temp_name)
+            (output / ("offline-search-body.en." + "0" * 32 + ".json")).write_text(
+                json.dumps([{"ref": "/docs/", "body": "text"}]), encoding="utf-8"
+            )
+            with self.assertRaisesRegex(SystemExit, "stale search resource fingerprint"):
+                versioning.scope_version_artifact(output, manifest, manifest["versions"][1], ORIGIN)
 
     def test_duo_view_page_marker_uses_the_mounted_path(self) -> None:
         manifest = versioning.load_manifest(versioning.ROOT / "versions.json")
@@ -2015,6 +2098,7 @@ class VersionUrlTest(unittest.TestCase):
             '<img srcset="/one.png 1x, /two.png 2x">'
             '<link imagesrcset="/three.png 400w, /four.png 800w">'
             '<button data-td-action-url="/action">action</button>'
+            '<div data-td-body-src="/offline-search-body.en.hash.json"></div>'
         )
         self.assertEqual(
             parser.urls,
@@ -2033,6 +2117,7 @@ class VersionUrlTest(unittest.TestCase):
                 ("imagesrcset", "/three.png"),
                 ("imagesrcset", "/four.png"),
                 ("data-td-action-url", "/action"),
+                ("data-td-body-src", "/offline-search-body.en.hash.json"),
             ],
         )
 

@@ -1,5 +1,5 @@
-{{- /* OINK v1.5.1 override: keep keyboard help in the header and expose
-       HugeGraph version links inside the native navbar-only mobile drawer. */ -}}
+{{- /* OINK override: keep HugeGraph's brand, header help and page-preserving
+       version links while inheriting native overflow and drawer controls. */ -}}
 {{- $config := partialCached "shell/config.html" . .Site.Language.Lang -}}
 {{- $targets := partialCached "language-targets.html" . .Site.BaseURL .RelPermalink .Site.Language.Lang -}}
 {{- $localSearch := partial "shell/search-enabled.html" . -}}
@@ -40,14 +40,22 @@
         {{- end }}
       </a>
 
-      {{- /* Center zone: the site's own content-driven menu entries, true-
-           centered in the row by the grid. */ -}}
+      {{- /* The native runtime collapses icons first, then moves remaining
+             navigation entries into its labelled overflow disclosure. */ -}}
       <div class="td-nav-links td-nav-menu-zone">
         {{- range $index, $entry := .Site.Menus.main -}}
           {{- if ne .Identifier "github" -}}
             {{- partial "navbar-item.html" (dict "page" $ "entry" $entry "mode" "desktop" "index" $index) -}}
           {{- end -}}
         {{- end }}
+        <div class="td-nav-overflow" data-td-nav-overflow hidden>
+          <button type="button" class="td-nav-overflow__trigger" data-td-nav-overflow-toggle
+            aria-haspopup="true" aria-expanded="false" aria-controls="td-nav-overflow-panel"
+            title="{{ T "ui_nav_more" }}" aria-label="{{ T "ui_nav_more" }}">
+            {{- partialCached "shell/icon.html" "ellipsis" "navbar-more" -}}
+          </button>
+          <div class="td-nav-menu__panel td-nav-overflow__panel" id="td-nav-overflow-panel" data-td-nav-overflow-panel hidden></div>
+        </div>
       </div>
 
       {{- /* Right zone: the search box leads as the elastic boundary before
@@ -122,10 +130,6 @@
         <div class="td-site-drawer__children">
           {{- partial "navbar-group-items.html" (dict "page" $ "items" .Children "mode" "mobile" "top" . "depth" 1) -}}
         </div>
-        {{- else if and (eq .Identifier "docs") $.Site.Params.versions }}
-        <div class="td-site-drawer__children" aria-label="{{ $.Site.Params.version_menu | default "Version" }}">
-          {{ partial "version-menu-links.html" (dict "page" $ "versions" $.Site.Params.versions "class" "td-site-nav__menu-link td-site-nav__menu-child" "key" "landing-mobile") }}
-        </div>
         {{- end }}
       {{- end }}
     {{- end }}
@@ -133,18 +137,22 @@
     <button type="button" class="td-site-nav__menu-link td-site-nav__menu-link--button" data-td-shell-search-open data-td-landing-menu-dismiss
       aria-haspopup="dialog" aria-expanded="false">{{ partialCached "shell/icon.html" "search" "landing-mobile-search" }}<span>{{ T "ui_search" }}</span></button>
     {{- end }}
-    <div class="hg-landing-mobile-utils">
-      <section class="hg-shell-mobile-utils__group" aria-label="{{ T "ui_language_select" }}">
-        {{ partial "language-selector.html" (dict "page" . "mode" "list" "class" "hg-shell-mobile-utils__languages") }}
-      </section>
-      {{ partial "shell/appearance-menu.html" (dict "page" $ "context" "drawer" "class" "hg-shell-mobile-utils__appearance" "trigger" "td-site-nav__menu-link td-site-nav__menu-link--button" "label" (T "ui_appearance")) }}
-    </div>
     {{- with $altSite }}
     <a class="td-site-nav__menu-link" href="{{ .url }}" target="_blank" rel="noopener noreferrer"><i class="fa-solid fa-language" aria-hidden="true"></i><span>{{ .label }}</span></a>
+    {{- end }}
+    {{ partial "language-selector.html" (dict "page" $ "mode" "list") }}
+    {{- with .Site.Params.versions }}
+    <section class="hg-shell-mobile-utils__group" aria-label="{{ $.Site.Params.version_menu | default "Version" }}">
+      <strong>{{ $.Site.Params.version_menu | default "Version" }}</strong>
+      <div class="hg-shell-mobile-utils__links">
+        {{ partial "version-menu-links.html" (dict "page" $ "versions" . "class" "" "key" "landing-mobile") }}
+      </div>
+    </section>
     {{- end }}
     {{- with $config.projectRepo }}
     <a class="td-site-nav__menu-link" href="{{ . }}" target="_blank" rel="noopener noreferrer"><i class="fa-brands fa-github" aria-hidden="true"></i><span>GitHub{{ with $githubStars }} · {{ . }}{{ end }}</span></a>
     {{- end }}
+    {{ partial "shell/appearance-menu.html" (dict "page" $ "context" "drawer" "class" "td-site-drawer__appearance" "trigger" "td-site-nav__menu-link td-site-nav__menu-link--button" "label" (T "ui_appearance")) }}
   </nav>
 </div>
 {{- end }}

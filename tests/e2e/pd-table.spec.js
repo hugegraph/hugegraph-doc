@@ -1,6 +1,10 @@
 const { test, expect } = require('./artifact-test');
 
-async function expectConfigurationCatalog(page, route, wideCount, ordinaryCount, environmentKeys = false) {
+// Each catalogue uses its own page and storage. Keep the existing worker cap
+// while allowing the long matrix to use both workers when other files finish.
+test.describe.configure({ mode: 'parallel' });
+
+async function expectConfigurationCatalog(page, route, wideCount, ordinaryCount, environmentKeys = false, fieldsCount = 0) {
   await page.goto(route);
   // Optional/deprecated catalogues still need readable identifiers
   // when readers explicitly expand them. Open through their UI.
@@ -11,6 +15,20 @@ async function expectConfigurationCatalog(page, route, wideCount, ordinaryCount,
   const tables = page.locator('.td-content table.td-table--wide');
   await expect(tables).toHaveCount(wideCount);
   await expect(page.locator('.td-content table:not(.td-table--wide)')).toHaveCount(ordinaryCount);
+  await expect(page.locator('.td-content .td-fields')).toHaveCount(fieldsCount);
+  const fields = await page.locator('.td-content .td-field').evaluateAll(nodes => nodes.map(node => ({
+    id: node.id,
+    name: node.querySelector('.td-field__name').textContent.trim(),
+    description: node.querySelector('.td-field__description').textContent.trim(),
+    font: parseFloat(getComputedStyle(node.querySelector('.td-field__description')).fontSize)
+  })));
+  expect(new Set(fields.map(field => field.id)).size).toBe(fields.length);
+  for (const field of fields) {
+    expect(field.id).toBeTruthy();
+    expect(field.name).toBeTruthy();
+    expect(field.description).toBeTruthy();
+    expect(field.font).toBeGreaterThanOrEqual(14);
+  }
   for (const table of await tables.all()) {
     const wrapper = table.locator('..');
     await wrapper.scrollIntoViewIfNeeded();
@@ -128,10 +146,10 @@ for (const language of ['en', 'cn']) {
             localStorage.setItem('td-color-theme', theme);
           }, { preset, theme });
           const prefix = language === 'cn' ? '/cn' : '';
-          for (const [route, wideCount, ordinaryCount] of [
-            ['config-backend-hbase', 4, 2], ['config-backend-hstore', 2, 3], ['config-option', 16, 0]
+          for (const [route, wideCount, ordinaryCount, fieldsCount] of [
+            ['config-backend-hbase', 4, 2, 0], ['config-backend-hstore', 2, 3, 0], ['config-option', 13, 0, 3]
           ]) {
-            await expectConfigurationCatalog(page, `${prefix}/docs/config/${route}/`, wideCount, ordinaryCount);
+            await expectConfigurationCatalog(page, `${prefix}/docs/config/${route}/`, wideCount, ordinaryCount, false, fieldsCount);
           }
         });
         test(`${language} ${preset} ${theme} Computer configuration identifiers remain intact at ${width}px`, async ({ page }) => {
@@ -151,10 +169,10 @@ for (const language of ['en', 'cn']) {
 
 for (const language of ['en', 'cn']) {
   for (const width of [1440, 390]) {
-    for (const [route, wideCount, ordinaryCount, environmentKeys] of [
-      ['hugegraph/hugegraph-hstore', 9, 2, false],
-      ['hugegraph/hugegraph-pd', 8, 3, false],
-      ['hugegraph-ai/config-reference', 3, 5, true]
+    for (const [route, wideCount, ordinaryCount, environmentKeys, fieldsCount] of [
+      ['hugegraph/hugegraph-hstore', 5, 2, false, 4],
+      ['hugegraph/hugegraph-pd', 1, 3, false, 7],
+      ['hugegraph-ai/config-reference', 3, 5, true, 0]
     ]) {
       test(`${language} ${route} technical references keep identifiers intact at ${width}px`, async ({ page }) => {
         await page.setViewportSize({ width, height: 1000 });
@@ -163,7 +181,7 @@ for (const language of ['en', 'cn']) {
           localStorage.setItem('td-color-theme', 'light');
         });
         const prefix = language === 'cn' ? '/cn' : '';
-        await expectConfigurationCatalog(page, `${prefix}/docs/quickstart/${route}/`, wideCount, ordinaryCount, environmentKeys);
+        await expectConfigurationCatalog(page, `${prefix}/docs/quickstart/${route}/`, wideCount, ordinaryCount, environmentKeys, fieldsCount);
       });
     }
   }

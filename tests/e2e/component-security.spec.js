@@ -28,11 +28,15 @@ function chartGate(option) {
   const json = JSON.stringify(option).replaceAll('<', '\\u003c');
   return securityGate(`<article><script type="application/json" data-td-echarts-options>${json}</script></article>`);
 }
-async function isolate(page) {
+async function isolate(page, markmapModules = false) {
   const requests = [];
   await page.route('**/*', async route => {
     if (route.request().isNavigationRequest()) {
       await route.fulfill({ contentType: 'text/html', body: '<div id="chart" style="width:600px;height:400px"></div>' });
+    } else if (markmapModules && new URL(route.request().url()).origin === 'http://component-security.invalid' &&
+      new URL(route.request().url()).pathname.startsWith('/third_party/markmap/')) {
+      const filename = path.join(root, new URL(route.request().url()).pathname);
+      await route.fulfill({ path: filename, contentType: 'text/javascript' });
     } else {
       requests.push(route.request().url());
       await route.abort(); // Every probe request stays inside this test.
@@ -82,7 +86,7 @@ test('safe shorthand and inherited fonts render with no outside requests', async
 });
 
 for (const [name, source, rejected, image] of [
-  ['outline', '---\nmarkmap:\n  spacingHorizontal: 40\n---\n# HugeGraph\n- server\n- core', false, false],
+  ['outline', '---\nmarkmap:\n  levelGap: 40\n---\n# HugeGraph\n- server\n- core', false, false],
   ['image', '# Parent\n- ![image](https://outside-review.invalid/map.png)', true, true],
   ['reference image', '# Parent\n- ![image][ref]\n\n[ref]: https://outside-review.invalid/ref.png', true, true],
   ['allowed-origin image', '# Parent\n- ![image](/img/local.png)', true, true],
@@ -90,20 +94,22 @@ for (const [name, source, rejected, image] of [
 ]) {
   test(`Markmap plain-text contract handles ${name} before rendering`, async ({ page }) => {
     const escaped = source.replaceAll('&', '&amp;').replaceAll('<', '&lt;').replaceAll('>', '&gt;');
-    const gate = securityGate(`<pre><code class="language-markmap">${escaped}</code></pre><script src="/third_party/markmap/markmap-autoloader.hash.js"></script>`);
+    const gate = securityGate(`<pre><code class="language-markmap">${escaped}</code></pre><script src="/js/chunks/markmap-en.hash.js"></script>`);
     expect(gate.status, gate.output).toBe(rejected ? 1 : 0);
-    const requests = await isolate(page);
-    await page.addScriptTag({ path: asset('markmap', 'd3.min.') });
-    await page.addScriptTag({ path: asset('markmap', 'markmap-lib.') });
-    await page.addScriptTag({ path: asset('markmap', 'markmap-view.') });
-    await page.evaluate(source => {
+    const requests = await isolate(page, true);
+    const engine = '/third_party/markmap/' + path.basename(asset('markmap', 'markmap.'));
+    await page.evaluate(async ({ source, engine }) => {
+      const api = await import(engine);
       document.getElementById('chart').innerHTML = '<svg style="width:600px;height:400px"></svg>';
-      const transformed = new markmap.Transformer().transform(source);
-      markmap.Markmap.create(document.querySelector('svg'), { duration: 0 }, transformed.root);
-    }, source);
+      const parsed = api.parse(source);
+      api.Markmap.create(document.querySelector('svg'), parsed.root, {
+        duration: 0, plugins: api.defaultContentPlugins,
+        measurer: api.createCanvasMeasurer(document.createElement('canvas').getContext('2d'))
+      });
+    }, { source, engine });
     if (image) await expect.poll(() => requests.length).toBeGreaterThan(0);
     else {
-      await expect(page.locator('foreignObject').first()).toBeVisible();
+      await expect(page.locator('svg [data-key^="node:"]').first()).toBeVisible();
       expect(requests).toEqual([]);
     }
   });

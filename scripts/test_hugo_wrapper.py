@@ -197,7 +197,7 @@ exit "${HG_WRAPPER_HUGO_EXIT:-0}"
                     expected_origin,
                 )
 
-    def test_build_enforces_strict_warnings_with_the_libsass_exception(self) -> None:
+    def test_build_enforces_strict_warnings(self) -> None:
         calls = self.run_wrapper("build", "--destination", "custom public with spaces")
         args = calls[1]["args"]
         self.assertNotIn("build", args)
@@ -216,12 +216,12 @@ exit "${HG_WRAPPER_HUGO_EXIT:-0}"
         self.assertIn("info", args)
         self.assertEqual(args[-2:], ["--destination", "custom public with spaces"])
 
-    def test_build_allows_only_the_exact_libsass_warning_and_keeps_output(self) -> None:
+    def test_build_rejects_obsolete_libsass_warning_and_keeps_output(self) -> None:
         output = "Starting Hugo build\n" + LIBSASS_WARNING + "Total in 12 ms\n"
         result = self.invoke_wrapper(
             "build", environment_overrides={"HG_WRAPPER_HUGO_STDERR": output}
         )
-        self.assertEqual(result.returncode, 0, result.stderr)
+        self.assertEqual(result.returncode, 1, result.stderr)
         self.assertIn(output, result.stdout + result.stderr)
 
     def test_build_rejects_other_hugo_warnings_even_beside_libsass(self) -> None:

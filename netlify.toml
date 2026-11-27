@@ -1,9 +1,10 @@
 # Legacy/ad-hoc preview only. ASF staging and production use .github/workflows/hugo.yml.
+# Version values are derived from toolchain.json by scripts/site_toolchain.py --sync.
 [build]
-command = "bash scripts/hugo.sh build"
+command = "python3 scripts/site_toolchain.py --check && bash scripts/hugo.sh build"
 publish = "public"
 
 [build.environment]
-GO_VERSION = "1.27.3"
-HUGO_VERSION = "0.168.0"
+GO_VERSION = "1.27.4"
+HUGO_VERSION = "0.170.1"
 HUGO_ENVIRONMENT = "production"

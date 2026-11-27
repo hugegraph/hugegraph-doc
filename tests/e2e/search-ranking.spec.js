@@ -86,7 +86,7 @@ const cases = Object.fromEntries(
 
 for (const [locale, localeCases] of Object.entries(cases)) {
   for (const [query, expectedRef, expectedTitle] of localeCases) {
-    test(`local Lunr ranks ${locale}: ${query}`, async ({ page }) => {
+    test(`native full-text search ranks ${locale}: ${query}`, async ({ page }) => {
       test.skip(!metadataIntegrated, "Search metadata fixture is unavailable");
       // Search uses the JSON index; loading documentation images adds no signal
       // and can leave unrelated image requests in flight during navigation.
@@ -99,7 +99,7 @@ for (const [locale, localeCases] of Object.entries(cases)) {
         .locator("#td-shell-search-results .td-shell-search__group")
         .first()
         .locator('[role="option"]');
-      await expect(pageResults.first(), `no Lunr results for ${query}`).toBeVisible();
+      await expect(pageResults.first(), `no native search results for ${query}`).toBeVisible();
       // OINK may append " › section" to a page's indexed title. Accept only
       // that explicit suffix and activate the matching row within the top
       // three, then verify its real destination rather than a title substring.

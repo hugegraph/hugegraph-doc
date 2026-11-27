@@ -1,0 +1,39 @@
+{{- /* OINK's native layer order and public bundle interface, with HugeGraph's
+       existing no-data-URL policy applied before minification/fingerprinting.
+       Only the reviewed Bootstrap SVGs are replaced; an unknown data URI is
+       a build error. Keep the module sources and the rest of the CSS intact. */ -}}
+{{- $name := . -}}
+{{- $bundle := false -}}
+{{- $names := index (partialCached "css/layers.html" "layers") $name -}}
+{{- if not $names -}}
+  {{- errorf "stylesheet: unknown OINK bundle %q" $name -}}
+{{- else -}}
+  {{- $layers := slice -}}
+  {{- range $names -}}
+    {{- $path := printf "css/td/%s.css" . -}}
+    {{- if hasPrefix . "/" }}{{ $path = printf "%s.css" (strings.TrimPrefix "/" .) }}{{ end -}}
+    {{- with resources.Get $path -}}
+      {{- $layers = $layers | append . -}}
+    {{- else -}}
+      {{- errorf "stylesheet: missing OINK layer assets/%s" $path -}}
+    {{- end -}}
+  {{- end -}}
+  {{- if $layers -}}
+    {{- $bundle = $layers | resources.Concat (printf "css/%s.css" $name) -}}
+    {{- $content := $bundle.Content -}}
+    {{- range $asset, $uri := hugo.Data.oink_css_assets -}}
+      {{- if strings.Contains $content $uri -}}
+        {{- $local := printf "img/bootstrap-controls/%s.svg" $asset -}}
+        {{- if not (fileExists (printf "static/%s" $local)) -}}
+          {{- errorf "stylesheet: missing reviewed local SVG static/%s" $local -}}
+        {{- end -}}
+        {{- $content = replace $content $uri (printf "../%s" $local) -}}
+      {{- end -}}
+    {{- end -}}
+    {{- if findRE `(?i)data:` $content -}}
+      {{- errorf "stylesheet: unreviewed data URI in OINK %s; review data/oink_css_assets.json and the local SVGs" $name -}}
+    {{- end -}}
+    {{- $bundle = resources.FromString (printf "css/%s.css" $name) $content -}}
+  {{- end -}}
+{{- end -}}
+{{- return $bundle -}}

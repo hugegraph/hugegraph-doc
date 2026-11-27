@@ -90,6 +90,12 @@ outputs:
   page: [HTML, markdown]
   section: [HTML, RSS, print, markdown]
 
+# Keep the blog's local copy-link action on the native accessible share bar.
+cascade:
+  - target: { path: '/blog/**', kind: page }
+    params:
+      share: [copy]
+
 params:
   # Native module outlines load the local runtime only on pages with Markmap.
   markmap: true
@@ -157,6 +163,7 @@ params:
       enable: true
       assistant_links: false
     reading_time: false
+    share: false
     feedback: false
     keyboard_nav: true
     # OINK native Duo View is exposed only for real Docs/Book/Blog translations.
@@ -166,5 +173,5 @@ module:
   imports:
     - path: github.com/pgsty/oink
   hugoVersion:
-    extended: true
-    min: 0.168.0
+    # Theme compatibility floor; the reproducible build pin is in toolchain.json.
+    min: 0.169.0

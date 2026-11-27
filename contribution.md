@@ -14,9 +14,10 @@ For the short workflow, start with [README.md](./README.md). This file records t
 
 The site uses the Hugo Module recorded in `go.mod` and `go.sum`:
 
-Toolchain versions are maintained in `go.mod` and `.github/workflows/hugo.yml`;
-`go.mod` / `go.sum` pin the theme. Hugo Extended uses its built-in LibSass compiler;
-no standalone Dart Sass or npm dependencies are needed to build the site. Node.js is needed only for the browser tests,
+Toolchain versions are maintained in `toolchain.json`; `go.mod` / `go.sum` pin the theme.
+After changing toolchain pins, run `python3 scripts/site_toolchain.py --sync` to update the Go directive and Netlify environment.
+CI reads the manifest and rejects drift in those derived copies. Standard Hugo builds the native CSS directly;
+no Sass compiler or npm dependencies are needed to build the site. Node.js is needed only for the browser tests,
 with its version declared by `tests/e2e/package.json` and CI.
 
 Verify the installed toolchain and locked module:
@@ -24,6 +25,7 @@ Verify the installed toolchain and locked module:
 ```bash
 hugo version
 go version
+python3 scripts/site_toolchain.py --check
 python3 scripts/oink_module.py
 ```
 
@@ -66,10 +68,8 @@ effect. Use `--baseURL` or `HG_DOC_SITE_ORIGIN` when changing the rendered
 origin (the flag wins when both are set); a server `--port` is reflected in
 the generated local origin.
 
-The pinned OINK release uses Hugo's built-in LibSass. Its deprecation warning must remain visible;
-do not add `--panicOnWarning` or suppress it with `ignoreLogs`. The shared
-`scripts/hugo_build.py` gate permits only that exact warning and fails builds on
-all other Hugo warnings, including missing translations and duplicate target
+The shared `scripts/hugo_build.py` gate streams complete diagnostics and fails builds on
+every Hugo warning, including retired Sass hooks, missing translations and duplicate target
 paths. Full output and Hugo failure status are preserved. The source, output
 and browser validators also remain blocking.
 
@@ -86,14 +86,16 @@ A complete historical cache hit uses one build job. Cold runs use at most three
 build groups, with at most two versions building concurrently within each runner.
 Historical artifacts are reused only when both the complete build-input fingerprint
 and artifact digest match. Missing or invalid cache entries rebuild automatically;
-manual dispatches start without the artifact cache and use the original build and
-validate commands so older candidate branches do not need the new CI helpers.
-Candidates pinned to OINK 1.3.0 are outside this workflow's supported scope.
-OINK 1.3.1 requires standalone Dart Sass, while this workflow installs native
-LibSass only. Both pins are rejected before scheduling builds; upgrade such a
-candidate to the current OINK pin before dispatching it.
-Historical documentation versions still use the current site's shell and are
-unaffected by this candidate-theme restriction. Cache hits still run the full
+manual dispatches start without the artifact cache. The trusted workflow on `master`
+resolves the candidate branch to an immutable SHA and reads its numeric `toolchain.json`
+pins as data. Its Go directive must match. Candidate scripts and tests run only in
+jobs with read-only repository permissions; the publication job consumes static artifacts
+and receives no candidate executable code. Candidates must include the current toolchain
+manifest and use native CSS; old Sass-based site shells require their original workflow.
+The trusted workflow must already support a new toolchain before staging that candidate.
+An upgrade PR cannot change the `master` workflow used by its own pre-merge staging run;
+land a separately reviewed workflow prerequisite first, or leave real ASF staging pending.
+Historical documentation versions use the current site's shell. Cache hits still run the full
 version validator, and aggregation validates every selected version again.
 
 Assembly validates at most two versions concurrently, then writes the complete
@@ -105,7 +107,10 @@ validation duration and must not be added twice. Site assembly and blocking brow
 tests share one runner and the same local artifact. The assembly job carries the
 required `deploy` check name, avoiding a separate gate runner and its queue time.
 Its first step requires successful preparation and builds, and all assembly and
-browser checks remain blocking. Visual captures remain advisory and publication
+browser checks remain blocking. Publication also explicitly requires the browser
+step's success output, covering the full Chromium suite and focused Firefox/WebKit
+contracts. This makes the existing aggregate-to-publication dependency visible;
+it does not replace any prior checks. Visual captures remain advisory and publication
 alone receives write permission. For a test failure, rerun failed
 jobs after inspecting the cause; artifact names remain stable within the run.
 

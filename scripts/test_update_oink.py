@@ -193,6 +193,9 @@ class UpgradeInventoryTest(unittest.TestCase):
 
     @unittest.skipUnless(shutil.which(os.environ.get("HUGO_BIN", "hugo")), "Hugo executable is required")
     def test_readonly_baseline_rejection_preserves_locks_with_real_hugo_proxy(self):
+        # Make this test independent of the order in which real-theme tests ran:
+        # only the synthetic extra module should need the file-only proxy below.
+        update_oink.download_locked(update_oink.ROOT)
         with tempfile.TemporaryDirectory() as directory:
             base = Path(directory)
             proxy = base / "proxy/example.com/extra/@v"
@@ -325,13 +328,16 @@ class UpgradeInventoryTest(unittest.TestCase):
                 self.assertEqual(env["GOWORK"], "off")
                 self.assertEqual(env["HUGO_MODULE_WORKSPACE"], "off")
                 self.assertEqual(env["HUGO_BIN"], "/resolved/hugo")
+                self.assertEqual(env["RUNNER_TEMP"], str(work.resolve()))
 
             with patch.dict(os.environ, {"HUGO_BIN": "./relative-hugo", "HUGO_MODULE_REPLACEMENTS": "preview",
-                                         "HUGO_PANICONWARNING": "true"}), \
+                                         "HUGO_PANICONWARNING": "true", "RUNNER_TEMP": "/original-runner-temp"}), \
                  patch.object(update_oink.shutil, "which", return_value="/resolved/hugo"), \
                  patch.object(update_oink, "validation_snapshot", return_value="local-snapshot"), \
+                 patch.object(update_oink, "capture_browser"), patch.object(update_oink, "browser_setup"), \
                  patch.object(update_oink, "run", side_effect=run):
                 update_oink.validate(work)
+                self.assertEqual(os.environ["RUNNER_TEMP"], "/original-runner-temp")
             self.assertTrue(any("scripts/build_versions.py" in argv and "--force-rebuild" not in argv for argv in observations))
             self.assertTrue(any(argv[1:3] == ["scripts/hugo_build.py", "/resolved/hugo"] for argv in observations))
             self.assertTrue(any("discover" in argv for argv in observations))
@@ -348,6 +354,7 @@ class UpgradeInventoryTest(unittest.TestCase):
             (work / "toolchain.json").write_text(json.dumps(dict(hugo="hugo 0.168.0", go="go1.27.3", webp="1.6.0")))
             (work / "resolved.json").write_text(json.dumps({"versions": []}))
             with patch.object(update_oink, "validation_snapshot", return_value="local-snapshot"), \
+                 patch.object(update_oink, "capture_browser"), patch.object(update_oink, "browser_setup"), \
                  patch.object(update_oink, "run") as run:
                 update_oink.validate(work)
             calls = run.call_args_list
@@ -372,6 +379,9 @@ class UpgradeInventoryTest(unittest.TestCase):
             self.assertEqual(versions.kwargs["env"]["HUGO_CACHEDIR"], str(work / "hugo-cache"))
             visual = next(call for call in calls if call.args[0] == ["npm", "run", "test:visual"])
             self.assertEqual(visual.kwargs["env"]["VISUAL_RESULTS_DIR"], str(work / "after"))
+            compatibility = next(call for call in calls if call.args[0] == ["npm", "run", "test:browsers"])
+            self.assertLess(calls.index(browser), calls.index(compatibility))
+            self.assertLess(calls.index(compatibility), calls.index(visual))
 
     def test_validation_snapshot_captures_worktree_sources_without_mutating_git_state(self):
         with tempfile.TemporaryDirectory() as directory:
@@ -466,6 +476,7 @@ class UpgradeInventoryTest(unittest.TestCase):
                  patch.object(update_oink, "download_locked", side_effect=download), \
                  patch.object(update_oink, "verify_hugo_graph", return_value="verified"), \
                  patch.object(update_oink, "snapshot", return_value={}), \
+                 patch.object(update_oink, "capture_before"), patch.object(update_oink, "performance_comparison", return_value={}), \
                  patch.object(update_oink, "validate") as validate, \
                  patch.object(update_oink, "command") as command, \
                  patch.object(update_oink.tempfile, "mkdtemp", return_value=str(root.parent / "artifacts")), \
@@ -475,6 +486,61 @@ class UpgradeInventoryTest(unittest.TestCase):
                     update_oink.main()
                 command.assert_not_called()
                 self.assertEqual(validate.call_count, 2)
+
+    @unittest.skipUnless(shutil.which(os.environ.get("GO_BIN", "go")), "Go executable is required")
+    def test_real_go_resume_restores_missing_target_checksums_only_in_original_transaction(self):
+        module = update_oink.download_locked(update_oink.ROOT)
+        target = module["Version"]
+        old = "v1.5.1" if target != "v1.5.1" else "v1.3.1"
+        previous = update_oink.prior_release(update_oink.ROOT, old)
+        target_mod = (update_oink.ROOT / "go.mod").read_text()
+        target_sums = (update_oink.ROOT / "go.sum").read_text().splitlines()
+        old_sums = f"{MODULE} {old} {previous['Sum']}\n{MODULE} {old}/go.mod {previous['GoModSum']}\n"
+        with tempfile.TemporaryDirectory() as directory:
+            for missing in (1, 2, 3):
+                with self.subTest(missing=missing):
+                    root, work = Path(directory) / f"source-{missing}", Path(directory) / f"work-{missing}"
+                    root.mkdir()
+                    (root / "go.mod").write_text(target_mod.replace(target, old))
+                    (root / "go.sum").write_text(old_sums)
+                    baseline = root / "baseline.json"
+                    baseline.write_text(json.dumps({"version": old, "files": {}}))
+                    update_oink.prepare_work(root, baseline, work, False, target)
+                    # Simulate Go's real ordering: committed go.mod, then an
+                    # interruption before one/both checksums reached go.sum.
+                    (root / "go.mod").write_text(target_mod)
+                    retained = [line for index, line in enumerate(target_sums) if not (missing & (1 << index))]
+                    (root / "go.sum").write_text(old_sums + "\n".join(retained) + "\n")
+                    update_oink.prepare_work(root, baseline, work, True, target)
+                    with patch.dict(os.environ, {"GOPROXY": "off", "GOSUMDB": "off", "GOTOOLCHAIN": "local"}), \
+                         patch.object(update_oink, "command", wraps=update_oink.command) as command:
+                        update_oink.resume_checksums(root, target, work)
+                        self.assertEqual(update_oink.download_locked(root)["Sum"], module["Sum"])
+                        command.assert_called_once_with(["get", MODULE + "@" + target], root)
+                    self.assertEqual((root / "go.sum").read_text().splitlines(), target_sums)
+                    self.assertEqual((work / "before/go.sum").read_text(), old_sums)
+                    self.assertEqual(json.loads((work / "review.json").read_text())["checksumRecovery"]["status"], "passed")
+            conflicting = f"{MODULE} {target} h1:{'A' * 43}=\n"
+            (root / "go.sum").write_text(conflicting)
+            with patch.dict(os.environ, {"GOPROXY": "off", "GOSUMDB": "off", "GOTOOLCHAIN": "local"}):
+                with self.assertRaisesRegex(ValueError, "checksum mismatch"):
+                    update_oink.resume_checksums(root, target, work)
+            self.assertEqual((root / "go.sum").read_text(), conflicting)
+
+    def test_missing_checksums_do_not_authorize_repair_from_fresh_resume_or_same_version_backup(self):
+        with tempfile.TemporaryDirectory() as directory:
+            for started_from_resume in (False, True):
+                root, work = Path(directory) / f"source-{started_from_resume}", Path(directory) / f"work-{started_from_resume}"
+                root.mkdir()
+                for name in ("go.mod", "go.sum", "baseline.json"):
+                    (root / name).write_text("")
+                update_oink.prepare_work(root, root / "baseline.json", work, started_from_resume, "v1.6.0")
+                with patch.object(update_oink, "locked_version", return_value="v1.6.0"), \
+                     patch.object(update_oink, "command") as command:
+                    with self.assertRaisesRegex(ValueError, "original upgrade transaction"):
+                        update_oink.resume_checksums(root, "v1.6.0", work)
+                    command.assert_not_called()
+                self.assertEqual((root / "go.sum").read_text(), "")
 
     def test_data_override_and_locale_inventory(self):
         with tempfile.TemporaryDirectory() as directory:

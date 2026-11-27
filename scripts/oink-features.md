@@ -13,7 +13,8 @@ belong in [oink-upgrade.md](oink-upgrade.md).
 | Actions readers perform in order | Ordered list + `{.steps}` | [Local preview](../content/en/community/documentation.md) |
 | Equivalent commands or configurations | Adjacent fences with `{tab="…"}` | [Server serializers](../content/en/docs/quickstart/hugegraph/hugegraph-server.md) |
 | Annotated directories | `filetree` fence; `wrap=true` for complete comments | Use for actual directory layouts, keeping comments short |
-| Technical catalogs | Table + `{.wide}`; optional `.expand` | [Configuration](../content/en/docs/config/config-option.md) |
+| Parameter definitions with direct search targets | Table + `{.fields}` | [Server configuration](../content/en/docs/config/config-option.md) |
+| Technical comparisons and catalogs | Table + `{.wide}`; optional `.expand` | [RocksDB configuration](../content/en/docs/config/config-backend-rocksdb.md) |
 | Architecture, dependencies or a decision flow | `mermaid` fence | [Server installation flow](../content/en/docs/quickstart/hugegraph/hugegraph-server.md) |
 | Text hierarchy | `markmap` fence | [Server module outline](../content/en/docs/quickstart/hugegraph/hugegraph-server.md) |
 | Quantitative comparison | `echarts` fence with its source table and test conditions | Benchmark content only when the chart clarifies a comparison |
@@ -45,7 +46,7 @@ The site's `markup.goldmark.parser.attribute.block: true` enables these markers.
 {.steps}
 ```
 
-OINK 1.4.0 adds compact presentation for short lists:
+OINK supports compact presentation for short lists:
 `{.cards .td-cards-list}` and `{.steps .td-steps-compact}`.
 Select them where each item is brief; longer descriptions and nested commands
 benefit from the regular layout. Cards are unordered choices; Steps express order.
@@ -54,7 +55,7 @@ benefit from the regular layout. Cards are unordered choices; Steps express orde
 
 Use standard language-labelled fences, including `text` for plain text. Global
 Hugo highlighting supplies inline line numbers. Ordinary snippets do not need a
-filename or title bar. For one short standalone command, OINK 1.4.0 supports:
+filename or title bar. For one short standalone command, use:
 
 ````markdown
 ```bash {class="td-code-command" lineNos=false}
@@ -113,6 +114,34 @@ pages and historical source branches need no mechanical migration.
 Do not combine `.expand` with `.fields`, which renders a definition list.
 See [upstream tables](https://oink.pgsty.com/docs/components/table/).
 
+### Searchable parameter definitions
+
+Use `.fields` for a genuine parameter reference: the first column names the
+field, the last describes it, and any middle columns become labelled metadata.
+The native renderer creates a definition list and stable `field-…` anchors;
+local search can open the corresponding definition directly.
+
+```markdown
+| Parameter | Type | Default | Description |
+| --- | --- | --- | --- |
+| `server.port` | int | `8080` | Port used by the service. |
+{.fields meta="type default"}
+```
+
+`meta` explicitly assigns roles to middle columns; omit it to keep their
+authored labels. The `required` role treats every nonempty cell as required,
+so do not assign it to a column containing both `true` and `false` values.
+Do not combine `.fields` with `.expand` or `.full-width`. Keep matrices,
+environment-variable comparisons and ordinary prose tables as tables.
+
+Latest Server, PD and Store parameter pages adopt this form selectively.
+Historical source tables keep their existing structure and use the current
+theme and search engine. Do not mechanically convert every table. Where an
+existing field anchor must be preserved, use native `fields` / `field`
+shortcodes with the field's explicit `id`, then test a real search click and
+fragment scroll in both languages. Also check mobile, Duo View and the complete
+Print/Markdown output. See [upstream fields](https://oink.pgsty.com/docs/components/fields/).
+
 ### Release cards
 
 The release box is a native shortcode, not copied HTML. Its only source of
@@ -141,13 +170,13 @@ See [release authoring](https://oink.pgsty.com/docs/write/releases/).
 ## Diagrams and images
 
 Use Mermaid for relationships and flows, Markmap for text outlines, and ECharts
-for numerical comparisons. OINK 1.4.0 gives existing Mermaid diagrams a shared
+for numerical comparisons. OINK gives existing Mermaid diagrams a shared
 reader with zoom/pan, source and SVG access; authors keep the same fence syntax.
 Keep required diagram resources local and let OINK load runtimes only on pages
 that use them. Enable another runtime only when real content needs it.
 
 Published Markmap content is limited to text outlines and code. Its front matter
-allows only a finite, nonnegative `spacingHorizontal`; active images, links,
+allows only a finite, nonnegative `levelGap`; active images, links,
 raw HTML and other front matter fail the site's validator. ECharts needs its
 source table, units and test conditions alongside the chart. Keep options within
 the URL, HTML and CSS sinks accepted by `dist/validate-site-output.py`;
@@ -176,7 +205,7 @@ Expo's generated previews, neighboring-original preload and album layout work
 do not apply to Gallery. Supply intrinsic `width` and `height` on standalone
 Markdown images to reserve space; those attributes do not compress the file.
 Inspect generated HTML and measure bytes/timing before claiming an improvement.
-See the [tagged Expo implementation](https://github.com/pgsty/oink/blob/v1.5.1/layouts/_partials/expo/items.html).
+Consult `layouts/_partials/expo/items.html` in the module version pinned by `go.mod`.
 
 ### Terminal recordings
 
@@ -199,7 +228,7 @@ The recorder is an authoring tool, not a build dependency.
 
 ## Native Duo View
 
-OINK 1.5.1 calls the feature **Duo View** in English and **双列视图** in
+OINK calls the feature **Duo View** in English and **双列视图** in
 Chinese. Use **Sync Scroll / 同步滚动** for its optional approximate heading
 alignment. The configuration and action IDs remain `params.ui.compare` and
 `compare_translations`; do not rename those public identifiers.
@@ -225,13 +254,16 @@ diagrams, code controls and fragment links continue to work inside each pane.
   Sidebar persistence uses `OinkSidebar`; AI integration uses the public
   search-tail API. Keep HugeGraph consent, version/language scope and local
   availability behavior in their existing hooks/adapters.
-- Local search uses `params.offline_search_index: content` so configuration names,
-  error messages and other body-only terms are searchable in both languages.
-  OINK loads the current language's index on demand; full content increases its
-  size and first-search initialization cost. Keep accurate titles, descriptions
-  and keywords for ranking. Run `tests/e2e/search-ranking.spec.js`, which preserves
-  the 24 metadata cases and separately checks 11 body-only queries with real
-  result clicks. Do not add keywords or boosts merely to satisfy body queries.
+- Local search uses native BM25 with `params.offline_search_index: content`, so
+  configuration names, error messages and body-only terms remain searchable in
+  both languages without a separate browser-built Lunr index. OINK loads the
+  current language's index on demand and splits it only above its native 2 MiB
+  threshold. A split body up to 8 MiB loads in the background; larger bodies or
+  Save-Data require the reader's explicit load action. Do not force splitting
+  for a small index or duplicate the engine. Keep accurate titles, descriptions
+  and keywords. Run `tests/e2e/search-ranking.spec.js`: all 24 metadata and 11
+  independent full-text ranking/click contracts remain mandatory, alongside
+  field-anchor checks. Do not add keywords or boosts merely to satisfy queries.
 - Blog sections provide default covers and reading-time metadata; articles own
   their real tags, categories and series order. Confirm authorship before adding
   an author profile. `blog_index: cards` is a card index; it is distinct from
@@ -243,8 +275,30 @@ diagrams, code controls and fragment links continue to work inside each pane.
   fallbacks. Check RSS where the component appears in a feed. A successful Hugo
   render alone does not establish compatibility.
 
-The [1.5.1 release](https://github.com/pgsty/oink/releases/tag/v1.5.1),
-[changelog](https://github.com/pgsty/oink/blob/v1.5.1/CHANGELOG.md) and
-[tagged source](https://github.com/pgsty/oink/tree/v1.5.1) are the reference for
-the current pin. Consult the pinned release before extending a component; the
-upstream website can describe a newer version.
+## Styles and runtime boundaries
+
+Site styles are plain CSS in `assets/css/project.css`; OINK publishes this after
+the theme bundle. The community roster loads its own plain CSS only where used.
+There is no Sass compiler or Extended-edition requirement. Use native custom
+properties and public components before adding a style or script override.
+
+The blog's copy-link bar uses native `share: [copy]`, scoped by the configuration
+cascade. Leave global sharing disabled; the native bar supplies accessible copy
+feedback without a custom template or third-party share scripts.
+
+The small `css/bundle.html` adapter preserves the native layer order and maps
+reviewed Bootstrap SVG data URIs to the existing local control images through
+`data/oink_css_assets.json`. Unknown data URIs fail the build and require review;
+never relax ASF CSP or the output validator to make a theme upgrade pass.
+Keep published CSS under `/css/` so relative fonts and control images work in
+the latest and archived version directories.
+
+The theme supplies its own navigation, version menus, tabs and search runtime.
+Do not rely on `window.bootstrap`, Bootstrap data attributes or `window.lunr`.
+Native component engines load near the viewport; tests must scroll a component
+into view before asserting it is interactive. Markmap renders SVG text through
+local ESM modules, and ReDoc uses a same-origin frame.
+
+The exact [module pin](../go.mod), its downloaded `CHANGELOG.md` and tagged
+source are the reference for the current site. Consult that release before
+extending a component; the upstream website may describe a newer version.

@@ -142,7 +142,7 @@ These tables list master configuration values and code defaults. See the [PDConf
 | `grpc.host` | `127.0.0.1` | none, required | Address this PD advertises for gRPC. Store and Server connect here, so set it to a reachable IPv4 address or hostname, never `127.0.0.1` or `0.0.0.0`, in a distributed deployment. |
 | `grpc.port` | `8686` | none, required | gRPC port. |
 | `server.port` | `8620` | none, required | REST API port. Also the port reported in Raft member information. |
-{.td-table--wide}
+{.fields}
 
 `application.yml.template` also carries `grpc.netty-server.max-inbound-message-size: 100MB`, but PD sets the gRPC server's inbound message limit to 1 GB in code, so that key has no effect.
 
@@ -158,7 +158,7 @@ These tables list master configuration values and code defaults. See the [PDConf
 | `raft.rpc-timeout` | not set | `10000` | Timeout of a Raft RPC between PD nodes, in milliseconds. Also the deadline of the ReadIndex wait that PD runs before it reads an id counter; id allocation fails when the wait takes longer. |
 | `raft.rpc-connect-timeout` | not set | `1000` | Timeout of the Ping that opens a Raft connection to a peer, in milliseconds. A candidate connects to its peers one at a time, so an election waits this long for each peer that accepts the TCP connection but does not answer. Requests on an open connection use `raft.rpc-timeout`. |
 | `raft.rpc-install-snapshot-timeout` | not set | `0` | Timeout for sending a snapshot to a follower that fell behind the log, in milliseconds. `0` uses `raft.rpc-timeout`. Raise it if large snapshots time out. |
-{.td-table--wide}
+{.fields}
 
 `raft.rpc-connect-timeout` and `raft.rpc-install-snapshot-timeout` exist only in versions after 1.7.0. In 1.7.0, `raft.rpc-timeout` is also the connect and
 install-snapshot timeout, and id allocation runs no ReadIndex wait.
@@ -173,7 +173,7 @@ install-snapshot timeout, and id allocation runs no ReadIndex wait.
 | `pd.min-store-count` | not set | `0` | Minimum active Store count required during Store drain/retirement checks. If remaining active stores fall below this value, the transition to `Exiting` is rejected. |
 | `pd.initial-store-list` | `127.0.0.1:8500` | empty | Comma separated Store gRPC addresses (`ip:port`) that are activated automatically when they register. An entry may also carry a group id as `store_address/group_id`. |
 | `pd.cluster_id` | not set | `1` | Cluster id, used to keep separate PD clusters apart. |
-{.td-table--wide}
+{.fields}
 
 **Store management**
 
@@ -184,7 +184,7 @@ install-snapshot timeout, and id allocation runs no ReadIndex wait.
 | `store.monitor_data_enabled` | `true` | `false` | Whether to persist Store monitoring samples. |
 | `store.monitor_data_interval` | `1 minute` | `1 minute` | Sampling interval, written as `<number> <unit>` with unit one of `second`, `minute`, `hour`, `day`, `month`, `year`. The number defaults to 1 when omitted. |
 | `store.monitor_data_retention` | `1 day` | `1 day` | How long monitoring samples are kept, same format as above. |
-{.td-table--wide}
+{.fields}
 
 **Partitions**
 
@@ -192,7 +192,7 @@ install-snapshot timeout, and id allocation runs no ReadIndex wait.
 |-----|---------------|------------------|-------------|
 | `partition.default-shard-count` | `1` | `3` | Number of replicas per partition. Use `3` for a production cluster. |
 | `partition.store-max-shard-count` | `12` | `24` | Maximum number of partition replicas one Store holds. |
-{.td-table--wide}
+{.fields}
 
 The initial partition count is derived from these two values and the size of `pd.initial-store-list`:
 
@@ -211,7 +211,7 @@ initial partitions = store count * partition.store-max-shard-count / partition.d
 | `management.metrics.export.prometheus.enabled` | `true` | Spring Boot default | Exposes `/actuator/prometheus`. |
 | `management.endpoints.web.exposure.include` | `health,metrics,prometheus` | Spring Boot exposes only `health` by default | Actuator allowlist; these endpoints bypass the PD REST Basic interceptor. |
 | `logging.config` | `file:./conf/log4j2.xml` | none | Log4j2 configuration. Writes `logs/hugegraph-pd.log`, `logs/hugegraph-pd_raft.log` and `logs/audit-hugegraph-pd.log`. |
-{.wide .hg-config-keys}
+{.fields}
 
 **Thread pools**
 
@@ -223,7 +223,7 @@ initial partitions = store count * partition.store-max-shard-count / partition.d
 | `job.uninterruptibleThreadPool.core` | `0` | Core size of the background metadata job pool. A value of 0 or less means half the available processors. |
 | `job.uninterruptibleThreadPool.max` | `256` | Maximum size of that pool. |
 | `job.uninterruptibleThreadPool.queue` | unbounded | Queue capacity of that pool. |
-{.td-table--wide}
+{.fields}
 
 #### 4.2 Single-node configuration
 

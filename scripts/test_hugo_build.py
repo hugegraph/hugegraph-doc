@@ -33,10 +33,10 @@ class HugoBuildTest(unittest.TestCase):
             text=True, capture_output=True, timeout=15,
         )
 
-    def test_classifier_allows_only_the_exact_libsass_payload(self):
-        self.assertFalse(is_unexpected_warning(LIBSASS_WARNING))
-        self.assertFalse(is_unexpected_warning("WARN\t" + LIBSASS_PAYLOAD + "\r\n"))
-        self.assertFalse(is_unexpected_warning("\033[33mWARN\033[0m  " + LIBSASS_PAYLOAD + "\n"))
+    def test_classifier_rejects_every_warning_including_obsolete_sass(self):
+        self.assertTrue(is_unexpected_warning(LIBSASS_WARNING))
+        self.assertTrue(is_unexpected_warning("WARN\t" + LIBSASS_PAYLOAD + "\r\n"))
+        self.assertTrue(is_unexpected_warning("\033[33mWARN\033[0m  " + LIBSASS_PAYLOAD + "\n"))
         for line in (
             "WARN  i18n|MISSING_TRANSLATION|en|missing_key\n",
             "WARN  Duplicate target paths: /collision/index.html\n",
@@ -57,7 +57,7 @@ class HugoBuildTest(unittest.TestCase):
             with self.subTest(line=line):
                 self.assertFalse(is_unexpected_warning(line))
 
-    def test_cli_keeps_both_output_streams_and_the_expected_warning(self):
+    def test_cli_keeps_both_output_streams_when_rejecting_an_obsolete_warning(self):
         before = "Starting build\n"
         after = "Total in 12 ms\n"
         result = self.invoke(
@@ -65,7 +65,7 @@ class HugoBuildTest(unittest.TestCase):
             "sys.stderr.write(sys.argv[2]); sys.stderr.flush(); sys.stdout.write(sys.argv[3])",
             before, LIBSASS_WARNING, after,
         )
-        self.assertEqual(result.returncode, 0, result.stdout + result.stderr)
+        self.assertEqual(result.returncode, 1, result.stdout + result.stderr)
         self.assertEqual(result.stdout, before + LIBSASS_WARNING + after)
 
     def test_cli_fails_for_other_warnings_from_either_stream_after_draining_output(self):
