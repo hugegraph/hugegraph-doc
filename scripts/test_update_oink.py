@@ -354,9 +354,10 @@ class UpgradeInventoryTest(unittest.TestCase):
             (work / "toolchain.json").write_text(json.dumps(dict(hugo="hugo 0.168.0", go="go1.27.3", webp="1.6.0")))
             (work / "resolved.json").write_text(json.dumps({"versions": []}))
             with patch.object(update_oink, "validation_snapshot", return_value="local-snapshot"), \
-                 patch.object(update_oink, "capture_browser"), patch.object(update_oink, "browser_setup"), \
+                 patch.object(update_oink, "capture_browser") as captures, patch.object(update_oink, "browser_setup"), \
                  patch.object(update_oink, "run") as run:
                 update_oink.validate(work)
+            captures.assert_called_once_with(work, work / "strict", "after")
             calls = run.call_args_list
             browser = next(call for call in calls if call.args[0] == ["npm", "run", "test:ci"])
             for name, config, variable in [("ai", "ai-enabled", "AI_SITE_ROOT"),
@@ -378,7 +379,8 @@ class UpgradeInventoryTest(unittest.TestCase):
             self.assertEqual(versions.args[0][versions.args[0].index("--workers") + 1], "2")
             self.assertEqual(versions.kwargs["env"]["HUGO_CACHEDIR"], str(work / "hugo-cache"))
             visual = next(call for call in calls if call.args[0] == ["npm", "run", "test:visual"])
-            self.assertEqual(visual.kwargs["env"]["VISUAL_RESULTS_DIR"], str(work / "after"))
+            self.assertEqual(visual.kwargs["env"]["VISUAL_RESULTS_DIR"], str(work / "after-site"))
+            self.assertEqual(visual.kwargs["env"]["SITE_ROOT"], str(work / "site"))
             compatibility = next(call for call in calls if call.args[0] == ["npm", "run", "test:browsers"])
             self.assertLess(calls.index(browser), calls.index(compatibility))
             self.assertLess(calls.index(compatibility), calls.index(visual))

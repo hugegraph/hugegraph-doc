@@ -61,7 +61,8 @@ version cache and parallel build runner. Local and CI checks use the same comman
 | --- | --- |
 | `report.md`, `review.json` | Current status, review impacts, command results, durations, comparison and exact recovery/resume commands |
 | `logs/` | Per-command combined stdout/stderr, including failed commands and actual historical cache outcomes |
-| `before/`, `after/` | Real page captures; `before/` also retains the first lock/inventory backup |
+| `before/`, `after/` | Paired latest-only page captures; `before/` also retains the first lock/inventory backup |
+| `after-site/` | Full aggregate-site visual captures, separate from the paired latest-only evidence |
 | `before-metrics.json`, `after-metrics.json` | Latest-only artifact bytes, estimated gzip bytes, build duration and actual tool versions |
 | `before-browser/`, `after-browser/` | Raw cold/warm bilingual search samples and summaries from the same browser harness |
 | `before-source/`, `baseline-site/` | Original detached checkout and its built site; the original commit never follows later edits |
@@ -78,7 +79,8 @@ and then applies the same strict checksum and module-graph verification. A fresh
 use the original transaction or restore its locks. Writable artifact paths must not be symbolic links, including when resuming.
 The updater does not automatically revert code, commit, push or publish.
 
-A task-local installed Chromium can be selected with `PLAYWRIGHT_CHROMIUM_EXECUTABLE_PATH`. Full acceptance still requires the Firefox/WebKit checks;
+A task-local installed Chromium can be selected with `PLAYWRIGHT_CHROMIUM_EXECUTABLE_PATH` (resolved to an executable file before any build).
+Playwright rechecks its managed browser cache on each setup, including resume. Full acceptance still requires the Firefox/WebKit checks;
 unavailable browsers are a failed prerequisite, not a skip that counts as a pass. CI installs the pinned Playwright browsers.
 
 ## Compatibility review map

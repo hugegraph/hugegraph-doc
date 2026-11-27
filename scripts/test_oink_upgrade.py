@@ -115,7 +115,8 @@ class UpgradeTest(unittest.TestCase):
             self.assertEqual(internal_file.read_text(), "user settings")
             self.assertFalse((internal / "before").exists())
             for reserved in ("toolchain.json", "resolved.json", "build-plan.json", "strict", "artifacts", "site", "ai",
-                             "ai-disabled", "hugo-cache", "version-cache", "after", "validation-snapshot.json", "ai.json", "ai-disabled.json"):
+                             "ai-disabled", "hugo-cache", "version-cache", "after", "after-site", "before-browser", "after-browser",
+                             "validation-snapshot.json", "ai.json", "ai-disabled.json"):
                 work = Path(directory) / ("external-" + reserved)
                 work.mkdir()
                 existing = work / reserved
@@ -126,6 +127,30 @@ class UpgradeTest(unittest.TestCase):
                     self.assertEqual(existing.read_text(), "user file")
                     self.assertFalse((work / "before").exists())
                     self.assertFalse((work / "review.json").exists())
+
+    def test_browser_output_directories_are_reserved_only_for_fresh_transactions(self):
+        with tempfile.TemporaryDirectory() as directory:
+            root, work = Path(directory) / "source", Path(directory) / "upgrade"
+            root.mkdir()
+            work.mkdir()
+            for name in ("go.mod", "go.sum", "oink-overrides.json"):
+                (root / name).write_text("original")
+            baseline = root / "oink-overrides.json"
+            for name in ("before-browser", "after-browser", "after-site"):
+                output = work / name
+                output.mkdir()
+                evidence = output / "existing.txt"
+                evidence.write_text("keep")
+                for resume in (False, True):
+                    with self.subTest(name=name, resume=resume), self.assertRaisesRegex(ValueError, "reserved runner outputs"):
+                        update_oink.prepare_work(root, baseline, work, resume, "v1.6.0")
+                self.assertEqual(evidence.read_text(), "keep")
+                self.assertFalse((work / "before").exists())
+                shutil.rmtree(output)
+            update_oink.prepare_work(root, baseline, work, False, "v1.6.0")
+            for name in ("before-browser", "after-browser", "after-site"):
+                (work / name).mkdir()
+            self.assertEqual(update_oink.prepare_work(root, baseline, work, True, "v1.6.0"), work)
 
     def test_fresh_resume_records_that_backup_can_already_pin_target(self):
         with tempfile.TemporaryDirectory() as directory:
@@ -175,7 +200,7 @@ class UpgradeTest(unittest.TestCase):
             victim = base / "unrelated.txt"
             victim.write_text("preserve unrelated data")
             for index, name in enumerate(("before", "logs/001.log", "before-browser/metrics.json", "review.json",
-                                           "report.md", "toolchain.json", "before-source", "strict/output.html")):
+                                           "report.md", "toolchain.json", "before-source", "strict/output.html", "after-site/capture.png")):
                 for resume in (False, True):
                     with self.subTest(path=name, resume=resume):
                         work = base / f"work-{index}-{resume}"
@@ -262,7 +287,24 @@ class UpgradeTest(unittest.TestCase):
             self.assertNotIn("other.json", metrics["files"])
             self.assertEqual(metrics["buildSeconds"], 1.25)
 
-    def test_custom_chromium_does_not_claim_a_managed_install_on_resume(self):
+    def test_custom_chromium_path_is_normalized_and_validated(self):
+        name = "PLAYWRIGHT_CHROMIUM_EXECUTABLE_PATH"
+        with tempfile.TemporaryDirectory() as directory:
+            executable = Path(directory) / "chrome"
+            executable.write_text("")
+            executable.chmod(0o700)
+            relative = os.path.relpath(executable)
+            with patch.dict(os.environ, {name: relative}):
+                self.assertEqual(update_oink.release_environment()[name], str(executable.resolve()))
+                self.assertEqual(os.environ[name], relative)
+            for invalid in (Path(directory), Path(directory) / "missing", executable):
+                if invalid == executable:
+                    executable.chmod(0o600)
+                with self.subTest(path=invalid), patch.dict(os.environ, {name: str(invalid)}):
+                    with self.assertRaisesRegex(ValueError, "not an executable file"):
+                        update_oink.release_environment()
+
+    def test_custom_chromium_and_managed_cache_are_rechecked_on_resume(self):
         for full in (False, True):
             with self.subTest(full=full), tempfile.TemporaryDirectory() as directory:
                 root, work = Path(directory) / "source", Path(directory) / "upgrade"
@@ -278,18 +320,22 @@ class UpgradeTest(unittest.TestCase):
                     self.assertEqual(json.loads((work / "review.json").read_text())["browsers"], managed)
                     self.assertEqual([call.args[0] for call in run.call_args_list],
                                      [["npm", "ci"]] + ([["npx", "playwright", "install", *managed]] if full else []))
-                    run.reset_mock()
                     with patch.dict(os.environ):
                         os.environ.pop("PLAYWRIGHT_CHROMIUM_EXECUTABLE_PATH", None)
-                        update_oink.browser_setup(work, full=full)
-                    run.assert_called_once_with(["npx", "playwright", "install", "chromium"], cwd=workspace)
-                    managed = ["chromium", *managed]
-                    self.assertEqual(json.loads((work / "review.json").read_text())["browsers"], managed)
+                        for cache in ("cache-a", "cache-b", "cache-b"):
+                            os.environ["PLAYWRIGHT_BROWSERS_PATH"] = cache
+                            run.reset_mock()
+                            update_oink.browser_setup(work, full=full)
+                            run.assert_called_once_with(["npx", "playwright", "install", "chromium", *managed], cwd=workspace)
+                            self.assertEqual(json.loads((work / "review.json").read_text())["browsers"], ["chromium", *managed])
                     run.reset_mock()
                     with patch.dict(os.environ, {"PLAYWRIGHT_CHROMIUM_EXECUTABLE_PATH": sys.executable}):
                         update_oink.browser_setup(work, full=full)
                     self.assertEqual(json.loads((work / "review.json").read_text())["browsers"], managed)
-                    run.assert_not_called()
+                    if full:
+                        run.assert_called_once_with(["npx", "playwright", "install", *managed], cwd=workspace)
+                    else:
+                        run.assert_not_called()
 
     def test_failed_step_keeps_log_and_status(self):
         with tempfile.TemporaryDirectory() as directory:

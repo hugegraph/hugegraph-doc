@@ -135,7 +135,8 @@ def write_report(work, report):
     if report.get("error"):
         rows.extend(["## Remaining check", "", report["error"], ""])
     rows.extend(["See `review.json` for commands, logs, review impacts, recovery and resume instructions;",
-                 "`before/` and `after/` for captures, and `before-browser/` and `after-browser/` for search samples.", ""])
+                 "`before/` and `after/` for paired latest captures, `after-site/` for full aggregate captures,",
+                 "and `before-browser/` and `after-browser/` for search samples.", ""])
     replace(work / "report.md", "\n".join(rows))
 
 
@@ -159,6 +160,12 @@ def release_environment():
         executable = shutil.which(configured) if configured else None
         if executable:
             env[name] = str(Path(executable).resolve())
+    name = "PLAYWRIGHT_CHROMIUM_EXECUTABLE_PATH"
+    if env.get(name):
+        executable = Path(env[name]).expanduser().resolve()
+        if not executable.is_file() or not os.access(executable, os.X_OK):
+            raise ValueError(f"{name} is not an executable file: {executable}")
+        env[name] = str(executable)
     return env
 
 
@@ -412,7 +419,7 @@ def prepare_work(root, baseline, requested, resume, target):
     # this transaction legitimately owns before-source/ as a detached checkout.
     try:
         require_no_symlinked_output_components(work / "before-source", "baseline checkout", {work})
-        writable = ("before", "after", "logs", "before-browser", "after-browser", "review.json", "report.md",
+        writable = ("before", "after", "after-site", "logs", "before-browser", "after-browser", "review.json", "report.md",
                     "toolchain.json", "resolved.json", "build-plan.json", "validation-snapshot.json",
                     "before-metrics.json", "after-metrics.json", "ai.json", "ai-disabled.json",
                     "strict", "artifacts", "site", "ai", "ai-disabled", "baseline-site", "version-cache", "hugo-cache")
@@ -444,7 +451,8 @@ def prepare_work(root, baseline, requested, resume, target):
     if not any(present):
         reserved = ("toolchain.json", "resolved.json", "build-plan.json", "validation-snapshot.json",
                     "strict", "artifacts", "site", "ai", "ai-disabled", "ai.json", "ai-disabled.json",
-                    "hugo-cache", "version-cache", "after", "before-source", "baseline-site", "before-metrics.json", "after-metrics.json", "report.md")
+                    "hugo-cache", "version-cache", "after", "after-site", "before-source", "baseline-site",
+                    "before-browser", "after-browser", "before-metrics.json", "after-metrics.json", "report.md")
         conflicts = [name for name in reserved if (work / name).exists() or (work / name).is_symlink()]
         if conflicts:
             raise ValueError(f"--work-dir contains reserved runner outputs: {', '.join(conflicts)}; use a fresh --work-dir")
@@ -488,19 +496,12 @@ def browser_setup(work, full=False):
     ready = report.get("browserLock") == lock and (ROOT / "tests/e2e/node_modules/@playwright/test").is_dir()
     if not ready:
         run(["npm", "ci"], cwd=ROOT / "tests/e2e")
-    installed = report.get("browsers", []) if ready else []
     executable = os.environ.get("PLAYWRIGHT_CHROMIUM_EXECUTABLE_PATH")
-    if executable:
-        if not os.access(executable, os.X_OK):
-            raise ValueError(f"PLAYWRIGHT_CHROMIUM_EXECUTABLE_PATH is not executable: {executable}")
-    elif "chromium" not in installed:
-        run(["npx", "playwright", "install", "chromium"], cwd=ROOT / "tests/e2e")
-    # A custom executable does not establish a managed Chromium installation.
     required = ([] if executable else ["chromium"]) + (["firefox", "webkit"] if full else [])
-    missing = [name for name in required if name != "chromium" and name not in installed]
-    if missing:
-        run(["npx", "playwright", "install", *missing], cwd=ROOT / "tests/e2e")
-    update_report(work, browserLock=lock, browsers=sorted(set(installed + required)))
+    # Playwright checks its current cache; a prior report cannot prove installation.
+    if required:
+        run(["npx", "playwright", "install", *required], cwd=ROOT / "tests/e2e")
+    update_report(work, browserLock=lock, browsers=required)
 
 
 def capture_browser(work, site, label):
@@ -641,7 +642,7 @@ def _validate(work, mode="full"):
              "--destination", work / name, "--cleanDestinationDir", "--gc", "--minify",
              "--environment", "production", "--printPathWarnings", "--printI18nWarnings", "--logLevel", "info"])
     env = dict(os.environ, SITE_ROOT=str(work / "site"), AI_SITE_ROOT=str(work / "ai"),
-               AI_DISABLED_SITE_ROOT=str(work / "ai-disabled"), VISUAL_RESULTS_DIR=str(work / "after"))
+               AI_DISABLED_SITE_ROOT=str(work / "ai-disabled"), VISUAL_RESULTS_DIR=str(work / "after-site"))
     browser_setup(work)
     run(["npm", "run", "test:ci"], cwd=ROOT / "tests/e2e", env=env)
     browser_setup(work, full=True)
