@@ -22,7 +22,9 @@ site shell.
   Expo's previews, preloading and layout optimizations do not apply to Gallery.
 
 Read the entry relevant to the task; small content edits do not require the full
-upgrade or deployment workflow. Use `go.mod` / `go.sum` and CI for pinned versions.
+upgrade or deployment workflow. Use `go.mod` / `go.sum` for the theme lock and
+`toolchain.json` for exact Hugo/Go versions; `scripts/site_toolchain.py --check`
+verifies the derived Go and legacy preview settings.
 
 ## Project constraints
 

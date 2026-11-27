@@ -73,23 +73,27 @@ function jobBody(name) {
   return body[1];
 }
 
-test("all Hugo jobs share the pinned native Hugo compiler setup", () => {
+test("all Hugo jobs share the validated standard or legacy Extended toolchain", () => {
   const action = fs.readFileSync(path.resolve(__dirname, "../../.github/actions/setup-site-tools/action.yml"), "utf8");
-  assert.match(workflow, /HUGO_VERSION: 0\.168\.0/);
+  assert.doesNotMatch(workflow, /HUGO_VERSION:|go-version-file:/);
+  assert.match(workflow, /scripts\/site_toolchain\.py --ref "\$SOURCE_SHA" --github-output/);
   for (const job of ["prepare", "build", "aggregate"]) {
     const body = jobBody(job);
     const setupPath = job === "prepare" ? "./.github/actions/setup-site-tools" : "./resolved/setup-site-tools";
     assert.equal(body.split(`uses: ${setupPath}\n`).length - 1, 1);
-    assert.match(body, /hugo-version: \$\{\{ env\.HUGO_VERSION \}\}/);
+    const source = job === "prepare" ? "steps.toolchain.outputs" : "needs.prepare.outputs";
+    assert.ok(body.includes("hugo-version: ${{ " + source + ".hugo_version }}"));
+    assert.ok(body.includes("hugo-extended: ${{ " + source + ".hugo_extended }}"));
+    assert.ok(body.includes("go-version: ${{ " + source + ".go_version }}"));
     if (job !== "aggregate") assert.doesNotMatch(body, /actions\/setup-node/);
   }
   assert.match(action, /uses: peaceiris\/actions-hugo@[a-f0-9]{40}/);
-  assert.match(action, /extended: true/);
+  assert.match(action, /extended: \$\{\{ inputs\.hugo-extended \}\}/);
   assert.doesNotMatch(action, /dart-sass|npm|setup-node/);
   assert.doesNotMatch(workflow, /DART_SASS_VERSION|dart-sass-version|sass --version/);
 });
 
-test("old manual candidate sources receive the trusted compiler action via prepared artifacts", () => {
+test("manual candidate sources receive the trusted tool action via prepared artifacts", () => {
   const { spawnSync } = require("node:child_process");
   const os = require("node:os");
   const directory = fs.mkdtempSync(path.join(os.tmpdir(), "trusted-site-tools-"));
@@ -137,7 +141,7 @@ test("historical and Hugo resource caches follow the native Hugo toolchain", () 
   }
   const resourceCache = jobBody("build").split("      - name: Cache Hugo resources\n")[1]
     .split("      - name:")[0];
-  assert.equal((resourceCache.match(/env\.HUGO_VERSION/g) ?? []).length, 2);
+  assert.equal((resourceCache.match(/needs\.prepare\.outputs\.hugo_version/g) ?? []).length, 2);
   assert.equal((resourceCache.match(/hashFiles\('resolved\/setup-site-tools\/action\.yml'\)/g) ?? []).length, 2);
 });
 
@@ -167,12 +171,56 @@ test("assembly runs blocking browser tests on its local artifact", () => {
   const aggregate = jobBody("aggregate");
   assert.doesNotMatch(workflow, /^  e2e:/m);
   assert.match(aggregate, /SITE_ROOT: \$\{\{ runner.temp \}\}\/public-site/);
-  assert.match(aggregate, /run: npm run test:ci/);
+  assert.match(aggregate, /id: e2e/);
+  assert.match(aggregate, /run: \|\n\s+npm run test:ci\n/);
+  assert.match(aggregate, /playwright install --with-deps chromium firefox webkit/);
   assert.doesNotMatch(aggregate, /continue-on-error:/);
   assert.match(aggregate, /^    name: deploy$/m);
   assert.match(aggregate, /needs: \[prepare, build\]/);
   assert.doesNotMatch(workflow, /^  deploy:/m);
   assert.match(jobBody("publish"), /needs: \[prepare, aggregate\]/);
+});
+
+test("legacy browser contracts remain required and native CSS candidates require all browsers", () => {
+  const { spawnSync } = require("node:child_process");
+  const os = require("node:os");
+  const directory = fs.mkdtempSync(path.join(os.tmpdir(), "candidate-browser-gates-"));
+  const log = path.join(directory, "calls");
+  try {
+    const stub = '#!/bin/sh\nprintf "%s %s\\n" "${0##*/}" "$*" >> "$CALL_LOG"\n'
+      + 'if [ "$*" = "$FAIL_COMMAND" ]; then exit 12; fi\n';
+    for (const name of ["npm", "npx"]) fs.writeFileSync(path.join(directory, name), stub, {mode: 0o755});
+    const run = (name, extended, fail = "") => {
+      fs.writeFileSync(log, "");
+      const result = spawnSync("bash", ["--noprofile", "--norc", "-p", "-e", "-c", stepScript(name)], {
+        cwd: directory, encoding: "utf8",
+        env: {...process.env, BASH_ENV: "", PATH: `${directory}:${process.env.PATH}`,
+          HUGO_EXTENDED: extended, CALL_LOG: log, FAIL_COMMAND: fail}
+      });
+      return {...result, calls: fs.readFileSync(log, "utf8").trim().split("\n")};
+    };
+    for (const extended of ["true", "false"]) {
+      const install = run("Install browser test workspace", extended);
+      assert.equal(install.status, 0, install.stderr);
+      assert.deepEqual(install.calls, ["npm ci", "npx playwright install --with-deps chromium"
+        + (extended === "false" ? " firefox webkit" : "")]);
+      const check = run("Run blocking browser contracts", extended);
+      assert.equal(check.status, 0, check.stderr);
+      assert.deepEqual(check.calls, extended === "true" ? ["npm run test:ci"]
+        : ["npm run test:ci", "npm run test:browsers"]);
+      const failed = run("Run blocking browser contracts", extended, "run test:ci");
+      assert.notEqual(failed.status, 0);
+      assert.deepEqual(failed.calls, ["npm run test:ci"]);
+    }
+    assert.notEqual(run("Run blocking browser contracts", "false", "run test:browsers").status, 0);
+    for (const step of ["Install browser test workspace", "Run blocking browser contracts"]) {
+      assert.notEqual(run(step, "").status, 0);
+      assert.doesNotMatch(stepBody(step), /--if-present/);
+      assert.match(stepBody(step), /HUGO_EXTENDED: \$\{\{ needs\.prepare\.outputs\.hugo_extended \}\}/);
+    }
+  } finally {
+    fs.rmSync(directory, {recursive: true, force: true});
+  }
 });
 
 test("required gate rejects failed, skipped and cancelled prerequisites", () => {
@@ -312,10 +360,10 @@ test("manual candidates build and validate every immutable selected version usin
   }
 });
 
-test("manual candidate planning distinguishes unsupported pins from external-Sass requirements", () => {
+test("manual candidate tools come from immutable data, never its executable helper", () => {
   const { spawnSync } = require("node:child_process");
   const os = require("node:os");
-  const directory = fs.mkdtempSync(path.join(os.tmpdir(), "candidate-theme-plan-"));
+  const directory = fs.mkdtempSync(path.join(os.tmpdir(), "candidate-toolchain-plan-"));
   const env = {...process.env, BASH_ENV: "", GOTOOLCHAIN: "local",
     GIT_AUTHOR_NAME: "Workflow contract", GIT_AUTHOR_EMAIL: "workflow@localhost",
     GIT_COMMITTER_NAME: "Workflow contract", GIT_COMMITTER_EMAIL: "workflow@localhost"};
@@ -324,52 +372,85 @@ test("manual candidate planning distinguishes unsupported pins from external-Sas
     assert.equal(result.status, 0, result.stderr);
     return result.stdout.trim();
   };
+  const execute = (name, extra) => spawnSync("bash", ["--noprofile", "--norc", "-p", "-e", "-c", stepScript(name)], {
+    cwd: directory, encoding: "utf8", env: {...env, ...extra}
+  });
   try {
     git("init", "--quiet", "--initial-branch=master");
     git("remote", "add", "origin", directory);
+    fs.mkdirSync(path.join(directory, "scripts"));
+    const helper = fs.readFileSync(path.resolve(__dirname, "../../scripts/site_toolchain.py"));
+    fs.writeFileSync(path.join(directory, "scripts/site_toolchain.py"), helper);
     fs.writeFileSync(path.join(directory, "versions.json"), JSON.stringify({
       versions: [{id: "latest", archived: false, ref: "master"}]
     }));
-    for (const [pin, rejected] of [["v1.2.0", false], ["v1.3.0", true], ["v1.3.1", true], ["v1.4.0", false]]) {
-      // Exercise both valid go.mod require forms through the real Go parser.
-      const requirement = pin === "v1.3.1"
-        ? `require (\n\tgithub.com/pgsty/oink ${pin}\n)\n`
-        : `require github.com/pgsty/oink ${pin}\n`;
-      const source = `module github.com/apache/hugegraph-doc\n\ngo 1.20\n\n${requirement}`;
-      fs.writeFileSync(path.join(directory, "go.mod"), source);
-      git("add", "go.mod");
-      git("-c", "core.hooksPath=/dev/null", "commit", "--quiet", "-m", pin);
-      git("branch", "--force", "candidate");
-      const sha = git("rev-parse", "HEAD");
-      const output = path.join(directory, `outputs-${pin}`);
-      const result = spawnSync("bash", ["--noprofile", "--norc", "-p", "-e", "-c",
-        stepScript("Resolve trusted event plan")], {
-        cwd: directory, encoding: "utf8",
-        env: {...env, EVENT_NAME: "workflow_dispatch", EVENT_SHA: sha,
-          OPERATION: "staging-next", SCOPE: "latest", CANDIDATE_BRANCH: "candidate",
-          CONFIRMATION: "publish asf-staging-oink", GITHUB_REF: "refs/heads/master",
-          PRODUCTION_ORIGIN: "https://production.example/", STAGING_ORIGIN: "https://staging.example/",
-          GITHUB_OUTPUT: output, RUNNER_TEMP: directory}
+    fs.writeFileSync(path.join(directory, "toolchain.json"), JSON.stringify({hugo: "0.168.0", go: "1.27.3"}));
+    fs.writeFileSync(path.join(directory, "go.mod"), "module github.com/apache/hugegraph-doc\n\ngo 1.27.3\n");
+    git("add", ".");
+    git("-c", "core.hooksPath=/dev/null", "commit", "--quiet", "-m", "trusted workflow");
+    git("switch", "--quiet", "-c", "candidate");
+    fs.writeFileSync(path.join(directory, "toolchain.json"), JSON.stringify({hugo: "0.170.1", go: "1.27.4"}));
+    fs.writeFileSync(path.join(directory, "go.mod"), "module github.com/apache/hugegraph-doc\n\ngo 1.27.4\n");
+    fs.writeFileSync(path.join(directory, "scripts/site_toolchain.py"), "raise RuntimeError('candidate code executed')\n");
+    git("add", ".");
+    git("-c", "core.hooksPath=/dev/null", "commit", "--quiet", "-m", "future candidate");
+    const sha = git("rev-parse", "HEAD");
+    git("switch", "--quiet", "master");
+    const output = path.join(directory, "plan-output");
+    const plan = execute("Resolve trusted event plan", {
+      EVENT_NAME: "workflow_dispatch", EVENT_SHA: git("rev-parse", "HEAD"),
+      OPERATION: "staging-next", SCOPE: "latest", CANDIDATE_BRANCH: "candidate",
+      CONFIRMATION: "publish asf-staging-oink", GITHUB_REF: "refs/heads/master",
+      PRODUCTION_ORIGIN: "https://production.example/", STAGING_ORIGIN: "https://staging.example/",
+      GITHUB_OUTPUT: output, RUNNER_TEMP: directory
+    });
+    assert.equal(plan.status, 0, plan.stderr);
+    assert.ok(fs.readFileSync(output, "utf8").includes(`source_sha=${sha}\n`));
+    const toolOutput = path.join(directory, "tool-output");
+    const tools = execute("Resolve candidate toolchain as data", {SOURCE_SHA: sha, GITHUB_OUTPUT: toolOutput});
+    assert.equal(tools.status, 0, tools.stderr);
+    assert.equal(fs.readFileSync(toolOutput, "utf8"), "hugo_version=0.170.1\ngo_version=1.27.4\nhugo_extended=false\n");
+    assert.deepEqual(fs.readFileSync(path.join(directory, "scripts/site_toolchain.py")), helper);
+  } finally {
+    fs.rmSync(directory, {recursive: true, force: true});
+  }
+});
+
+test("publication explicitly requires the blocking browser result", () => {
+  const { spawnSync } = require("node:child_process");
+  const os = require("node:os");
+  const directory = fs.mkdtempSync(path.join(os.tmpdir(), "publication-browser-gate-"));
+  assert.match(jobBody("aggregate"), /e2e_result: \$\{\{ steps\.e2e\.outcome \}\}/);
+  assert.match(jobBody("publish"), /needs\.aggregate\.outputs\.e2e_result == 'success'/);
+  try {
+    fs.mkdirSync(path.join(directory, "public-site/build-metadata"), {recursive: true});
+    fs.writeFileSync(path.join(directory, "public-site/build-metadata/versions.json"), "{}");
+    for (const result of ["success", "failure", "skipped", "cancelled", ""]) {
+      const child = spawnSync("bash", ["--noprofile", "--norc", "-p", "-e", "-c", stepScript("Verify fixed publication target")], {
+        cwd: directory, env: {...process.env, BASH_ENV: "", E2E_RESULT: result, TARGET: "asf-staging-oink", PREFIX: "staging"}
       });
-      if (rejected) {
-        assert.notEqual(result.status, 0, pin);
-        if (pin === "v1.3.0") {
-          assert.match(result.stdout, /OINK v1\.3\.0 manual candidates are not supported/);
-          assert.doesNotMatch(result.stdout, /needs standalone Dart Sass/);
-        } else {
-          assert.ok(result.stdout.includes(`OINK ${pin} needs standalone Dart Sass`), result.stdout);
-        }
-        assert.match(result.stdout, /upgrade the candidate to OINK v1\.4\.0/);
-        assert.equal(fs.existsSync(output), false);
-      } else {
-        assert.equal(result.status, 0, result.stderr);
-        assert.ok(fs.readFileSync(output, "utf8").includes(`source_sha=${sha}\n`));
-      }
-      assert.equal(fs.readFileSync(path.join(directory, "go.mod"), "utf8"), source);
+      assert.equal(child.status === 0, result === "success", result);
     }
   } finally {
     fs.rmSync(directory, {recursive: true, force: true});
   }
+});
+
+test("manual source tests stay read-only while publication consumes only the static artifact", () => {
+  assert.match(stepBody("Validate source and version tooling"), /if: github.event_name != 'workflow_dispatch'/);
+  assert.match(stepBody("Validate manual candidate source and version tooling"),
+    /if: github.event_name == 'workflow_dispatch' && matrix.group.id == '0'/);
+  for (const job of ["prepare", "build", "aggregate", "visual"]) {
+    assert.match(jobBody(job), /permissions: \{ contents: read \}/);
+    assert.doesNotMatch(jobBody(job), /secrets\./);
+  }
+  const publish = jobBody("publish");
+  assert.match(publish, /uses: actions\/download-artifact@[a-f0-9]{40}/);
+  assert.match(publish, /name: hugegraph-site-\$\{\{ needs\.prepare\.outputs\.artifact_prefix \}\}-\$\{\{ github\.run_id \}\}/);
+  assert.doesNotMatch(publish, /actions\/checkout|npm|python3|uses: \.\//);
+  assert.match(workflow, /^  push:\n    branches: \[master\]$/m);
+  assert.match(stepScript("Resolve trusted event plan"),
+    /elif \[\[ "\$EVENT_NAME" == push \]\]; then\n\s+test "\$GITHUB_REF" = refs\/heads\/master\n\s+publish_branch="asf-site"/);
 });
 
 test("manual aggregation retains staging flags without requiring new candidate CLI options", () => {

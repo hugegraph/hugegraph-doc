@@ -17,7 +17,9 @@ test('the site enables native Duo View', () => {
 
 test('the legacy preview uses the same build command and toolchain as the site', () => {
   const goVersion = read('go.mod').match(/^go (\S+)$/m)[1];
-  const hugoVersion = read('.github/workflows/hugo.yml').match(/^ +HUGO_VERSION: (\S+)$/m)[1];
+  const pins = JSON.parse(read('toolchain.json'));
+  const hugoVersion = pins.hugo;
+  assert.equal(pins.go, goVersion);
   const netlify = read('netlify.toml');
   assert.match(netlify, /^command = "bash scripts\/hugo\.sh build"$/m);
   assert.equal(netlify.match(/^GO_VERSION = "([^"]+)"$/m)[1], goVersion);

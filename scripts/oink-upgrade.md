@@ -14,8 +14,8 @@ This document uses the upstream product names consistently:
 
 OINK 1.5.1 requires Hugo Extended 0.168.0 and Go 1.27.3. Hugo's built-in LibSass compiles the site, so no standalone Dart Sass or npm site-build
 dependency is needed. Use Python 3.13, WebP's `cwebp` / `dwebp`, and a Node version satisfying `tests/e2e/package.json`; Node is used only by browser tests.
-The pinned versions live in `.github/workflows/hugo.yml`, `go.mod`, and the local/legacy preview configuration. Set `HUGO_BIN`, `GO_BIN`, or `PYTHON_BIN`
-only for task-local tools.
+Exact Hugo/Go pins live in `toolchain.json`. After changing them, run `python3 scripts/site_toolchain.py --sync` to update `go.mod` and `netlify.toml`;
+`--check` verifies consistency. Set `HUGO_BIN`, `GO_BIN`, or `PYTHON_BIN` only for task-local tools.
 
 Read the [OINK 1.5 upgrade guide](https://oink.pgsty.com/zh/docs/admin/upgrade/#preparing-1-5) and the
 [OINK 1.5.1 release notes](https://github.com/pgsty/oink/releases/tag/v1.5.1) before changing the lock. Keep LibSass deprecation warnings visible: do not add
@@ -145,6 +145,14 @@ scope: full
 candidate_branch: <ASF candidate branch>
 confirmation: publish asf-staging-oink
 ```
+
+The trusted workflow resolves the candidate branch once to a commit SHA, then reads only `toolchain.json` and the Go directive through its own parser.
+Both tool pins must be exact numeric `X.Y.Z` values. Hugo versions before 0.169.0 use Extended for the current LibSass theme; newer candidates use standard
+Hugo and must provide the blocking `test:browsers` suite in addition to `test:ci`. Candidate source/tests execute in read-only jobs; the write-enabled job
+downloads the tested static artifact and runs no candidate scripts. The trusted workflow must already be available on ASF `master` before dispatch.
+
+Existing pushes to ASF `master` automatically build and publish Production. Merging a workflow prerequisite also triggers that path; maintainers must
+arrange the merge and Production release explicitly. Preparing a prerequisite PR or a candidate branch does not authorize either action.
 
 `scope: full` is required for this upgrade because the current theme is applied to latest plus 1.7, 1.5, 1.3 and 1.0. Verify the staged origin's English/Chinese
 route matrix, same-origin iframe policy, canonical/hreflang, search, Kapa consent, Print/RSS/Markdown outputs, desktop/mobile behavior and captures. Record the
