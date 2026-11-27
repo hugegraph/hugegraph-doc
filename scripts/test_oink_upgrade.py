@@ -262,6 +262,35 @@ class UpgradeTest(unittest.TestCase):
             self.assertNotIn("other.json", metrics["files"])
             self.assertEqual(metrics["buildSeconds"], 1.25)
 
+    def test_custom_chromium_does_not_claim_a_managed_install_on_resume(self):
+        for full in (False, True):
+            with self.subTest(full=full), tempfile.TemporaryDirectory() as directory:
+                root, work = Path(directory) / "source", Path(directory) / "upgrade"
+                workspace = root / "tests/e2e"
+                (workspace / "node_modules/@playwright/test").mkdir(parents=True)
+                (workspace / "package-lock.json").write_text("{}")
+                work.mkdir()
+                (work / "review.json").write_text("{}")
+                with patch.object(update_oink, "ROOT", root), patch.object(update_oink, "run") as run:
+                    with patch.dict(os.environ, {"PLAYWRIGHT_CHROMIUM_EXECUTABLE_PATH": sys.executable}):
+                        update_oink.browser_setup(work, full=full)
+                    managed = ["firefox", "webkit"] if full else []
+                    self.assertEqual(json.loads((work / "review.json").read_text())["browsers"], managed)
+                    self.assertEqual([call.args[0] for call in run.call_args_list],
+                                     [["npm", "ci"]] + ([["npx", "playwright", "install", *managed]] if full else []))
+                    run.reset_mock()
+                    with patch.dict(os.environ):
+                        os.environ.pop("PLAYWRIGHT_CHROMIUM_EXECUTABLE_PATH", None)
+                        update_oink.browser_setup(work, full=full)
+                    run.assert_called_once_with(["npx", "playwright", "install", "chromium"], cwd=workspace)
+                    managed = ["chromium", *managed]
+                    self.assertEqual(json.loads((work / "review.json").read_text())["browsers"], managed)
+                    run.reset_mock()
+                    with patch.dict(os.environ, {"PLAYWRIGHT_CHROMIUM_EXECUTABLE_PATH": sys.executable}):
+                        update_oink.browser_setup(work, full=full)
+                    self.assertEqual(json.loads((work / "review.json").read_text())["browsers"], managed)
+                    run.assert_not_called()
+
     def test_failed_step_keeps_log_and_status(self):
         with tempfile.TemporaryDirectory() as directory:
             work = Path(directory)

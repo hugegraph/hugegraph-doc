@@ -495,7 +495,8 @@ def browser_setup(work, full=False):
             raise ValueError(f"PLAYWRIGHT_CHROMIUM_EXECUTABLE_PATH is not executable: {executable}")
     elif "chromium" not in installed:
         run(["npx", "playwright", "install", "chromium"], cwd=ROOT / "tests/e2e")
-    required = ["chromium", "firefox", "webkit"] if full else ["chromium"]
+    # A custom executable does not establish a managed Chromium installation.
+    required = ([] if executable else ["chromium"]) + (["firefox", "webkit"] if full else [])
     missing = [name for name in required if name != "chromium" and name not in installed]
     if missing:
         run(["npx", "playwright", "install", *missing], cwd=ROOT / "tests/e2e")

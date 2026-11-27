@@ -75,10 +75,10 @@ class HugoBuildTest(unittest.TestCase):
                     "import sys; sys.stdout.write(sys.argv[1]); sys.stdout.flush(); "
                     "getattr(sys, sys.argv[2]).write('WARN  unexpected warning\\n'); "
                     "getattr(sys, sys.argv[2]).flush(); sys.stdout.write('finished build\\n')",
-                    LIBSASS_WARNING, stream,
+                    "Starting build\n", stream,
                 )
                 self.assertEqual(result.returncode, 1)
-                self.assertIn(LIBSASS_WARNING, result.stdout)
+                self.assertIn("Starting build\n", result.stdout)
                 self.assertIn("WARN  unexpected warning\n", result.stdout)
                 self.assertIn("finished build\n", result.stdout)
 

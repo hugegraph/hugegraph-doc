@@ -224,7 +224,7 @@ exit "${HG_WRAPPER_HUGO_EXIT:-0}"
         self.assertEqual(result.returncode, 1, result.stderr)
         self.assertIn(output, result.stdout + result.stderr)
 
-    def test_build_rejects_other_hugo_warnings_even_beside_libsass(self) -> None:
+    def test_build_rejects_other_hugo_warnings_individually(self) -> None:
         for warning in (
             "WARN  i18n|MISSING_TRANSLATION|en|missing_key\n",
             "WARN  Duplicate target paths: /collision/index.html\n",
@@ -236,7 +236,7 @@ exit "${HG_WRAPPER_HUGO_EXIT:-0}"
                     "build",
                     environment_overrides={
                         "HG_WRAPPER_HUGO_STDOUT": "build output before warning\n",
-                        "HG_WRAPPER_HUGO_STDERR": LIBSASS_WARNING + warning + "build output after warning\n",
+                        "HG_WRAPPER_HUGO_STDERR": warning + "build output after warning\n",
                     },
                 )
                 self.assertNotEqual(result.returncode, 0)
