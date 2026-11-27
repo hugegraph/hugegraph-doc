@@ -22,7 +22,9 @@ site shell.
   Expo's previews, preloading and layout optimizations do not apply to Gallery.
 
 Read the entry relevant to the task; small content edits do not require the full
-upgrade or deployment workflow. Use `go.mod` / `go.sum` and CI for pinned versions.
+upgrade or deployment workflow. Use `go.mod` / `go.sum` for the theme and
+`toolchain.json` for Hugo/Go pins; sync platform-specific copies with
+`python3 scripts/site_toolchain.py --sync` after changing the toolchain.
 
 ## Project constraints
 
@@ -53,7 +55,7 @@ upgrade or deployment workflow. Use `go.mod` / `go.sum` and CI for pinned versio
   screenshots. A rendered site alone does not prove interaction compatibility.
 - Before pushing documentation edits, run `bash dist/validate-links.sh`. For
   title, description, keyword, route or substantial body changes, also run the
-  source tests with CI's Python, Hugo Extended and WebP tools; build
+  source tests with CI's Python, Hugo and WebP tools; build
   and validate a fresh latest artifact. Run `tests/e2e/search-ranking.spec.js`
   when search-facing content changes; keep metadata accurate instead of
   weakening ranking checks. Small prose edits need only focused checks.

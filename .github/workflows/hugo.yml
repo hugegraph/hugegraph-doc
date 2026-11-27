@@ -32,8 +32,8 @@ concurrency:
   cancel-in-progress: true
 
 env:
-  HUGO_VERSION: 0.168.0
   HUGO_ENVIRONMENT: production
+  GOTOOLCHAIN: local
   PRODUCTION_ORIGIN: https://hugegraph.apache.org/
   STAGING_ORIGIN: https://hugegraph-oink.staged.apache.org/
 
@@ -53,6 +53,8 @@ jobs:
       latest_sha: ${{ steps.plan.outputs.latest_sha }}
       source_sha: ${{ steps.plan.outputs.source_sha }}
       python_version: ${{ steps.python.outputs.python-version }}
+      hugo_version: ${{ steps.toolchain.outputs.hugo_version }}
+      go_version: ${{ steps.toolchain.outputs.go_version }}
       cache_key: ${{ steps.history-plan.outputs.key }}
       cache_prefix: ${{ steps.history-plan.outputs.prefix }}
       history_hit: ${{ steps.history-lookup.outcome == 'success' && steps.history-lookup.outputs.cache-hit || 'false' }}
@@ -68,21 +70,6 @@ jobs:
         id: python
         with:
           python-version: "3.13"
-      - uses: actions/setup-go@b7ad1dad31e06c5925ef5d2fc7ad053ef454303e # v7
-        with:
-          go-version-file: go.mod
-          cache: true
-      - name: Setup site compilers
-        uses: ./.github/actions/setup-site-tools
-        with:
-          hugo-version: ${{ env.HUGO_VERSION }}
-      - name: Install WebP validators
-        run: |
-          sudo apt-get update
-          sudo apt-get install --yes --no-install-recommends webp
-          command -v cwebp
-          command -v dwebp
-
       - name: Resolve trusted event plan
         id: plan
         env:
@@ -122,26 +109,6 @@ jobs:
             latest_sha="$(awk '{print $1}' <<<"$resolved")"
             [[ "$latest_sha" =~ ^[0-9a-f]{40}$ ]]
             git fetch --no-tags origin "$latest_sha"
-
-            # Inspect the immutable candidate before scheduling native-only builds.
-            candidate_theme="$(
-              set -e
-              candidate_probe="$(mktemp -d "$RUNNER_TEMP/oink-candidate.XXXXXX")"
-              trap 'rm -f -- "$candidate_probe/go.mod"; rmdir -- "$candidate_probe"' EXIT
-              git show "$latest_sha:go.mod" > "$candidate_probe/go.mod"
-              go mod edit -json "$candidate_probe/go.mod" |
-                jq -er '.Require[] | select(.Path == "github.com/pgsty/oink") | .Version'
-            )"
-            case "$candidate_theme" in
-              v1.3.0)
-                echo "::error::OINK v1.3.0 manual candidates are not supported by this workflow; upgrade the candidate to OINK v1.4.0 before dispatching again."
-                exit 1
-                ;;
-              v1.3.1)
-                echo "::error::OINK $candidate_theme needs standalone Dart Sass. This workflow uses Hugo's built-in LibSass; upgrade the candidate to OINK v1.4.0 before dispatching again."
-                exit 1
-                ;;
-            esac
 
             case "$OPERATION" in
               staging-next)
@@ -185,8 +152,32 @@ jobs:
             echo "source_sha=$latest_sha"
           } >> "$GITHUB_OUTPUT"
 
-      - name: Validate source and version tooling
+      - name: Resolve candidate toolchain as data
+        id: toolchain
+        env:
+          SOURCE_SHA: ${{ steps.plan.outputs.source_sha }}
         run: |
+          # This parser comes from the trusted workflow checkout. Candidate
+          # input is limited to numeric version pins and its go.mod directive.
+          python3 scripts/site_toolchain.py --ref "$SOURCE_SHA" --github-output >> "$GITHUB_OUTPUT"
+      - uses: actions/setup-go@b7ad1dad31e06c5925ef5d2fc7ad053ef454303e # v7
+        with:
+          go-version: ${{ steps.toolchain.outputs.go_version }}
+          cache: true
+      - name: Setup site tools
+        uses: ./.github/actions/setup-site-tools
+        with:
+          hugo-version: ${{ steps.toolchain.outputs.hugo_version }}
+      - name: Install WebP validators
+        run: |
+          sudo apt-get update
+          sudo apt-get install --yes --no-install-recommends webp
+          command -v cwebp
+          command -v dwebp
+      - name: Validate source and version tooling
+        if: github.event_name != 'workflow_dispatch'
+        run: |
+          python3 scripts/site_toolchain.py --check
           bash dist/validate-links.sh
           go mod download
           PYTHONDONTWRITEBYTECODE=1 \
@@ -286,18 +277,29 @@ jobs:
           path: resolved
       - uses: actions/setup-go@b7ad1dad31e06c5925ef5d2fc7ad053ef454303e # v7
         with:
-          go-version-file: go.mod
+          go-version: ${{ needs.prepare.outputs.go_version }}
           cache: true
-      - name: Setup site compilers
+      - name: Setup site tools
         uses: ./resolved/setup-site-tools
         with:
-          hugo-version: ${{ env.HUGO_VERSION }}
+          hugo-version: ${{ needs.prepare.outputs.hugo_version }}
       - name: Cache Hugo resources
         uses: actions/cache@55cc8345863c7cc4c66a329aec7e433d2d1c52a9 # v6
         with:
           path: ${{ env.HUGO_CACHEDIR }}
-          key: ${{ runner.os }}-hugo-${{ env.HUGO_VERSION }}-${{ hashFiles('resolved/setup-site-tools/action.yml') }}-group${{ matrix.group.id }}-${{ hashFiles('go.sum') }}
-          restore-keys: ${{ runner.os }}-hugo-${{ env.HUGO_VERSION }}-${{ hashFiles('resolved/setup-site-tools/action.yml') }}-group${{ matrix.group.id }}-
+          key: ${{ runner.os }}-hugo-${{ needs.prepare.outputs.hugo_version }}-${{ hashFiles('resolved/setup-site-tools/action.yml') }}-group${{ matrix.group.id }}-${{ hashFiles('go.sum') }}
+          restore-keys: ${{ runner.os }}-hugo-${{ needs.prepare.outputs.hugo_version }}-${{ hashFiles('resolved/setup-site-tools/action.yml') }}-group${{ matrix.group.id }}-
+      - name: Validate manual candidate source and version tooling
+        if: github.event_name == 'workflow_dispatch' && matrix.group.id == '0'
+        run: |
+          # Candidate code runs only on this unprivileged, read-only runner.
+          sudo apt-get update
+          sudo apt-get install --yes --no-install-recommends webp
+          python3 scripts/site_toolchain.py --check
+          bash dist/validate-links.sh
+          go mod download
+          PYTHONDONTWRITEBYTECODE=1 \
+            python3 -m unittest discover -s scripts -p 'test_*.py' -v
       - name: Verify pinned OINK module
         run: |
           lscpu | sed -n '/^CPU(s):/p; /^Model name:/p'
@@ -389,6 +391,8 @@ jobs:
     runs-on: ubuntu-latest
     timeout-minutes: 35
     permissions: { contents: read }
+    outputs:
+      e2e_result: ${{ steps.e2e.outcome }}
     env:
       HUGO_CACHEDIR: /tmp/hugo-cache-${{ github.run_id }}-${{ github.run_attempt }}-aggregate
     steps:
@@ -481,17 +485,17 @@ jobs:
           cache-dependency-path: tests/e2e/package-lock.json
       - uses: actions/setup-go@b7ad1dad31e06c5925ef5d2fc7ad053ef454303e # v7
         with:
-          go-version-file: go.mod
+          go-version: ${{ needs.prepare.outputs.go_version }}
           cache: true
-      - name: Setup site compilers
+      - name: Setup site tools
         uses: ./resolved/setup-site-tools
         with:
-          hugo-version: ${{ env.HUGO_VERSION }}
-      - name: Install Chromium test workspace
+          hugo-version: ${{ needs.prepare.outputs.hugo_version }}
+      - name: Install browser test workspace
         working-directory: tests/e2e
         run: |
           npm ci
-          npx playwright install --with-deps chromium
+          npx playwright install --with-deps chromium firefox webkit
       - name: Build manifest-derived AI fixture
         run: |
           python3 scripts/versioning.py config \
@@ -516,14 +520,17 @@ jobs:
             --destination "${RUNNER_TEMP}/ai-disabled-site" \
             --cleanDestinationDir --gc --minify --environment production \
             --printPathWarnings --printI18nWarnings --logLevel info
-      - name: Run blocking Chromium contracts
+      - name: Run blocking browser contracts
+        id: e2e
         working-directory: tests/e2e
         env:
           SITE_ROOT: ${{ runner.temp }}/public-site
           AI_SITE_ROOT: ${{ runner.temp }}/ai-site
           AI_DISABLED_SITE_ROOT: ${{ runner.temp }}/ai-disabled-site
           EXPECTED_VERSIONS: ${{ needs.prepare.outputs.selection }}
-        run: npm run test:ci
+        run: |
+          npm run test:ci
+          npm run test:browsers
       - name: Upload E2E report
         if: ${{ !cancelled() }}
         uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7
@@ -532,6 +539,8 @@ jobs:
           path: |
             tests/e2e/playwright-report
             tests/e2e/test-results
+            tests/e2e/playwright-compat-report
+            tests/e2e/test-results-compat
           retention-days: 7
           if-no-files-found: warn
 
@@ -573,7 +582,7 @@ jobs:
           if-no-files-found: warn
 
   publish:
-    if: needs.prepare.outputs.publish_branch != ''
+    if: needs.prepare.outputs.publish_branch != '' && needs.aggregate.result == 'success' && needs.aggregate.outputs.e2e_result == 'success'
     needs: [prepare, aggregate]
     runs-on: ubuntu-latest
     timeout-minutes: 10
@@ -587,7 +596,9 @@ jobs:
         env:
           TARGET: ${{ needs.prepare.outputs.publish_branch }}
           PREFIX: ${{ needs.prepare.outputs.artifact_prefix }}
+          E2E_RESULT: ${{ needs.aggregate.outputs.e2e_result }}
         run: |
+          test "$E2E_RESULT" = success
           case "$PREFIX:$TARGET" in
             production:asf-site|staging:asf-staging-oink) ;;
             *) exit 1 ;;

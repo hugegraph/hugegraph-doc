@@ -29,7 +29,7 @@ test('Kapa active resource is dynamic, exact-hosted, and never wildcarded', () =
 
 test('theme color and social fallback have one configuration authority', () => {
   const config = read('hugo.yaml');
-  const css = read('assets/scss/_styles_project.scss');
+  const css = read('assets/css/project.css');
   const hook = read('layouts/_partials/hooks/body-end.html');
   const adapter = read('assets/js/kapa-adapter.js');
   assert.match(config, /theme_color: '#532fc9'/);

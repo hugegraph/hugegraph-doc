@@ -16,12 +16,12 @@ test('the site enables native Duo View', () => {
 });
 
 test('the legacy preview uses the same build command and toolchain as the site', () => {
-  const goVersion = read('go.mod').match(/^go (\S+)$/m)[1];
-  const hugoVersion = read('.github/workflows/hugo.yml').match(/^ +HUGO_VERSION: (\S+)$/m)[1];
+  const toolchain = JSON.parse(read('toolchain.json'));
   const netlify = read('netlify.toml');
-  assert.match(netlify, /^command = "bash scripts\/hugo\.sh build"$/m);
-  assert.equal(netlify.match(/^GO_VERSION = "([^"]+)"$/m)[1], goVersion);
-  assert.equal(netlify.match(/^HUGO_VERSION = "([^"]+)"$/m)[1], hugoVersion);
+  assert.match(netlify, /^command = "python3 scripts\/site_toolchain\.py --check && bash scripts\/hugo\.sh build"$/m);
+  assert.equal(read('go.mod').match(/^go (\S+)$/m)[1], toolchain.go);
+  assert.equal(netlify.match(/^GO_VERSION = "([^"]+)"$/m)[1], toolchain.go);
+  assert.equal(netlify.match(/^HUGO_VERSION = "([^"]+)"$/m)[1], toolchain.hugo);
 });
 
 test('the site reuses OINK Duo View instead of carrying a second reader or router', () => {
@@ -55,7 +55,7 @@ test('the site reuses OINK Duo View instead of carrying a second reader or route
   }
 });
 
-test('local template overrides retain OINK 1.5.1 page and mobile contracts', () => {
+test('local template overrides retain OINK page and mobile contracts', () => {
   const manifest = read('layouts/_partials/actions/manifest.html');
   const navbar = read('layouts/_partials/navbar.html');
   const sidebar = read('layouts/_partials/shell/sidebar-panel.html');
@@ -108,7 +108,7 @@ test('language preference and Kapa return before touching a Duo View pane docume
 });
 
 test('pane-only HugeGraph chrome is hidden without disabling content runtimes', () => {
-  const styles = read('assets/scss/_styles_project.scss');
+  const styles = read('assets/css/project.css');
   assert.match(styles, /html\[data-td-compare-pane\]/);
   for (const selector of ['.hg-ask-ai-launcher', '.hg-ai-consent', '.hg-ai-status']) {
     assert.match(styles, new RegExp(selector.replace('.', '\\.')));

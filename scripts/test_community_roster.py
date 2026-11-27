@@ -571,11 +571,6 @@ class CommunityContentContractTests(unittest.TestCase):
     def setUpClass(cls):
         cls._site = tempfile.TemporaryDirectory(prefix="community-content-site-")
         hugo = os.environ.get("HUGO_BIN", "hugo")
-        hugo_version = subprocess.check_output([hugo, "version"], text=True)
-        if "+extended" not in hugo_version:
-            raise RuntimeError(
-                f"Community render contracts require Hugo Extended: {hugo_version.strip()}"
-            )
         environment = {**os.environ, "GOPROXY": "off"}
         subprocess.run(
             [hugo, "--quiet", "--destination", cls._site.name],

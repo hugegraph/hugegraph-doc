@@ -40,7 +40,7 @@ The map uses short labels for the repository modules described above. `server`, 
 ```markmap
 ---
 markmap:
-  spacingHorizontal: 40
+  levelGap: 40
 ---
 # HugeGraph
 ## server

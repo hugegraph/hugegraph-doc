@@ -184,7 +184,7 @@ This file contains only `rocksdb` and Actuator exposure settings.
 | `grpc.netty-server.max-inbound-message-size` | `1000MB` | gRPC default | Maximum size of a single inbound gRPC message. Bound by the `grpc-spring-boot-starter` Netty server. |
 | `grpc.server.wait-time` | not set | `3600` | Seconds a scan stream waits for the client to consume a page before the server aborts it. |
 | `server.port` | `8520` | required | REST and Actuator port. Also reported to PD as the `rest.port` label. |
-{.td-table--wide}
+{.fields}
 
 **Raft**
 
@@ -203,7 +203,7 @@ This file contains only `rocksdb` and Actuator exposure settings.
 | `raft.maxEntriesSize` | not set | `256` | Maximum number of entries in one `AppendEntries` request. |
 | `raft.maxBodySize` | not set | `524288` | Maximum byte size of one `AppendEntries` request. |
 | `ave-logEntry-size-ratio` | not set | `0.95` | Smoothing ratio used to estimate the average log entry size. Note that this key sits at the top level, not under `raft`. |
-{.td-table--wide}
+{.fields}
 
 **Storage and labels**
 
@@ -214,7 +214,7 @@ This file contains only `rocksdb` and Actuator exposure settings.
 | `app.fake-pd` | not set | `false` | Built-in PD mode for standalone testing. Do not use it in production. |
 | `app.placeholder-size` | not set | `10` | Size in GB of a `placeholder` file created in each data path at startup, so space can be freed in an emergency. `0` disables it. |
 | `app.label.<name>` | not set | none | Arbitrary key/value labels sent to PD in the store heartbeat. The node adds `rest.port` on its own. |
-{.td-table--wide}
+{.fields}
 
 **RocksDB**
 
@@ -224,7 +224,7 @@ This file contains only `rocksdb` and Actuator exposure settings.
 | `rocksdb.write_buffer_size` | `32000000` | Derived, see Meaning | Memtable size in bytes. When absent or `0`, the node uses `total_memory_size / 1000`, at least `1048576` (1 MiB). |
 | `rocksdb.min_write_buffer_number_to_merge` | `16` | `16` | Number of memtables merged together before a flush. |
 | `rocksdb.write_buffer_ratio` | not set | `0.66` | Share of `total_memory_size` given to the write cache. The rest becomes the block cache. |
-{.td-table--wide}
+{.fields}
 
 ### RocksDB memory budget sizing rules {#rocksdb-memory-budget}
 

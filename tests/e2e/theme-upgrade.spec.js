@@ -328,6 +328,22 @@ for (const language of ['en', 'cn']) {
     await expect(page.locator(`.td-blog-posts h2 > a[href$="${quickStart}"]`)).toBeVisible();
     await expect(page.locator(`.td-blog-posts h2 > a[href$="${configuration}"]`)).toBeVisible();
   });
+
+  test(`${language} blog uses the native local copy-link action and announces success`, async ({ page, context }) => {
+    await context.grantPermissions(['clipboard-read', 'clipboard-write']);
+    await page.goto(quickStart);
+    const share = page.locator('[data-td-share]');
+    const copy = share.getByRole('button', { name: language === 'cn' ? '复制链接' : 'Copy link', exact: true });
+    await expect(share.locator('a')).toHaveCount(0);
+    await expect(share.getByRole('button')).toHaveCount(1);
+    await copy.click();
+    const canonical = await page.locator('link[rel="canonical"]').getAttribute('href');
+    await expect.poll(() => page.evaluate(() => navigator.clipboard.readText())).toBe(canonical);
+    await expect(copy).toHaveClass(/td-is-copied/);
+    await expect(share.getByRole('status')).toHaveText(language === 'cn' ? '已复制链接' : 'Link copied');
+    await page.goto(`${prefix}/docs/introduction/`);
+    await expect(page.locator('[data-td-share]')).toHaveCount(0);
+  });
 }
 
 for (const language of ['en', 'cn']) {
@@ -468,7 +484,7 @@ for (const language of ['en', 'cn']) {
   });
 }
 
-test('Chinese keyword-only summary search displays the authored description', async ({ page }) => {
+test('Chinese keyword search uses the authored description or matching body text', async ({ page }) => {
   const fs = require('node:fs');
   const path = require('node:path');
   const root = process.env.SITE_ROOT;
@@ -477,9 +493,18 @@ test('Chinese keyword-only summary search displays the authored description', as
   const records = JSON.parse(fs.readFileSync(path.join(root, indexName), 'utf8'));
   const record = records.find(item => item.ref === '/cn/docs/quickstart/toolchain/hugegraph-hubble/');
   expect(record).toBeTruthy();
-  const query = '图形化界面';
-  expect(record.keywords).toContain(query);
-  for (const value of [record.title, record.headings, record.description, record.body]) {
+  let body = record.body;
+  if (typeof body !== 'string') {
+    const bodyName = fs.readdirSync(root).find(name => /^offline-search-body\.cn\..*\.json$/.test(name));
+    expect(bodyName, 'Split search index must retain its body resource').toBeTruthy();
+    body = JSON.parse(fs.readFileSync(path.join(root, bodyName), 'utf8')).find(item => item.ref === record.ref)?.body;
+  }
+  expect(body).toBeTruthy();
+  // Use a single CJK bigram for a genuinely keyword-only match. The longer
+  // synonym also contains 化界/界面, which occur in the authored body.
+  const query = '图形';
+  expect(record.keywords.some(keyword => keyword.includes(query))).toBe(true);
+  for (const value of [record.title, record.headings, record.description, body]) {
     expect(JSON.stringify(value || '')).not.toContain(query);
   }
   expect(record.description.length).toBeGreaterThan(10);
@@ -489,6 +514,21 @@ test('Chinese keyword-only summary search displays the authored description', as
   const result = page.locator('#td-shell-search-results [role="option"]').filter({ hasText: record.title });
   await expect(result).toBeVisible();
   await expect(result.locator('.td-shell-search__item-excerpt')).toHaveText(record.description);
+
+  const compound = '图形化界面';
+  expect(record.keywords).toContain(compound);
+  const loadLabel = await page.locator('#td-shell-search').getAttribute('data-td-t-body-load');
+  if (loadLabel) {
+    const load = page.locator('#td-shell-search-results [role="option"]').filter({ hasText: loadLabel.split('{size}')[0] });
+    if (await load.count()) await load.click();
+  }
+  await page.locator('.td-shell-search__input').fill(compound);
+  await expect(result.locator('.td-shell-search__item-excerpt')).not.toHaveText(record.description);
+  const excerpt = (await result.locator('.td-shell-search__item-excerpt').innerText()).replace(/^…|…$/g, '').trim();
+  const normalize = value => value.replace(/\s+/g, ' ');
+  expect(normalize(body)).toContain(normalize(excerpt));
+  const terms = await page.evaluate(query => window.OinkSearchEngine.terms(query), compound);
+  expect(terms.some(term => excerpt.includes(term))).toBe(true);
   await result.click();
   await expect(page).toHaveURL(url => url.pathname === record.ref);
 });
@@ -661,11 +701,12 @@ for (const language of ['en', 'cn']) {
 
   test(`${language} Server map folds nodes while steps and outdated status retain real context`, async ({ page }) => {
     await page.goto(serverPath);
+    await page.locator('pre:has(code.language-markmap), div.markmap').first().scrollIntoViewIfNeeded();
     const map = page.locator('div.markmap');
     await expect(map.locator('svg')).toBeVisible();
-    const nodes = map.locator('.markmap-node');
+    const nodes = map.locator('svg [data-key^="node:"]');
     await expect.poll(() => nodes.count()).toBeGreaterThan(3);
-    const branch = nodes.filter({ hasText: /^server$/ }).locator('circle');
+    const branch = nodes.filter({ hasText: /^server$/ }).locator(':scope > rect');
     const before = await nodes.count();
     await branch.click();
     await expect.poll(() => nodes.count()).toBeLessThan(before);
@@ -694,26 +735,26 @@ for (const language of ['en', 'cn']) {
           }, { preset, colorTheme });
           await page.goto(serverPath);
           await expect(page.locator('html')).toHaveAttribute('data-bs-theme', colorTheme);
+          await page.locator('pre:has(code.language-markmap), div.markmap').first().scrollIntoViewIfNeeded();
           const map = page.locator('div.markmap');
-          await map.scrollIntoViewIfNeeded();
-          await expect(map.locator('.markmap-node')).toHaveCount(7);
+          await expect(map.locator('svg [data-key^="node:"]')).toHaveCount(7);
           // Markmap scales the SVG group, so computed font-size alone can report
           // 16px while the labels actually render at only 4px on a narrow screen.
-          await expect.poll(() => map.locator('foreignObject').evaluateAll(nodes => {
+          await expect.poll(() => map.locator('svg [data-key^="node:"] text').evaluateAll(nodes => {
             const labels = nodes.map(node => {
-              const text = node.querySelector('div');
+              const text = node.querySelector('tspan');
               const transform = node.getScreenCTM();
               const { left, right } = node.getBoundingClientRect();
               return { left, right,
                 font: parseFloat(getComputedStyle(text).fontSize) * Math.hypot(transform.a, transform.b) };
             });
-            return labels.every(label => label.font >= 12 && label.left >= 0 && label.right <= innerWidth);
+            return labels.length >= 7 && labels.every(label => label.font >= 12 && label.left >= 0 && label.right <= innerWidth);
           })).toBe(true);
-          const colors = await map.locator('.markmap-foreign div').first().evaluate(node => {
+          const colors = await map.locator('svg [data-key^="node:"] text tspan').first().evaluate(node => {
             const rgb = color => color.match(/[\d.]+/g).slice(0, 3).map(Number);
             let ancestor = node;
             while (ancestor && !/^rgb\(/.test(getComputedStyle(ancestor).backgroundColor)) ancestor = ancestor.parentElement;
-            const foreground = getComputedStyle(node).color;
+            const foreground = getComputedStyle(node).fill;
             const background = getComputedStyle(ancestor || document.body).backgroundColor;
             const luminance = color => rgb(color).map(value => {
               const channel = value / 255;
@@ -745,14 +786,15 @@ for (const language of ['en', 'cn']) {
   test(`${language} native Markmap keeps dark ink when printing from dark mode`, async ({ page }) => {
     await page.addInitScript(() => localStorage.setItem('td-color-theme', 'dark'));
     await page.goto(serverPath);
-    const labels = page.locator('div.markmap .markmap-foreign div');
+    await page.locator('pre:has(code.language-markmap), div.markmap').first().scrollIntoViewIfNeeded();
+    const labels = page.locator('div.markmap svg [data-key^="node:"] text tspan');
     await expect(labels.first()).toBeVisible();
     await page.emulateMedia({ media: 'print' });
     const printColors = await labels.first().evaluate(node => ({
-      text: getComputedStyle(node).color,
+      text: getComputedStyle(node).fill,
       background: getComputedStyle(document.body).backgroundColor
     }));
-    expect(printColors.text).toBe('rgb(51, 51, 51)');
+    expect(printColors.text).toBe('rgb(0, 0, 0)');
     expect(printColors.background).toBe('rgb(255, 255, 255)');
     await page.goto(`${prefix}/_print/docs/`);
     await expect(page.locator('body')).toContainText('hugegraph-core');

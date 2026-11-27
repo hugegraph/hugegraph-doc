@@ -54,9 +54,9 @@ REQUIRED_FILES = (
     "client-go/index.html",
 )
 
-HREFLANG_FALLBACKS = {
+HREFLANG_MISSING_TRANSLATIONS = {
     # The English release note is intentionally draft-only.
-    "cn/docs/changelog/hugegraph-0.12.0-release-notes/index.html": {"en-US": "/"},
+    "cn/docs/changelog/hugegraph-0.12.0-release-notes/index.html": {"en-US"},
 }
 
 # Mirrors the HTTPS image sources currently allowed by the ASF staging CSP:
@@ -158,6 +158,7 @@ CSS_PRESENTATION_ATTRIBUTES = {
 }
 RUNTIME_ACTIVE_URL_ATTRIBUTES = {
     "data-td-index-src",
+    "data-td-body-src",
     "data-td-url",
     "data-td-action-url",
 }
@@ -172,7 +173,7 @@ OINK_READER_LABEL_FIELDS = {
     },
 }
 OINK_CONFIG_MARKERS = {
-    "data-td-diagram-source", "data-td-echarts-options", "data-td-asciinema-config",
+    "data-td-diagram-source", "data-td-echarts-options", "data-td-asciinema-config", "data-td-markmap-config",
 } | set(OINK_READER_LABEL_FIELDS)
 
 
@@ -635,7 +636,7 @@ def toc_accessibility_errors(parser: DocumentParser, page_name: str) -> list[str
         parts[0] == "cn"
         or (len(parts) >= 3 and parts[0] == "versions" and parts[2] == "cn")
     )
-    expected = "目录" if is_chinese else "Content"
+    expected = "目录" if is_chinese else "On this page"
     labels = parser.toc_nav_labels[0]
     if labels != [expected]:
         return [
@@ -1009,7 +1010,7 @@ class DocumentParser(html.parser.HTMLParser):
         if tag == "script" and values.get("id") == "td-action-manifest":
             self._in_action_manifest = True
         if is_inert_oink_component_source(tag, values):
-            for marker in ("data-td-echarts-options", "data-td-asciinema-config", *OINK_READER_LABEL_FIELDS):
+            for marker in ("data-td-echarts-options", "data-td-asciinema-config", "data-td-markmap-config", *OINK_READER_LABEL_FIELDS):
                 if marker in values:
                     self._component_source = marker
                     self._component_json = ""
@@ -1083,14 +1084,14 @@ class DocumentParser(html.parser.HTMLParser):
                 header = lines[1:end] if end is not None else lines[1:]
                 allowed = all(not line.strip() or line.lstrip().startswith("#") or
                               re.fullmatch(r"markmap:\s*(?:#.*)?", line) or
-                              re.fullmatch(r"  spacingHorizontal:\s*(?:\d+(?:\.\d*)?|\.\d+)\s*(?:#.*)?", line)
+                              re.fullmatch(r"  levelGap:\s*(?:\d+(?:\.\d*)?|\.\d+)\s*(?:#.*)?", line)
                               for line in header)
                 roots = sum(bool(re.fullmatch(r"markmap:\s*(?:#.*)?", line)) for line in header)
-                spacing_values = [re.match(r"  spacingHorizontal:\s*((?:\d+(?:\.\d*)?|\.\d+))", line)[1]
-                                  for line in header if re.match(r"  spacingHorizontal:\s*((?:\d+(?:\.\d*)?|\.\d+))", line)]
+                spacing_values = [re.match(r"  levelGap:\s*((?:\d+(?:\.\d*)?|\.\d+))", line)[1]
+                                  for line in header if re.match(r"  levelGap:\s*((?:\d+(?:\.\d*)?|\.\d+))", line)]
                 spacing_valid = all(finite_json_number(float(value)) for value in spacing_values)
                 if end is None or not allowed or roots != 1 or len(spacing_values) > 1 or not spacing_valid:
-                    self.authored_violations.append("Markmap plain-text policy permits only numeric markmap.spacingHorizontal frontmatter")
+                    self.authored_violations.append("Markmap plain-text policy permits only numeric markmap.levelGap frontmatter")
                 lines = lines[end + 1:] if end is not None else []
             # MarkdownIt keeps inline/fenced code inert. Preserve that property
             # instead of mistaking a displayed image example for active markup.
@@ -1124,6 +1125,15 @@ class DocumentParser(html.parser.HTMLParser):
             return
         if not isinstance(payload, dict):
             self.authored_violations.append("OINK component JSON payload must be an object")
+            return
+        if self._component_source == "data-td-markmap-config":
+            source = payload.get("src")
+            if (set(payload) != {"src"} or not isinstance(source, str) or not re.fullmatch(
+                    r"/(?:versions/[0-9.]+/)?third_party/markmap/markmap(?:\.[0-9a-f]+)?\.js", source)):
+                self.authored_violations.append("Markmap engine must be the local native ESM entry")
+            else:
+                self.resources.append(("script", "src", source))
+                self.urls.append(("src", source))
             return
         label_fields = OINK_READER_LABEL_FIELDS.get(self._component_source)
         if label_fields is not None:
@@ -1650,12 +1660,8 @@ def main() -> int:
                 "en-US": urllib.parse.urljoin(base, english_path.lstrip("/")),
                 "zh-CN": urllib.parse.urljoin(base, chinese_path.lstrip("/")),
             }
-            for language, fallback_path in HREFLANG_FALLBACKS.get(
-                page_name, {}
-            ).items():
-                expected_hreflang[language] = urllib.parse.urljoin(
-                    base, fallback_path.lstrip("/")
-                )
+            for language in HREFLANG_MISSING_TRANSLATIONS.get(page_name, set()):
+                expected_hreflang.pop(language, None)
             if actual_hreflang != expected_hreflang:
                 errors.append(
                     f"{page_name}: hreflang {actual_hreflang} != {expected_hreflang}"

@@ -7,6 +7,7 @@ const releaseLinks = [
   'https://github.com/apache/hugegraph/archive/refs/tags/1.7.0.zip',
   'https://github.com/apache/hugegraph'
 ];
+const configurationKey = 'gremlin.graph';
 
 for (const language of ['en', 'cn']) {
   const prefix = language === 'cn' ? '/cn' : '';
@@ -35,15 +36,17 @@ for (const language of ['en', 'cn']) {
     test(`${language} native configuration table reader preserves data, keyboard focus and Print at ${width}px`, async ({ page, request }) => {
       await page.setViewportSize({ width, height: 1000 });
       await page.goto(configurationRoute);
-      const frame = page.locator('[data-td-table-expand]').filter({ hasText: 'restserver.connection_max_requests' });
+      const frame = page.locator('[data-td-table-expand]').filter({ hasText: configurationKey });
       const button = frame.locator('.td-table-expand');
       const dialog = page.locator('[data-td-table-reader]');
-      const table = page.locator('table.expand').filter({ hasText: 'restserver.connection_max_requests' });
+      const table = page.locator('table.expand').filter({ hasText: configurationKey });
       await expect(frame).toHaveCount(1);
       await expect(button).toBeVisible();
       await expect(table).toHaveClass(/td-table--wide/);
       const rows = await table.locator('tbody tr').count();
       expect(rows).toBeGreaterThan(20);
+      await expect(table.locator('tbody tr > td:first-child').first()).toHaveText(configurationKey);
+      const sourceRows = await table.locator('tbody tr').allTextContents();
       await button.scrollIntoViewIfNeeded();
       await button.focus();
       const scrollY = await page.evaluate(() => window.scrollY);
@@ -52,7 +55,7 @@ for (const language of ['en', 'cn']) {
       await expect(dialog.locator('table')).toHaveCount(1);
       await expect(frame.locator('table')).toHaveCount(0);
       await expect(dialog.locator('tbody tr')).toHaveCount(rows);
-      await expect(dialog).toContainText('restserver.connection_max_requests');
+      await expect(dialog.locator('tbody tr')).toHaveText(sourceRows);
       await expect(dialog.locator('#td-table-reader-title')).toBeFocused();
       await page.keyboard.press('Shift+Tab');
       expect(await dialog.evaluate(node => node.contains(document.activeElement))).toBe(true);
@@ -60,6 +63,7 @@ for (const language of ['en', 'cn']) {
       await expect(dialog).toBeHidden();
       await expect(button).toBeFocused();
       await expect(frame.locator('tbody tr')).toHaveCount(rows);
+      await expect(frame.locator('tbody tr')).toHaveText(sourceRows);
       expect(Math.abs(await page.evaluate(() => window.scrollY) - scrollY)).toBeLessThanOrEqual(1);
 
       await button.press('Enter');
@@ -70,15 +74,15 @@ for (const language of ['en', 'cn']) {
       await page.emulateMedia({ media: 'print' });
       await expect(button).toBeHidden();
       await expect(table).toBeVisible();
-      await expect(table).toContainText('restserver.connection_max_requests');
+      await expect(table.locator('tbody tr')).toHaveText(sourceRows);
       await page.emulateMedia({ media: 'screen' });
       expect(await page.evaluate(() => document.documentElement.scrollWidth <= innerWidth + 1)).toBe(true);
 
       const markdown = await request.get(`${configurationRoute}index.md`);
       expect(markdown.ok()).toBe(true);
       const text = await markdown.text();
-      expect(text).toContain('restserver.connection_max_requests');
-      expect(text).toContain('server.start_ignore_single_graph_error');
+      expect(text).toContain(configurationKey);
+      expect(text).toContain('serializer.buffer_max_capacity');
       expect(text).not.toContain('data-td-table-reader');
     });
   }
@@ -160,7 +164,13 @@ for (const language of ['en', 'cn']) {
     await expect(card).toHaveCount(1);
     await expect(card.locator('time')).toHaveAttribute('datetime', '2025-11-16');
     expect(await card.locator('a').evaluateAll(links => links.map(link => link.getAttribute('href')))).toEqual(releaseLinks);
-    await expect(page.locator('table').filter({ hasText: 'restserver.connection_max_requests' })).toHaveCount(1);
+    const table = page.locator('table').filter({ hasText: configurationKey });
+    await expect(table).toHaveCount(1);
+    expect(await table.locator('tbody tr').count()).toBeGreaterThan(20);
+    const field = page.locator('.td-field').filter({ has: page.locator('.td-field__name', { hasText: /^restserver\.connection_max_requests$/ }) });
+    await expect(field).toHaveCount(1);
+    await expect(field.locator('.td-field__meta-value')).toHaveText('256');
+    await expect(field.locator('.td-field__description')).not.toBeEmpty();
     await expect(page.locator('[data-td-table-reader]')).toHaveCount(0);
     await expect(page.locator('.td-table-expand')).toHaveCount(0);
     const diagramSource = page.locator('pre.td-mermaid-source code').filter({ hasText: 'bin/start-hugegraph.sh -p true' });

@@ -101,7 +101,7 @@ if [ "$mode" = "server" ]; then
       "$@"
   fi
 else
-  # Keep the known LibSass deprecation visible; other warnings remain blocking.
+  # Preserve complete diagnostics; every warning blocks the production build.
   "$python_bin" scripts/hugo_build.py "$hugo_bin" \
     --config "hugo.yaml,$config_file" \
     --cleanDestinationDir \

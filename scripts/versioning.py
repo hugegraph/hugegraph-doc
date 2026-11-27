@@ -93,7 +93,7 @@ DOCS_MERGE_EQUIVALENT_PREFERENCES = {
     "cn:clients/client/hugegraph-client": "cn:clients/hugegraph-client",
 }
 URL_ATTRIBUTE_RE = re.compile(
-    r"(?P<prefix>[\s<](?:href|xlink:href|src|action|formaction|data|poster|data-td-index-src|data-td-url|data-td-action-url|data-td-image-zoom)=)"
+    r"(?P<prefix>[\s<](?:href|xlink:href|src|action|formaction|data|poster|data-td-index-src|data-td-body-src|data-td-url|data-td-action-url|data-td-image-zoom)=)"
     r"(?P<quote>[\"']?)(?P<url>[^\s\"'<>`]+)(?P=quote)",
     re.IGNORECASE,
 )
@@ -118,6 +118,16 @@ COMPARE_CONFIG_RE = re.compile(
     r"(?P<body>.*?)"
     r"(?P<close></script>)",
     re.IGNORECASE | re.DOTALL,
+)
+MARKMAP_CONFIG_RE = re.compile(
+    r"(?P<open><script\b(?=[^>]*\bdata-td-markmap-config(?:[\s=>]))[^>]*>)"
+    r"(?P<body>.*?)"
+    r"(?P<close></script>)",
+    re.IGNORECASE | re.DOTALL,
+)
+SEARCH_RESOURCE_PATTERNS = (
+    "offline-search-index.*.json",
+    "offline-search-body.*.json",
 )
 COMPARE_PAGE_PATH_RE = re.compile(
     r"""(?P<open><meta\b(?=[^>]*\sname=["']?oink-compare-page(?:["'\s>]|$))"""
@@ -259,6 +269,7 @@ class DocumentParser(html.parser.HTMLParser):
             "action",
             "poster",
             "data-td-index-src",
+            "data-td-body-src",
             "data-td-url",
             "data-td-action-url",
             "data-td-image-zoom",
@@ -325,7 +336,7 @@ def require_toc_accessible_name(parser: DocumentParser, relative: str) -> None:
             f"expected at most one TableOfContents nav in {relative}, "
             f"found {len(parser.toc_nav_labels)}"
         )
-    expected = "目录" if relative.startswith("cn/") else "Content"
+    expected = "目录" if relative.startswith("cn/") else "On this page"
     labels = parser.toc_nav_labels[0]
     if labels != [expected]:
         fail(
@@ -3148,19 +3159,19 @@ def scope_version_artifact(
     for path in sorted(output.rglob("*")):
         if not path.is_file():
             continue
-        if path.match("offline-search-index.*.json"):
+        if any(path.match(pattern) for pattern in SEARCH_RESOURCE_PATTERNS):
             parts = path.name.split(".")
             digest = hashlib.md5(path.read_bytes()).hexdigest()
             if len(parts) != 4 or parts[2] != digest:
                 fail(
-                    f"stale search index fingerprint before rewrite: {path.relative_to(output)}"
+                    f"stale search resource fingerprint before rewrite: {path.relative_to(output)}"
                 )
             data = json.loads(path.read_text(encoding="utf-8"))
             if not isinstance(data, list):
-                fail(f"unexpected search index shape: {path}")
+                fail(f"unexpected search resource shape: {path}")
             for item in data:
                 if not isinstance(item, dict) or not isinstance(item.get("ref"), str):
-                    fail(f"invalid search index entry: {path}")
+                    fail(f"invalid search resource entry: {path}")
                 old = item["ref"]
                 item["ref"] = rewrite(old)
                 stats["searchRefs"] += old != item["ref"]
@@ -3211,27 +3222,42 @@ def scope_version_artifact(
                 + match.group("close")
             )
 
+        def replace_markmap_config(match: re.Match) -> str:
+            # The native ESM entry is loaded from JSON, outside Hugo's URL
+            # canonification. Keep it in the same artifact as its chunks.
+            data = json.loads(match.group("body"))
+            old = data["src"]
+            data["src"] = rewrite(old)
+            stats["urls"] += data["src"] != old
+            return (
+                match.group("open")
+                + json.dumps(data, ensure_ascii=False, separators=(",", ":"))
+                + match.group("close")
+            )
+
         if path.suffix == ".html":
             if mount:
                 rendered = COMPARE_PAGE_PATH_RE.sub(mount_compare_page, rendered)
             rendered = ACTION_MANIFEST_RE.sub(replace_manifest, rendered)
             rendered = COMPARE_CONFIG_RE.sub(replace_compare_config, rendered)
+            rendered = MARKMAP_CONFIG_RE.sub(replace_markmap_config, rendered)
         if rendered != original:
             path.write_text(rendered, encoding="utf-8")
             stats["files"] += 1
             stats["urls"] += changed
-    renamed_indexes = []
-    for path in sorted(output.glob("offline-search-index.*.json")):
+    renamed_resources = []
+    for path in sorted(path for pattern in SEARCH_RESOURCE_PATTERNS for path in output.glob(pattern)):
         digest = hashlib.md5(path.read_bytes()).hexdigest()
         parts = path.name.split(".")
         if len(parts) != 4:
-            fail(f"unexpected search index filename: {path.name}")
-        new_name = f"offline-search-index.{parts[1]}.{digest}.json"
+            fail(f"unexpected search resource filename: {path.name}")
+        new_name = f"{parts[0]}.{parts[1]}.{digest}.json"
         if path.name != new_name:
             new_path = path.with_name(new_name)
             path.rename(new_path)
-            renamed_indexes.append((path.name, new_name))
-    for old_name, new_name in renamed_indexes:
+            body_bytes = new_path.stat().st_size if parts[0] == "offline-search-body" else None
+            renamed_resources.append((path.name, new_name, body_bytes))
+    for old_name, new_name, body_bytes in renamed_resources:
         references = 0
         for path in sorted(output.rglob("*")):
             if not path.is_file() or path.suffix not in {
@@ -3245,11 +3271,20 @@ def scope_version_artifact(
             text = path.read_text(encoding="utf-8")
             count = text.count(old_name)
             if count:
-                path.write_text(text.replace(old_name, new_name), encoding="utf-8")
+                text = text.replace(old_name, new_name)
+                if body_bytes is not None and path.suffix == ".html":
+                    # The native palette uses this size for its automatic
+                    # download budget and the reader's explicit-load label.
+                    text = re.sub(
+                        r'(\bdata-td-body-bytes=)(["\']?)\d+\2',
+                        lambda match: f"{match[1]}{match[2]}{body_bytes}{match[2]}",
+                        text,
+                    )
+                path.write_text(text, encoding="utf-8")
                 references += count
         if references == 0:
-            fail(f"renamed search index has no generated reference: {old_name}")
-    stats["searchFingerprints"] = len(renamed_indexes)
+            fail(f"renamed search resource has no generated reference: {old_name}")
+    stats["searchFingerprints"] = len(renamed_resources)
     return stats
 
 
@@ -3936,11 +3971,11 @@ def _validate_artifact(args: argparse.Namespace) -> None:
         relative_path = path.relative_to(root)
         if "_nav" in relative_path.parts:
             fail(f"private Docs navigation route was rendered: {relative_path}")
-        if path.match("offline-search-index.*.json"):
+        if any(path.match(pattern) for pattern in SEARCH_RESOURCE_PATTERNS):
             parts = path.name.split(".")
             digest = hashlib.md5(path.read_bytes()).hexdigest()
             if len(parts) != 4 or parts[2] != digest:
-                fail(f"stale search index fingerprint: {path.relative_to(root)}")
+                fail(f"stale search resource fingerprint: {path.relative_to(root)}")
             data = json.loads(path.read_text(encoding="utf-8"))
             for item in data:
                 ref = item.get("ref") if isinstance(item, dict) else None
@@ -4042,6 +4077,10 @@ def _validate_artifact(args: argparse.Namespace) -> None:
             fail(f"404 page does not use the interactive OINK shell: {relative}")
         document = DocumentParser()
         document.feed(text)
+        # validate_output_security has already checked the native JSON schema;
+        # its ESM URL still needs the same presence/version check as script[src].
+        for config in MARKMAP_CONFIG_RE.finditer(text):
+            validate_url(json.loads(config.group("body"))["src"], path)
         alias_target = refresh_target(document)
         validate_social_image_metadata(
             document,
@@ -4454,7 +4493,7 @@ def build(args: argparse.Namespace) -> None:
             cwd=assembly,
             check=True,
         )
-        # Keep the exact known LibSass warning visible; reject other diagnostics.
+        # Keep complete Hugo diagnostics visible; every warning is blocking.
         command = [
             hugo,
             "--config",

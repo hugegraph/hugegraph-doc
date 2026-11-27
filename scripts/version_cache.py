@@ -64,7 +64,7 @@ def snapshot(path):
 
 def shared_digest(root):
     paths = {*versioning.SHELL_FILES, *versioning.SHELL_DIRS,
-             *versioning.SHELL_CONTENT_DIRS, "versions.json", "dist", ".htaccess", ".asf.yaml",
+             *versioning.SHELL_CONTENT_DIRS, "versions.json", "toolchain.json", "dist", ".htaccess", ".asf.yaml",
              ".github/actions/setup-site-tools"}
     paths.update(p for p in versioning.SHELL_CONTENT if p.endswith("docs/SUMMARY.md"))
     paths.update("static/" + p for p in (*versioning.SHELL_STATIC_FILES, *versioning.SHELL_STATIC_DIRS))

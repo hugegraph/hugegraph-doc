@@ -38,7 +38,7 @@ flowchart TD
 ```markmap
 ---
 markmap:
-  spacingHorizontal: 40
+  levelGap: 40
 ---
 # HugeGraph
 ## server

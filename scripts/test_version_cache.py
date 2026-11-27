@@ -76,6 +76,13 @@ class VersionCacheTests(unittest.TestCase):
         self.write("scripts/test_versioning.py", "changed assertions")
         self.assertEqual(before, self.plan())
 
+    def test_toolchain_pin_changes_invalidate_history(self):
+        before = self.plan()
+        self.write("toolchain.json", '{"hugo":"0.170.1","go":"1.27.4"}')
+        after = self.plan()
+        self.assertNotEqual(before["cacheKey"], after["cacheKey"])
+        self.assertNotEqual(before["cachePrefix"], after["cachePrefix"])
+
     def test_history_sha_only_invalidates_corresponding_version(self):
         before = self.plan()
         self.manifest["versions"][1]["sha"] = "d" * 40

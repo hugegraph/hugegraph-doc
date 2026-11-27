@@ -19,6 +19,8 @@ const states = [
   ["cn-appearance-mobile-dark", "/cn/docs/introduction/", { width: 390, height: 844 }, "dark", "appearance"],
   ["en-paper-desktop-light", "/docs/introduction/", { width: 1440, height: 900 }, "light", "paper"],
   ["cn-paper-mobile-dark", "/cn/docs/introduction/", { width: 390, height: 844 }, "dark", "paper"],
+  ["en-fields-desktop-light", "/docs/config/config-option/", { width: 1440, height: 1000 }, "light", "fields"],
+  ["cn-fields-mobile-dark", "/cn/docs/config/config-option/", { width: 390, height: 844 }, "dark", "fields"],
   ...["en", "cn"].flatMap(language => {
     const prefix = language === "cn" ? "/cn" : "";
     return ["slate", "paper"].flatMap(preset => ["light", "dark"].flatMap(theme => {
@@ -84,6 +86,10 @@ for (const [name, url, viewport, theme, state, preset = "slate"] of states) {
     await expect(page.locator("body")).toBeVisible();
     let sectionHeading;
     if (["gallery", "chart", "longcode", "markmap", "terminal", "math"].includes(state)) {
+      if (state === "markmap") {
+        // The SVG exists only after the native lazy runtime reaches the fence.
+        await page.locator('pre:has(code.language-markmap), div.markmap').first().scrollIntoViewIfNeeded();
+      }
       const selector = { gallery: ".td-gallery", chart: "[data-td-echarts-canvas]",
         longcode: "[data-td-collapse-lines]", markmap: ".markmap svg",
         terminal: "[data-td-asciinema]", math: ".katex-display" }[state];
@@ -109,10 +115,12 @@ for (const [name, url, viewport, theme, state, preset = "slate"] of states) {
         })).toBe(true);
       }
       else if (state === "markmap") {
-        // Ensure the fit animation has settled into legible labels before capture.
-        await expect.poll(() => component.locator("foreignObject").evaluateAll(nodes => nodes.every(node => {
+        // The baseline uses HTML labels; native 1.6 uses SVG text. Check the
+        // real labels in either renderer, never an empty selection.
+        await expect.poll(() => component.locator('foreignObject, [data-key^="node:"] text')
+          .evaluateAll(nodes => nodes.length === 7 && nodes.every(node => {
           const matrix = node.getScreenCTM();
-          const text = node.querySelector("div");
+          const text = node.querySelector("div, tspan");
           const bounds = node.getBoundingClientRect();
           return parseFloat(getComputedStyle(text).fontSize) * Math.hypot(matrix.a, matrix.b) >= 12 &&
             bounds.left >= 0 && bounds.right <= innerWidth;
@@ -137,6 +145,13 @@ for (const [name, url, viewport, theme, state, preset = "slate"] of states) {
       await heading.scrollIntoViewIfNeeded();
       await page.waitForLoadState("networkidle");
       await expect.poll(() => page.evaluate(() => document.documentElement.scrollWidth <= innerWidth + 1)).toBe(true);
+    } else if (state === "fields") {
+      // Match the same real section before (table) and after (native fields).
+      sectionHeading = page.locator('.td-content h3').filter({ hasText: /^Rest Server & API / });
+      await expect(sectionHeading).toHaveCount(1);
+      await sectionHeading.scrollIntoViewIfNeeded();
+      await expect(page.locator('.td-content table, .td-content .td-fields')
+        .filter({ hasText: 'restserver.connection_max_requests' })).toHaveCount(1);
     } else if (state === "pd") {
       // Content-based selection works for both the old local class and native wide tables.
       const table = page.locator(".td-content table").filter({ hasText: "HG_PD_AUTH_SECRET_KEY" });
@@ -232,7 +247,7 @@ for (const [name, url, viewport, theme, state, preset = "slate"] of states) {
       animations: "disabled",
       path: path.join(directory, `${name}.png`),
       fullPage: !["duo", "duo-mobile", "gallery", "chart", "longcode", "markmap", "terminal", "math",
-        "pd", "computer", "config-api", "helm", "footer", "hubble-import", "hubble-nodes"].includes(state)
+        "fields", "pd", "computer", "config-api", "helm", "footer", "hubble-import", "hubble-nodes"].includes(state)
     });
     if (sectionHeading) {
       expect(await sectionHeading.evaluate(node => Math.abs(node.getBoundingClientRect().top - 108))).toBeLessThan(2);

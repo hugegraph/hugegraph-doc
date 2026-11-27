@@ -28,7 +28,7 @@ search_boost: 1.5
 | resultIterationBatchSize  | 64                                                                                                           | 流式返回结果集时，每批返回的结果条数。                                     |
 | ssl.enabled               | false                                                                                                        | Gremlin Server 是否启用 TLS。                                              |
 | authentication            | 未配置                                                                                                        | 启用认证时配置认证器、处理器和 `rest-server.properties` 路径。                   |
-{.td-table--wide}
+{.fields}
 
 ### Rest Server & API 配置项
 
@@ -76,7 +76,7 @@ search_boost: 1.5
 | memory_monitor.period                  | 2000                                             | The period in ms of JVM memory usage monitoring, in each period we will detect the jvm memory usage and take corresponding actions.                                                                            |
 | log.slow_query_threshold               | 1000                                             | The threshold time(ms) of logging slow query, 0 means logging slow query is disabled.                                                                                                                          |
 | log.slow_query_body_limit              | 512                                              | 慢查询日志记录的请求体最大字节数，0 表示不记录。记录的前缀原样写入，可能包含敏感的 Gremlin 或 Cypher 字面量。                      |
-{.wide .expand}
+{.fields}
 
 角色选举配置项 `server.role_election` 和 `server.role.*` 仅适用于 1.7.0 及更早版本。之后的版本不再读取这些配置项：若仍然设置，服务可以正常启动，并为每个配置项输出一条警告日志。
 
@@ -96,7 +96,7 @@ search_boost: 1.5
 | meta.ca              |                       | The ca file of meta server.                                     |
 | meta.client_ca       |                       | The client ca file of meta server.                              |
 | meta.client_key      |                       | The client key file of meta server.                             |
-{.td-table--wide}
+{.fields}
 
 HStore 后端还会从图配置文件 `{graph-name}.properties` 中读取以下两项，默认值 0 表示由 PD 决定：
 
@@ -194,7 +194,7 @@ HStore 后端还会从图配置文件 `{graph-name}.properties` 中读取以下�
 | memory.max_capacity                   | 1073741824                                   | The maximum memory capacity in bytes that can be managed for all queries in HugeGraph.                                                                                                                                                                                                                                                                                                                                                                                                                                                                           |
 | memory.one_query_max_capacity         | 104857600                                    | The maximum memory capacity in bytes that can be managed for a query in HugeGraph.                                                                                                                                                                                                                                                                                                                                                                                                                                                                               |
 | memory.alignment                      | 8                                            | The alignment used for round memory size.                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                        |
-{.td-table--wide}
+{.wide .expand}
 
 > [!DETAILS]- **Raft 配置项 (已废弃)**
 > 发行包中的图配置模板已将这些配置项标注为废弃。它们仅在 `raft.mode=true` 时生效，且 `raft.group_peers` 从 `rest-server.properties` 读取，而不是图配置文件。

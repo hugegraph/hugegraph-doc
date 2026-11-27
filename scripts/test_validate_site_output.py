@@ -66,7 +66,7 @@ class SiteOutputSecurityTest(unittest.TestCase):
         fixtures = (
             (
                 "docs/config/index.html",
-                '<nav id="TableOfContents" aria-label="Content"></nav>',
+                '<nav id="TableOfContents" aria-label="On this page"></nav>',
             ),
             (
                 "cn/docs/config/index.html",
@@ -96,18 +96,18 @@ class SiteOutputSecurityTest(unittest.TestCase):
             (
                 '<nav id="TableOfContents"></nav>',
                 "docs/config/index.html: TableOfContents nav must have exactly one "
-                "localized aria-label 'Content', found []",
+                "localized aria-label 'On this page', found []",
             ),
             (
-                '<nav id="TableOfContents" aria-label="Content"></nav>',
+                '<nav id="TableOfContents" aria-label="On this page"></nav>',
                 "cn/docs/config/index.html: TableOfContents nav must have exactly one "
-                "localized aria-label '目录', found ['Content']",
+                "localized aria-label '目录', found ['On this page']",
             ),
             (
-                '<nav id="TableOfContents" aria-label="Content" '
-                'aria-label="Content"></nav>',
+                '<nav id="TableOfContents" aria-label="On this page" '
+                'aria-label="On this page"></nav>',
                 "docs/config/index.html: TableOfContents nav must have exactly one "
-                "localized aria-label 'Content', found ['Content', 'Content']",
+                "localized aria-label 'On this page', found ['On this page', 'On this page']",
             ),
         )
         for fragment, expected in fixtures:
@@ -707,10 +707,24 @@ class SiteOutputSecurityTest(unittest.TestCase):
                                json.dumps(option).replace("<", "\\u003c") + '</script>')
                 self.assertEqual(bool(VALIDATOR.document_security_errors(parser, "index.html", BASE)), rejected)
 
+    def test_markmap_esm_source_and_split_search_body_remain_local(self) -> None:
+        for source in ["/third_party/markmap/markmap.abc123.js", "/versions/1.7/third_party/markmap/markmap.abc123.js"]:
+            fragment = '<script type="application/json" data-td-markmap-config>' + json.dumps({"src": source}) + '</script>'
+            parser = parse(fragment)
+            self.assertEqual(VALIDATOR.document_security_errors(parser, "index.html", BASE), [])
+            self.assertIn(("script", "src", source), parser.resources)
+            self.assertIn(("src", source), parser.urls)
+        for payload in [{"src": "https://evil.example/map.js"}, {"src": "/uploads/arbitrary.js"},
+                        {"src": "/third_party/markmap/markmap.js", "extraJs": []}, {"src": ["/safe.js"]}]:
+            fragment = '<script type="application/json" data-td-markmap-config>' + json.dumps(payload) + '</script>'
+            self.assertTrue(VALIDATOR.document_security_errors(parse(fragment), "index.html", BASE))
+        fragment = '<div data-td-body-src="https://evil.example/search.json"></div>'
+        self.assertTrue(VALIDATOR.document_security_errors(parse(fragment), "index.html", BASE))
+
     def test_enabled_markmap_uses_explicit_plain_text_contract(self) -> None:
         import html
-        runtime = '<script src="/third_party/markmap/markmap-autoloader.hash.js"></script>'
-        plain = "---\n# layout comment\nmarkmap:\n  spacingHorizontal: 40 # layout\n---\n# HugeGraph\n- server\n- `core`"
+        runtime = '<script src="/js/chunks/markmap-en.hash.js"></script>'
+        plain = "---\n# layout comment\nmarkmap:\n  levelGap: 40 # layout\n---\n# HugeGraph\n- server\n- `core`"
         for source in [plain, "# Outline\n- `![image](https://evil.example/code.png)`", "# Outline\n```text\n![image](https://evil.example/code.png)\n```", "# Outline\n- &lt;img src=/literal&gt;"]:
             parser = parse('<pre><code class="language-markmap">' + html.escape(source) + '</code></pre>' + runtime)
             self.assertEqual(VALIDATOR.document_security_errors(parser, "index.html", BASE), [], source)
@@ -741,12 +755,12 @@ class SiteOutputSecurityTest(unittest.TestCase):
             (root / "content").mkdir()
             sources = [
                 ("# HugeGraph\n- server\n- core", False),
-                ("---\nmarkmap:\n  spacingHorizontal: 40\n---\n# HugeGraph\n- server", False),
+                ("---\nmarkmap:\n  levelGap: 40\n---\n# HugeGraph\n- server", False),
                 ("# Parent\n- ![image](/img/local.png)", True),
                 ("# Parent\n- ![image][ref]\n\n[ref]: https://evil.example/ref.png", True),
-                # This pinned hook double-escapes raw HTML; textContent still
-                # contains &lt; so MarkdownIt renders literal text, not an img.
-                ("# Parent\n- <img src=/local.png onerror=evil()>", False),
+                # The native source carrier now preserves raw source after one
+                # HTML decode, so the plain-text policy must reject markup.
+                ("# Parent\n- <img src=/local.png onerror=evil()>", True),
                 ("---\nmarkmap:\n  extraJs: [/local.js]\n---\n# Parent", True),
                 ("# Parent\n- `![image](https://evil.example/code.png)`", False),
             ]

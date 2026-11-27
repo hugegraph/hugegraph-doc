@@ -2,7 +2,7 @@
 
 [![Ask DeepWiki](https://img.shields.io/badge/Ask-DeepWiki-blue)](https://deepwiki.com/apache/hugegraph-doc)
 [![License](https://img.shields.io/badge/License-Apache%202.0-blue.svg)](LICENSE)
-[![Hugo](https://img.shields.io/badge/Hugo-Extended-ff4088?logo=hugo)](https://gohugo.io/)
+[![Hugo](https://img.shields.io/badge/Hugo-native_CSS-ff4088?logo=hugo)](https://gohugo.io/)
 [![OINK theme version](https://img.shields.io/badge/dynamic/regex?url=https%3A%2F%2Fraw.githubusercontent.com%2Fapache%2Fhugegraph-doc%2Frefs%2Fheads%2Fmaster%2Fgo.mod&search=github%5C.com%2Fpgsty%2Foink%5Cs%2B%28v%5CS%2B%29&replace=%241&label=OINK&color=blue)](go.mod)
 
 ---
@@ -17,9 +17,9 @@ For the HugeGraph database project, visit [apache/hugegraph](https://github.com/
 
 Only **3 steps** are needed to run the documentation website locally.
 
-**Prerequisites:** Go 1.27.3+ and [Hugo Extended](https://github.com/gohugoio/hugo/releases) 0.168.0.
-Hugo's built-in LibSass compiles the site; no standalone Sass installation is needed. CI pins the supported toolchain in
-`.github/workflows/hugo.yml`. Node.js and npm are needed only for browser tests; the site has no npm build step or vendored theme checkout.
+**Prerequisites:** Install the Go and [Hugo](https://github.com/gohugoio/hugo/releases) versions pinned in [toolchain.json](toolchain.json).
+The site uses native CSS and standard Hugo, with no Sass compiler. Node.js and npm are needed only for browser tests;
+the site has no npm build step or vendored theme checkout.
 
 ```bash
 # 1. Clone repository
@@ -105,8 +105,8 @@ For theme updates, compatibility review and rollback, use the [OINK upgrade SOP]
 
 只需 **3 步**即可在本地启动文档网站。
 
-**前置条件：** Go 1.27.3+、[Hugo Extended](https://github.com/gohugoio/hugo/releases) 0.168.0。
-Hugo 使用内置 LibSass 编译站点，无需单独安装 Sass。CI 在 `.github/workflows/hugo.yml` 中固定受支持的工具链。
+**前置条件：** 安装 [toolchain.json](toolchain.json) 固定的 Go 和 [Hugo](https://github.com/gohugoio/hugo/releases) 版本。
+站点使用原生 CSS 和标准版 Hugo，无需 Sass 编译器。
 Node.js 和 npm 仅用于浏览器测试；站点没有 npm 构建步骤，也不需要检出到仓库内的主题副本。
 
 ```bash
